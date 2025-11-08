@@ -49,9 +49,9 @@ export const featuredMovies: Movie[] = [
     year: 2022,
     duration: "1h 37m",
     rating: 4.2,
-    thumbnail: "/posters/parallel-laughter.jpg",
+    thumbnail: "https://lh3.googleusercontent.com/pw/AP1GczPun242vmKuOphKEcCYpbkLH14tzc3six1GjNfdJGT1M3EoY74STgJ9tv9H44Ii7w5in5RHm6HpMIuTwoIsehniqNBrPGr_BrI_9rV4483ZsSnND43aR5AVkve03SqEpuBXqadcQcdqVtrcvrkd1T4=w948-h948-s-no-gm?authuser=0",
     poster:
-      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80",
+      "https://lh3.googleusercontent.com/pw/AP1GczPun242vmKuOphKEcCYpbkLH14tzc3six1GjNfdJGT1M3EoY74STgJ9tv9H44Ii7w5in5RHm6HpMIuTwoIsehniqNBrPGr_BrI_9rV4483ZsSnND43aR5AVkve03SqEpuBXqadcQcdqVtrcvrkd1T4=w948-h948-s-no-gm?authuser=0",
     tags: ["Hài hước", "Giả tưởng"],
     moods: ["Hài hước", "Khoa học viễn tưởng"],
     cast: ["Ryan Reynolds", "Awkwafina", "John Boyega"],
