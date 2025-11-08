@@ -1,33 +1,17 @@
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
-
-const cards = [
-  {
-    title: "Phim đang phát hành",
-    value: "128",
-    delta: "+8 phim mới",
-    badge: "Cần duyệt 3 poster",
-  },
-  {
-    title: "Người dùng hoạt động",
-    value: "24,560",
-    delta: "+12% MoM",
-    badge: "5 tài khoản bị báo cáo",
-  },
-  {
-    title: "Tỉ lệ hài lòng AI",
-    value: "92%",
-    delta: "+4% tuần này",
-    badge: "Dựa trên 1.200 rating",
-  },
-];
+import { useFetch } from "../../hooks/useFetch";
+import type { AdminStatsResponse } from "../../types/api";
 
 export function AdminDashboardPage() {
+  const { data, loading, error } = useFetch<AdminStatsResponse>("/admin/stats");
+  const cards = data?.metrics ?? [];
+
   return (
     <div className="space-y-10">
       <PageHeader
         title="Trung tâm quản trị"
-        description="Giám sát dữ liệu phim, người dùng và hiệu suất AI. Các con số đang mô phỏng để minh hoạ giao diện."
+        description="Giám sát dữ liệu phim, người dùng và hiệu suất AI. Số liệu lấy từ API admin."
         actions={
           <div className="flex gap-3">
             <Link
@@ -47,15 +31,18 @@ export function AdminDashboardPage() {
       />
 
       <section className="grid gap-6 md:grid-cols-3">
+        {loading && <p className="text-slate-400">Đang tải thống kê…</p>}
+        {error && <p className="text-red-400">Không tải được: {error}</p>}
         {cards.map((card) => (
           <div
-            key={card.title}
+            key={card.label}
             className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25"
           >
-            <p className="text-sm text-slate-300">{card.title}</p>
+            <p className="text-sm text-slate-300">{card.label}</p>
             <p className="mt-3 text-3xl font-bold text-white">{card.value}</p>
-            <p className="mt-2 text-xs text-emerald-300">{card.delta}</p>
-            <p className="mt-4 text-xs text-slate-400">{card.badge}</p>
+            <p className="mt-2 text-xs text-emerald-300">
+              Dữ liệu thời gian thực
+            </p>
           </div>
         ))}
       </section>
@@ -87,6 +74,22 @@ export function AdminDashboardPage() {
           </p>
         </div>
       </section>
+
+      {data?.topMoods?.length ? (
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
+          <p className="text-sm font-semibold text-white">Top mood hiện tại</p>
+          <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-300">
+            {data.topMoods.map((item) => (
+              <span
+                key={item.mood}
+                className="rounded-full border border-white/10 px-4 py-1 text-white"
+              >
+                {item.mood}: {item.total} phim
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

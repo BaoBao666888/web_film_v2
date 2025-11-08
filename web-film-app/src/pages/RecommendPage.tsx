@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
-import { aiPlaylists, featuredMovies } from "../data/movies";
 import { PageHeader } from "../components/PageHeader";
+import { aiPlaylists, featuredMovies } from "../data/movies";
+import { useFetch } from "../hooks/useFetch";
+import type { RecommendationResponse } from "../types/api";
 
 const roadmapItems = [
   {
@@ -21,11 +23,17 @@ const roadmapItems = [
 ];
 
 export function RecommendPage() {
+  const { data, loading, error } = useFetch<RecommendationResponse>(
+    "/ai/recommendations"
+  );
+  const movies = data?.items ?? featuredMovies;
+  const playlists = data?.playlists ?? aiPlaylists;
+
   return (
     <div className="space-y-10">
       <PageHeader
         title="Gợi ý phim AI"
-        description="Playlist demo hiển thị cách hệ thống sẽ phân nhóm film theo mood và hành vi người dùng. Ghi chú roadmap mô tả các bước hoàn thiện."
+        description="Playlist này lấy trực tiếp từ API hybrid recommendation (demo). Khi gắn model thật, chỉ cần thay đổi service AI là front hoạt động."
       />
 
       <section className="grid gap-6 md:grid-cols-[1fr_0.9fr]">
@@ -37,8 +45,10 @@ export function RecommendPage() {
             Dựa trên mood “cần phiêu lưu nhẹ nhàng” + lịch sử xem gần đây.
             Hệ thống sẽ cập nhật theo rating mới nhất của bạn.
           </p>
+          {loading && <p className="text-slate-400">Đang tính toán playlist…</p>}
+          {error && <p className="text-red-400">Lỗi: {error}</p>}
           <div className="grid gap-5 md:grid-cols-2">
-            {featuredMovies.map((movie) => (
+            {movies.map((movie) => (
               <div
                 key={movie.id}
                 className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-dark/60 backdrop-blur transition hover:border-primary/80"
@@ -53,11 +63,11 @@ export function RecommendPage() {
                     {movie.title}
                   </p>
                   <p className="mt-1 text-xs text-slate-300">
-                    {movie.genres.join(" • ")}
+                    {movie.moods?.join(" • ")}
                   </p>
                   <p className="mt-3 flex-1 text-xs text-slate-400">
-                    Ưu tiên do bạn thích {movie.moods[0]} và thường xem vào buổi
-                    tối cuối tuần.
+                    Ưu tiên do bạn thích {movie.moods?.[0] ?? "mood bất kỳ"} và
+                    xem nhiều vào cuối tuần.
                   </p>
                   <Link
                     to={`/movie/${movie.id}`}
@@ -104,7 +114,7 @@ export function RecommendPage() {
           Mood playlist khác
         </h3>
         <div className="mt-5 grid gap-5 md:grid-cols-3">
-          {aiPlaylists.map((playlist) => (
+          {playlists.map((playlist) => (
             <div
               key={playlist.id}
               className={`rounded-3xl border border-white/10 bg-gradient-to-br ${playlist.gradient} p-6 shadow-lg shadow-black/25`}

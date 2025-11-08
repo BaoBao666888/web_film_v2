@@ -1,89 +1,65 @@
-export type MovieMood =
-  | "Hành động"
-  | "Lãng mạn"
-  | "Kinh dị"
-  | "Hài hước"
-  | "Hoạt hình"
-  | "Khoa học viễn tưởng"
-  | "Huyền bí"
-  | "Tài liệu";
-
-export interface Movie {
-  id: string;
-  title: string;
-  year: number;
-  duration: string;
-  genres: string[];
-  description: string;
-  rating: number;
-  moods: MovieMood[];
-  poster: string;
-  thumbnail: string;
-  cast: string[];
-  director: string;
-  trailerUrl?: string;
-  isTrending?: boolean;
-  isNew?: boolean;
-}
+import type { Movie, Playlist } from "../types/api";
 
 export const featuredMovies: Movie[] = [
   {
     id: "nightfall-echoes",
+    slug: "nightfall-echoes",
     title: "Nightfall Echoes",
+    synopsis:
+      "Một đặc vụ điều tra những âm vang bí ẩn trong không gian và phát hiện ra bí mật có thể thay đổi lịch sử nhân loại.",
     year: 2024,
     duration: "2h 08m",
-    genres: ["Hành động", "Khoa học viễn tưởng"],
-    description:
-      "Một đặc vụ điều tra những âm vang bí ẩn trong không gian và phát hiện ra bí mật có thể thay đổi lịch sử nhân loại.",
     rating: 4.7,
-    moods: ["Hành động", "Huyền bí"],
-    poster:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=400&q=80",
     thumbnail:
       "https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?auto=format&fit=crop&w=600&q=80",
+    poster:
+      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80",
+    trailerUrl: "https://www.youtube.com/watch?v=XfR9iY5y94s",
+    videoUrl:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    tags: ["Hành động", "Khoa học viễn tưởng"],
+    moods: ["Hành động", "Huyền bí"],
     cast: ["Liam Anderson", "Zoey Carter", "Ken Watanabe"],
     director: "Aurora Lang",
-    trailerUrl: "https://www.youtube.com/watch?v=XfR9iY5y94s",
-    isTrending: true,
   },
   {
     id: "echoes-of-sakura",
+    slug: "echoes-of-sakura",
     title: "Echoes of Sakura",
+    synopsis:
+      "Câu chuyện cảm động về hai nghệ sĩ trẻ tìm lại bản thân giữa mùa hoa anh đào Kyoto.",
     year: 2023,
     duration: "1h 52m",
-    genres: ["Lãng mạn", "Drama"],
-    description:
-      "Câu chuyện cảm động về hai nghệ sĩ trẻ tìm lại bản thân giữa những mùa hoa anh đào rực rỡ tại Kyoto.",
     rating: 4.5,
-    moods: ["Lãng mạn"],
-    poster:
-      "https://images.unsplash.com/photo-1526498460520-4c246339dccb?auto=format&fit=crop&w=400&q=80",
     thumbnail:
       "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80",
+    poster:
+      "https://images.unsplash.com/photo-1526498460520-4c246339dccb?auto=format&fit=crop&w=900&q=80",
+    tags: ["Lãng mạn", "Drama"],
+    moods: ["Lãng mạn"],
     cast: ["Haruka Abe", "Kei Tanaka", "Lucy Liu"],
     director: "Naomi Kurosawa",
-    isNew: true,
   },
   {
     id: "parallel-laughter",
+    slug: "parallel-laughter",
     title: "Parallel Laughter",
+    synopsis:
+      "Nhà khoa học kỳ quặc thử mở timeline vui vẻ nhất nhưng vô tình nhân bản chính mình.",
     year: 2022,
     duration: "1h 37m",
-    genres: ["Hài hước", "Giả tưởng"],
-    description:
-      "Một nhà khoa học chế tạo cỗ máy mở ra các dòng thời gian song song để tìm phiên bản hạnh phúc nhất của chính mình.",
     rating: 4.2,
-    moods: ["Hài hước", "Khoa học viễn tưởng"],
+    thumbnail: "/posters/parallel-laughter.jpg",
     poster:
-      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=400&q=80",
-    thumbnail:
-      "/posters/parallel-laughter.jpg",
+      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80",
+    tags: ["Hài hước", "Giả tưởng"],
+    moods: ["Hài hước", "Khoa học viễn tưởng"],
     cast: ["Ryan Reynolds", "Awkwafina", "John Boyega"],
     director: "Dax Shepherd",
   },
 ];
 
-export const aiPlaylists = [
+export const aiPlaylists: Playlist[] = [
   {
     id: "cozy-sci-fi",
     title: "Khoa học viễn tưởng nhẹ nhàng",
@@ -124,7 +100,7 @@ export const chatbotExamples = [
   },
 ];
 
-export const moods: MovieMood[] = [
+export const moods = [
   "Hành động",
   "Lãng mạn",
   "Kinh dị",

@@ -1,7 +1,42 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { api } from "../lib/api";
 
 export function RegisterPage() {
+  const [name, setName] = useState("Nguyễn Minh Anh");
+  const [nickname, setNickname] = useState("minhanh.07");
+  const [email, setEmail] = useState("minhanh@example.com");
+  const [password, setPassword] = useState("123456");
+  const [confirmPassword, setConfirmPassword] = useState("123456");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (password !== confirmPassword) {
+      setStatus("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+    setLoading(true);
+    setStatus(null);
+    try {
+      const response = await api.auth.register({ name, email, password });
+      setStatus(
+        `Tạo tài khoản thành công! ID: ${response.user.id} – hãy đăng nhập để trải nghiệm.`
+      );
+    } catch (err) {
+      setStatus(
+        err instanceof Error
+          ? err.message
+          : "Không thể đăng ký, vui lòng thử lại."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-10">
       <PageHeader
@@ -9,7 +44,10 @@ export function RegisterPage() {
         description="Tạo tài khoản để lưu playlist, đồng bộ thiết bị và nhận gợi ý cá nhân hóa."
       />
 
-      <form className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl shadow-black/30">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl shadow-black/30"
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-400">
@@ -17,6 +55,8 @@ export function RegisterPage() {
             </label>
             <input
               type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
               placeholder="Nguyễn Minh Anh"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
@@ -27,6 +67,8 @@ export function RegisterPage() {
             </label>
             <input
               type="text"
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
               placeholder="minhanh.07"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
@@ -39,6 +81,8 @@ export function RegisterPage() {
           </label>
           <input
             type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             placeholder="ban@domain.com"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
           />
@@ -51,6 +95,8 @@ export function RegisterPage() {
             </label>
             <input
               type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
@@ -61,6 +107,8 @@ export function RegisterPage() {
             </label>
             <input
               type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="••••••••"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
@@ -87,10 +135,11 @@ export function RegisterPage() {
         </div>
 
         <button
-          type="button"
-          className="w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
         >
-          Tạo tài khoản
+          {loading ? "Đang tạo..." : "Tạo tài khoản"}
         </button>
 
         <p className="text-xs text-slate-400">
@@ -99,10 +148,11 @@ export function RegisterPage() {
             Đăng nhập
           </Link>
         </p>
-        <p className="text-[11px] text-slate-500">
-          Ghi chú: Form đăng ký chưa kết nối API. Cần thêm validation client +
-          gửi yêu cầu tới `/auth/register`.
-        </p>
+        {status && (
+          <p className="text-[11px] text-emerald-400">
+            {status}
+          </p>
+        )}
       </form>
     </div>
   );

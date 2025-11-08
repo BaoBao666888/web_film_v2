@@ -1,13 +1,25 @@
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
-import { featuredMovies } from "../../data/movies";
+import { useFetch } from "../../hooks/useFetch";
+import type { AdminMoviesResponse } from "../../types/api";
+import { api } from "../../lib/api";
 
 export function AdminManagePage() {
+  const { data, loading, error, refetch } =
+    useFetch<AdminMoviesResponse>("/admin/movies");
+  const movies = data?.movies ?? [];
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bạn chắc chắn muốn xoá phim này?")) return;
+    await api.movies.delete(id);
+    refetch();
+  };
+
   return (
     <div className="space-y-10">
       <PageHeader
         title="Quản lý phim"
-        description="Danh sách phim hiện có. Từ đây admin có thể sửa, xoá hoặc chuyển sang playlist nổi bật."
+        description="Danh sách phim hiện có. Dữ liệu lấy từ API admin/movies."
         actions={
           <Link
             to="/admin/add-movie"
@@ -30,7 +42,21 @@ export function AdminManagePage() {
             </tr>
           </thead>
           <tbody>
-            {featuredMovies.map((movie) => (
+            {loading && (
+              <tr>
+                <td colSpan={5} className="px-6 py-6 text-center text-slate-400">
+                  Đang tải danh sách phim…
+                </td>
+              </tr>
+            )}
+            {error && (
+              <tr>
+                <td colSpan={5} className="px-6 py-6 text-center text-red-400">
+                  {error}
+                </td>
+              </tr>
+            )}
+            {movies.map((movie) => (
               <tr
                 key={movie.id}
                 className="border-t border-white/10 transition hover:bg-white/5"
@@ -51,17 +77,20 @@ export function AdminManagePage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
-                  {movie.genres.join(", ")}
+                  {movie.tags?.join(", ")}
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">{movie.year}</td>
                 <td className="px-6 py-4 text-xs text-slate-300">
-                  {movie.rating.toFixed(1)}
+                  {movie.rating?.toFixed(1)}
                 </td>
                 <td className="px-6 py-4 text-right text-xs">
                   <button className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary">
                     Sửa
                   </button>
-                  <button className="rounded-full border border-red-400/40 px-3 py-1 text-red-300 hover:bg-red-500/10">
+                  <button
+                    onClick={() => handleDelete(movie.id)}
+                    className="rounded-full border border-red-400/40 px-3 py-1 text-red-300 hover:bg-red-500/10"
+                  >
                     Xoá
                   </button>
                 </td>
@@ -72,8 +101,8 @@ export function AdminManagePage() {
       </div>
 
       <p className="text-xs text-slate-500">
-        Ghi chú: Các nút Sửa/Xoá sẽ gọi API tương ứng. Hiện tại hiển thị bảng
-        demo để kiểm tra giao diện.
+        Ghi chú: Nút xoá đang gọi trực tiếp DELETE /movies/:id. Khi có xác thực
+        admin thật, cần thêm JWT & logs.
       </p>
     </div>
   );

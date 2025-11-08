@@ -11,6 +11,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { LogoutPage } from "./pages/LogoutPage";
+import { WatchPage } from "./pages/WatchPage";
 import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
 import { AdminAddMoviePage } from "./pages/admin/AdminAddMoviePage";
 import { AdminManagePage } from "./pages/admin/AdminManagePage";
@@ -31,6 +32,7 @@ function App() {
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="logout" element={<LogoutPage />} />
+        <Route path="watch/:id" element={<WatchPage />} />
 
         <Route path="admin">
           <Route index element={<AdminDashboardPage />} />

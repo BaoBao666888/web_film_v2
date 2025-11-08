@@ -1,8 +1,27 @@
 import { Link } from "react-router-dom";
-import { aiPlaylists, featuredMovies } from "../data/movies";
 import { StatusBadge } from "../components/StatusBadge";
+import { aiPlaylists, featuredMovies } from "../data/movies";
+import { useFetch } from "../hooks/useFetch";
+import type {
+  MovieListResponse,
+  RecommendationResponse,
+} from "../types/api";
 
 export function HomePage() {
+  const { data: trendingData, loading: trendingLoading } =
+    useFetch<MovieListResponse>("/movies?limit=6");
+  const { data: playlistData } = useFetch<{ items: typeof aiPlaylists }>(
+    "/ai/playlists"
+  );
+  const { data: aiData } = useFetch<RecommendationResponse>(
+    "/ai/recommendations"
+  );
+
+  const trendingMovies = trendingData?.items ?? featuredMovies;
+  const playlists = playlistData?.items ?? aiPlaylists;
+  const heroMovies = trendingMovies.slice(0, 2);
+  const recommendationList = aiData?.items ?? trendingMovies.slice(0, 3);
+
   return (
     <div className="space-y-12">
       <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-secondary/60 to-dark p-10 shadow-xl shadow-black/30">
@@ -32,14 +51,14 @@ export function HomePage() {
               </Link>
             </div>
             <p className="mt-6 text-xs text-slate-400">
-              Ghi chú: Dữ liệu demo để mô phỏng luồng trải nghiệm. Backend sẽ
-              kết nối sau khi hoàn tất giao diện.
+              Ghi chú: API đang chạy ở cổng 4000 — dữ liệu bạn thấy được lấy từ
+              backend Express + JSON DB, có fallback demo nếu API ngắt.
             </p>
           </div>
           <div className="relative">
             <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-3xl" />
             <div className="relative space-y-4">
-              {featuredMovies.slice(0, 2).map((movie) => (
+              {heroMovies.map((movie) => (
                 <article
                   key={movie.id}
                   className="flex items-center gap-4 rounded-2xl bg-white/5 p-4 backdrop-blur"
@@ -54,10 +73,10 @@ export function HomePage() {
                       {movie.title}
                     </p>
                     <p className="text-xs text-slate-300">
-                      {movie.genres.join(" • ")} · {movie.duration}
+                      {movie.moods?.join(" • ") || movie.duration}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {movie.moods.map((mood) => (
+                      {movie.moods?.map((mood) => (
                         <span
                           key={mood}
                           className="rounded-full bg-white/10 px-3 py-1 text-[10px] uppercase tracking-wide text-slate-200"
@@ -87,7 +106,10 @@ export function HomePage() {
           </Link>
         </div>
         <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredMovies.map((movie) => (
+          {trendingLoading && (
+            <p className="text-slate-400">Đang tải phim trending…</p>
+          )}
+          {trendingMovies.map((movie) => (
             <Link
               to={`/movie/${movie.id}`}
               key={movie.id}
@@ -100,23 +122,21 @@ export function HomePage() {
               />
               <div className="space-y-2 p-5">
                 <div className="flex items-center gap-2">
-                  {movie.isTrending && (
-                    <StatusBadge label="Hot" tone="warning" />
-                  )}
-                  {movie.isNew && <StatusBadge label="Mới" tone="success" />}
+                  <StatusBadge
+                    label={`${movie.rating?.toFixed(1) ?? "4.0"} ★`}
+                    tone="warning"
+                  />
+                  <StatusBadge label={String(movie.year)} tone="info" />
                 </div>
                 <p className="text-lg font-semibold text-white">
                   {movie.title}
                 </p>
-                <p className="text-xs text-slate-300">
-                  {movie.genres.join(" • ")}
-                </p>
-                <p className="text-sm text-slate-200 line-clamp-2">
-                  {movie.description}
+                <p className="text-xs text-slate-300 line-clamp-2">
+                  {movie.synopsis}
                 </p>
                 <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>{movie.year}</span>
-                  <span>{movie.rating.toFixed(1)} ★ IMDb</span>
+                  <span>{movie.duration}</span>
+                  <span>{movie.moods?.slice(0, 2).join(" • ")}</span>
                 </div>
               </div>
             </Link>
@@ -135,7 +155,7 @@ export function HomePage() {
           </Link>
         </div>
         <div className="mt-6 grid gap-5 md:grid-cols-3">
-          {aiPlaylists.map((playlist) => (
+          {playlists.map((playlist) => (
             <div
               key={playlist.id}
               className={`relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br ${playlist.gradient} p-6 shadow-lg shadow-black/20`}
@@ -152,6 +172,44 @@ export function HomePage() {
                 className="mt-5 inline-flex items-center text-sm font-medium text-white transition hover:text-dark/80"
               >
                 Mở playlist →
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h3 className="text-2xl font-semibold text-white">
+            AI đề xuất riêng cho bạn
+          </h3>
+          <Link
+            to="/recommend"
+            className="text-sm text-slate-300 transition hover:text-primary"
+          >
+            Xem thêm
+          </Link>
+        </div>
+        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+          {recommendationList.map((movie) => (
+            <div
+              key={`rec-${movie.id}`}
+              className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/25"
+            >
+              <p className="text-xs uppercase tracking-wide text-slate-400">
+                Gợi ý dựa trên mood của bạn
+              </p>
+              <p className="mt-3 text-lg font-semibold text-white">
+                {movie.title}
+              </p>
+              <p className="mt-2 text-sm text-slate-300 line-clamp-3">
+                {movie.synopsis}
+              </p>
+              <Link
+                to={`/movie/${movie.id}`}
+                className="mt-4 inline-flex items-center text-sm text-primary hover:text-primary/80"
+              >
+                Xem chi tiết →
               </Link>
             </div>
           ))}

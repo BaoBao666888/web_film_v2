@@ -1,46 +1,43 @@
+import { useMemo, useState } from "react";
 import { PageHeader } from "../../components/PageHeader";
-
-const users = [
-  {
-    name: "Minh Anh",
-    email: "minhanh@example.com",
-    role: "User",
-    status: "Hoạt động",
-    joined: "12/08/2024",
-  },
-  {
-    name: "Trung Kiên",
-    email: "kien.trung@example.com",
-    role: "Admin",
-    status: "Hoạt động",
-    joined: "05/03/2023",
-  },
-  {
-    name: "Ngọc Hân",
-    email: "han.ngoc@example.com",
-    role: "User",
-    status: "Tạm khoá",
-    joined: "29/06/2024",
-  },
-];
+import { useFetch } from "../../hooks/useFetch";
+import type { AdminUsersResponse } from "../../types/api";
 
 export function AdminUsersPage() {
+  const { data, loading, error } = useFetch<AdminUsersResponse>("/admin/users");
+  const [search, setSearch] = useState("");
+
+  const users = useMemo(() => {
+    const list = data?.users ?? [];
+    if (!search.trim()) return list;
+    return list.filter(
+      (user) =>
+        user.name.toLowerCase().includes(search.toLowerCase()) ||
+        user.email.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [data?.users, search]);
+
   return (
     <div className="space-y-10">
       <PageHeader
         title="Quản lý người dùng"
-        description="Giám sát tài khoản và phân quyền. Dữ liệu bên dưới là demo để trình bày UI."
+        description="Giám sát tài khoản và phân quyền. Danh sách dưới đây lấy từ API admin/users."
       />
 
       <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/30">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-2">
             <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Tìm theo tên, email..."
               className="w-72 rounded-full border border-white/10 bg-dark/60 px-4 py-2 text-sm text-white placeholder:text-slate-500"
             />
-            <button className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary">
-              Tìm
+            <button
+              onClick={() => setSearch("")}
+              className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
+            >
+              Xoá lọc
             </button>
           </div>
           <button className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary">
@@ -61,6 +58,20 @@ export function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-6 text-center text-slate-400">
+                    Đang tải người dùng…
+                  </td>
+                </tr>
+              )}
+              {error && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-6 text-center text-red-400">
+                    {error}
+                  </td>
+                </tr>
+              )}
               {users.map((user) => (
                 <tr
                   key={user.email}
@@ -74,10 +85,12 @@ export function AdminUsersPage() {
                     {user.role}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-300">
-                    {user.status}
+                    Hoạt động
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-400">
-                    {user.joined}
+                    {user.created_at
+                      ? new Date(user.created_at).toLocaleDateString("vi-VN")
+                      : "..."}
                   </td>
                   <td className="px-6 py-4 text-right text-xs">
                     <button className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary">

@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { featuredMovies, moods } from "../data/movies";
 import { PageHeader } from "../components/PageHeader";
+import { featuredMovies, moods } from "../data/movies";
+import { useFetch } from "../hooks/useFetch";
+import type { MovieListResponse, Movie } from "../types/api";
 
 const quickQueries = [
   "Phim hành động nhẹ nhàng",
@@ -11,18 +14,42 @@ const quickQueries = [
 ];
 
 export function SearchPage() {
-  const results = useMemo(() => featuredMovies.slice(0, 3), []);
+  const [inputValue, setInputValue] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const { data, loading, error } = useFetch<MovieListResponse>(
+    keyword
+      ? `/movies?q=${encodeURIComponent(keyword)}`
+      : "/movies?limit=6",
+    [keyword]
+  );
+
+  const results = useMemo<Movie[]>(() => {
+    if (data?.items?.length) {
+      return data.items;
+    }
+    return featuredMovies.slice(0, 3);
+  }, [data]);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setKeyword(inputValue.trim());
+  };
+
+  const handleQuickQuery = (value: string) => {
+    setInputValue(value);
+    setKeyword(value);
+  };
 
   return (
     <div className="space-y-10">
       <PageHeader
         title="Tìm kiếm thông minh"
-        description="Nhập từ khóa hoặc mô tả tự nhiên để AI hiểu chính xác mood bạn muốn. Dữ liệu demo giúp mô phỏng trải nghiệm trước khi kết nối API NLP."
+        description="Nhập từ khóa hoặc mô tả tự nhiên để AI hiểu chính xác mood bạn muốn. Dữ liệu đang lấy trực tiếp từ API /movies và sẽ nâng cấp semantic search sau."
       />
 
       <section className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-          <div>
+          <form onSubmit={handleSubmit}>
             <label htmlFor="query" className="text-sm text-slate-300">
               Câu truy vấn / từ khóa
             </label>
@@ -31,17 +58,22 @@ export function SearchPage() {
                 id="query"
                 name="query"
                 placeholder="Ví dụ: 'Tôi muốn xem phim trinh thám căng thẳng nhưng kết thúc lạc quan'"
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
                 className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
               />
-              <button className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-dark transition hover:bg-primary/90">
+              <button
+                type="submit"
+                className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-dark transition hover:bg-primary/90"
+              >
                 Tìm kiếm
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Ghi chú: Sẽ kết nối API semantic search. Hiện tại form mô phỏng
-              UI, chưa gửi request.
+              Từ khóa sẽ gọi API `/movies`. Khi chưa nhập gì, hệ thống hiển thị
+              đề xuất mặc định từ backend.
             </p>
-          </div>
+          </form>
 
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -51,6 +83,7 @@ export function SearchPage() {
               {quickQueries.map((query) => (
                 <button
                   key={query}
+                  onClick={() => handleQuickQuery(query)}
                   className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200 transition hover:border-primary hover:text-primary"
                 >
                   {query}
@@ -67,6 +100,7 @@ export function SearchPage() {
               {moods.map((mood) => (
                 <span
                   key={mood}
+                  onClick={() => handleQuickQuery(mood)}
                   className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200"
                 >
                   #{mood}
@@ -97,9 +131,18 @@ export function SearchPage() {
       </section>
 
       <section>
-        <h3 className="text-lg font-semibold text-white">
-          Kết quả nổi bật (demo)
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">
+            Kết quả tìm kiếm
+          </h3>
+          {keyword && (
+            <p className="text-xs text-slate-400">
+              Từ khóa: <span className="text-white">{keyword}</span>
+            </p>
+          )}
+        </div>
+        {loading && <p className="text-slate-400">Đang tìm kiếm…</p>}
+        {error && <p className="text-red-400">Lỗi: {error}</p>}
         <div className="mt-5 grid gap-5 md:grid-cols-3">
           {results.map((movie) => (
             <article
@@ -116,10 +159,10 @@ export function SearchPage() {
                   {movie.title}
                 </p>
                 <p className="mt-1 text-xs text-slate-300">
-                  {movie.genres.join(" • ")}
+                  {movie.moods?.join(" • ")}
                 </p>
                 <p className="mt-3 flex-1 text-sm text-slate-200">
-                  {movie.description}
+                  {movie.synopsis}
                 </p>
                 <Link
                   to={`/movie/${movie.id}`}

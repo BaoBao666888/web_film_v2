@@ -1,32 +1,21 @@
 import { PageHeader } from "../../components/PageHeader";
-
-const stats = [
-  {
-    label: "Lượt xem trong ngày",
-    value: "58,240",
-    sub: "+9% so với hôm qua",
-  },
-  {
-    label: "Playlist AI được mở",
-    value: "7,420",
-    sub: "+14% tuần này",
-  },
-  {
-    label: "Đánh giá cảm xúc tích cực",
-    value: "76%",
-    sub: "+6% kể từ khi cập nhật gợi ý mới",
-  },
-];
+import { useFetch } from "../../hooks/useFetch";
+import type { AdminStatsResponse } from "../../types/api";
 
 export function AdminStatsPage() {
+  const { data, loading, error } = useFetch<AdminStatsResponse>("/admin/stats");
+  const stats = data?.metrics ?? [];
+
   return (
     <div className="space-y-10">
       <PageHeader
         title="Thống kê & phân tích"
-        description="Biểu diễn dữ liệu AI Recommendation và phản hồi người dùng. Số liệu mẫu để minh hoạ UI."
+        description="Biểu diễn dữ liệu AI Recommendation và phản hồi người dùng. Dữ liệu lấy trực tiếp từ API admin/stats."
       />
 
       <section className="grid gap-6 md:grid-cols-3">
+        {loading && <p className="text-slate-400">Đang tải...</p>}
+        {error && <p className="text-red-400">{error}</p>}
         {stats.map((item) => (
           <div
             key={item.label}
@@ -36,7 +25,9 @@ export function AdminStatsPage() {
               {item.label}
             </p>
             <p className="mt-3 text-3xl font-bold text-white">{item.value}</p>
-            <p className="mt-2 text-xs text-emerald-300">{item.sub}</p>
+            <p className="mt-2 text-xs text-emerald-300">
+              Dữ liệu cập nhật gần nhất
+            </p>
           </div>
         ))}
       </section>
@@ -47,13 +38,22 @@ export function AdminStatsPage() {
             Biểu đồ cảm xúc (demo)
           </p>
           <div className="flex h-64 items-end gap-3 rounded-2xl border border-white/5 bg-dark/60 p-6">
-            {[50, 80, 65, 90, 72].map((height, idx) => (
+            {(data?.topMoods ?? []).length === 0 && (
+              <p className="text-xs text-slate-500">
+                Chưa có dữ liệu mood. Khi người dùng xem/đánh giá nhiều hơn,
+                biểu đồ sẽ hiện tại đây.
+              </p>
+            )}
+            {(data?.topMoods ?? []).map((mood, idx) => (
               <div key={idx} className="flex w-14 flex-col items-center gap-2">
                 <div
                   className="w-full rounded-full bg-primary"
-                  style={{ height: `${height}%`, minHeight: "40px" }}
+                  style={{
+                    height: `${Math.min(100, mood.total * 10)}%`,
+                    minHeight: "40px",
+                  }}
                 />
-                <p className="text-[10px] text-slate-400">Tuần {idx + 1}</p>
+                <p className="text-[10px] text-slate-400">{mood.mood}</p>
               </div>
             ))}
           </div>
