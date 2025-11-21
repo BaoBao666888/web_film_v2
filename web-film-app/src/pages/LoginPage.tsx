@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { api } from "../lib/api";
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("minhanh@example.com");
   const [password, setPassword] = useState("123456");
   const [loading, setLoading] = useState(false);
@@ -16,9 +17,18 @@ export function LoginPage() {
     setStatus(null);
     try {
       const response = await api.auth.login({ email, password });
-      setStatus(
-        `Xin chào ${response.user.name}! Token: ${response.token.slice(0, 12)}...`
-      );
+
+      // Lưu thông tin đăng nhập vào localStorage
+      localStorage.setItem("authToken", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      setStatus(`Đăng nhập thành công! Xin chào ${response.user.name}`);
+
+      // Redirect về trang chủ và reload sau 1.5 giây
+      setTimeout(() => {
+        navigate("/", { replace: true });
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setStatus(
         err instanceof Error ? err.message : "Đăng nhập thất bại, thử lại."
@@ -45,8 +55,8 @@ export function LoginPage() {
           </label>
           <input
             type="email"
-             value={email}
-             onChange={(event) => setEmail(event.target.value)}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             placeholder="ban@domain.com"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
           />
@@ -57,15 +67,18 @@ export function LoginPage() {
           </label>
           <input
             type="password"
-             value={password}
-             onChange={(event) => setPassword(event.target.value)}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
             placeholder="••••••••"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
           />
         </div>
         <div className="flex items-center justify-between text-xs text-slate-400">
           <label className="flex items-center gap-2">
-            <input type="checkbox" className="h-4 w-4 rounded border-white/20 bg-dark/70" />
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-white/20 bg-dark/70"
+            />
             Ghi nhớ đăng nhập
           </label>
           <Link to="#" className="text-primary">
@@ -86,9 +99,15 @@ export function LoginPage() {
           </Link>
         </p>
         {status && (
-          <p className="text-[11px] text-emerald-400">
+          <div
+            className={`p-3 rounded-xl text-sm ${
+              status.includes("thành công")
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                : "bg-red-500/20 text-red-400 border border-red-500/30"
+            }`}
+          >
             {status}
-          </p>
+          </div>
         )}
       </form>
     </div>

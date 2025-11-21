@@ -2,17 +2,32 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { featuredMovies } from "../data/movies";
 import { useFetch } from "../hooks/useFetch";
+import { useAuth } from "../hooks/useAuth";
 import type { ProfileResponse } from "../types/api";
 
-const DEFAULT_USER_ID = "demo-user";
-
 export function ProfilePage() {
+  const { user: authUser } = useAuth();
   const { data, loading, error } = useFetch<ProfileResponse>(
-    `/auth/profile/${DEFAULT_USER_ID}`
+    authUser?.id ? `/auth/profile/${authUser.id}` : null
   );
-  const user = data?.user;
+  const user = data?.user || authUser;
   const favorites = data?.favorites?.length ? data.favorites : featuredMovies;
   const history = data?.history ?? [];
+
+  // Nếu chưa đăng nhập, redirect về login
+  if (!authUser) {
+    return (
+      <div className="rounded-3xl border border-orange-400/30 bg-orange-500/10 p-10 text-center">
+        <p className="text-orange-200 mb-4">Bạn cần đăng nhập để xem hồ sơ</p>
+        <Link
+          to="/login"
+          className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
+        >
+          Đăng nhập ngay
+        </Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return <p>Đang tải hồ sơ…</p>;
@@ -25,7 +40,7 @@ export function ProfilePage() {
   return (
     <div className="space-y-10">
       <PageHeader
-        title={`Hồ sơ của ${user?.name ?? "Minh Anh"}`}
+        title={`Hồ sơ của ${user?.name}`}
         description="Thông tin cá nhân, phim yêu thích và lịch sử xem lấy từ API auth."
         actions={
           <Link
@@ -48,38 +63,22 @@ export function ProfilePage() {
               />
             ) : (
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 text-2xl text-primary">
-                {user?.name?.slice(0, 2).toUpperCase() ?? "MA"}
+                {user?.name?.slice(0, 2).toUpperCase()}
               </div>
             )}
             <div>
-              <p className="text-lg font-semibold text-white">
-                {user?.name ?? "Minh Anh"}
-              </p>
-              <p className="text-xs text-slate-400">
-                {user?.email ?? "minhanh@example.com"}
-              </p>
+              <p className="text-lg font-semibold text-white">{user?.name}</p>
+              <p className="text-xs text-slate-400">{user?.email}</p>
             </div>
           </div>
           <div className="grid gap-3 text-xs text-slate-300">
             <p>
-              • Thành viên từ:{" "}
-              <span className="text-white">
-                {user?.created_at
-                  ? new Date(user.created_at).toLocaleDateString("vi-VN")
-                  : "03/2023"}
-              </span>
+              • Thành viên từ: <span className="text-white">03/2023</span>
             </p>
             <p>
               • Gói sử dụng: <span className="text-primary">Premium AI</span>
             </p>
             <p>• Mood yêu thích: Khoa học viễn tưởng, Lãng mạn</p>
-          </div>
-          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-xs text-slate-200">
-            <p className="font-semibold text-white">Ghi chú triển khai</p>
-            <p className="mt-2">
-              - Khi hoàn tất auth, token sẽ lấy từ context thay vì default user.
-            </p>
-            <p className="mt-1">- Thêm khả năng chỉnh sửa avatar, mật khẩu.</p>
           </div>
         </div>
 
@@ -89,39 +88,42 @@ export function ProfilePage() {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {favorites.map((movie) => {
                 const posterSrc =
-                  "poster" in movie && typeof (movie as { poster?: string }).poster === "string"
+                  "poster" in movie &&
+                  typeof (movie as { poster?: string }).poster === "string"
                     ? (movie as { poster?: string }).poster
                     : movie.thumbnail;
                 return (
-                <Link
-                  key={movie.id}
-                  to={`/movie/${movie.id}`}
-                  className="flex gap-3 rounded-2xl border border-white/10 bg-dark/60 p-3 transition hover:border-primary/80"
-                >
-                  <img
-                    src={posterSrc}
-                    alt={movie.title}
-                    className="h-20 w-16 rounded-xl object-cover"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {movie.title}
-                    </p>
-                    <p className="text-xs text-slate-300">
-                      {movie.tags?.join(" • ")}
-                    </p>
-                    <p className="mt-2 text-[11px] text-slate-400">
-                      Rating gần nhất: 4.{Math.floor(Math.random() * 3 + 2)}
-                    </p>
-                  </div>
-                </Link>
-              );
+                  <Link
+                    key={movie.id}
+                    to={`/movie/${movie.id}`}
+                    className="flex gap-3 rounded-2xl border border-white/10 bg-dark/60 p-3 transition hover:border-primary/80"
+                  >
+                    <img
+                      src={posterSrc}
+                      alt={movie.title}
+                      className="h-20 w-16 rounded-xl object-cover"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {movie.title}
+                      </p>
+                      <p className="text-xs text-slate-300">
+                        {movie.tags?.join(" • ")}
+                      </p>
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        Rating gần nhất: 4.{Math.floor(Math.random() * 3 + 2)}
+                      </p>
+                    </div>
+                  </Link>
+                );
               })}
             </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-            <p className="text-sm font-semibold text-white">Lịch sử xem gần đây</p>
+            <p className="text-sm font-semibold text-white">
+              Lịch sử xem gần đây
+            </p>
             <div className="mt-4 flex flex-col gap-3 text-xs text-slate-300">
               {history.length === 0 && (
                 <p className="text-slate-500">

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { api } from "../lib/api";
 
 export function RegisterPage() {
+  const navigate = useNavigate();
   const [name, setName] = useState("Nguyễn Minh Anh");
   const [nickname, setNickname] = useState("minhanh.07");
   const [email, setEmail] = useState("minhanh@example.com");
@@ -23,9 +24,18 @@ export function RegisterPage() {
     setStatus(null);
     try {
       const response = await api.auth.register({ name, email, password });
-      setStatus(
-        `Tạo tài khoản thành công! ID: ${response.user.id} – hãy đăng nhập để trải nghiệm.`
-      );
+
+      // Lưu thông tin đăng nhập vào localStorage
+      localStorage.setItem("authToken", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      setStatus(`Tạo tài khoản thành công! Xin chào ${response.user.name}`);
+
+      // Redirect về trang chủ và reload sau 1.5 giây
+      setTimeout(() => {
+        navigate("/", { replace: true });
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setStatus(
         err instanceof Error
@@ -120,17 +130,25 @@ export function RegisterPage() {
             Thể loại yêu thích
           </label>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {["Hành động", "Lãng mạn", "Sci-fi", "Drama", "Hoạt hình", "Hài hước"].map(
-              (genre) => (
-                <label
-                  key={genre}
-                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-slate-200"
-                >
-                  <input type="checkbox" className="h-4 w-4 rounded border-white/20 bg-dark/70" />
-                  {genre}
-                </label>
-              )
-            )}
+            {[
+              "Hành động",
+              "Lãng mạn",
+              "Sci-fi",
+              "Drama",
+              "Hoạt hình",
+              "Hài hước",
+            ].map((genre) => (
+              <label
+                key={genre}
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-slate-200"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-white/20 bg-dark/70"
+                />
+                {genre}
+              </label>
+            ))}
           </div>
         </div>
 
@@ -148,11 +166,7 @@ export function RegisterPage() {
             Đăng nhập
           </Link>
         </p>
-        {status && (
-          <p className="text-[11px] text-emerald-400">
-            {status}
-          </p>
-        )}
+        {status && <p className="text-[11px] text-emerald-400">{status}</p>}
       </form>
     </div>
   );
