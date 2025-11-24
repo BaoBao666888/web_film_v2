@@ -1,45 +1,51 @@
 # Lumi AI Cinema – Fullstack Prototype
 
-Prototype kết hợp frontend React + backend Express (JSON DB). Front hiển thị real data từ API `/api/*`, bao gồm đề xuất AI, chatbot và trang xem phim.
+Frontend React (Vite + Tailwind) giao tiếp với backend Express/Mongo qua các API `/api/*`. Giao diện gồm home, tìm kiếm, phim chi tiết/xem phim, chatbot AI, trang đánh giá, hồ sơ và khu vực quản trị.
 
-## Cấu trúc chính
+## Cấu trúc
 
-- `src/App.tsx`: Khai báo router, gom tất cả các trang.
-- `src/layouts/MainLayout.tsx`: Header, footer và nền gradient dùng chung.
-- `src/pages/`: Bộ trang dành cho người dùng, chatbot, rating, quản trị, v.v.
-- `src/data/movies.ts`: Dữ liệu fallback khi API tạm ngắt (poster, playlist demo).
-- `src/components/`: Navbar, footer, badge, header tái sử dụng.
-- `backend/`: Express server, JSON database, route AI/Movies/Auth/Admin.
+- `src/App.tsx`: Router tổng – gom toàn bộ trang user/admin.
+- `src/layouts/MainLayout.tsx`: Navbar, footer, nền gradient dùng chung.
+- `src/pages/`: Các trang người dùng (`Home`, `Search`, `MovieDetail`, `Watch`, `Rating`, `Profile`, `Chat`, `Recommend`) và admin (`admin/*`).
+- `src/hooks/useAuth.ts`: Quản lý token + thông tin đăng nhập (localStorage).
+- `src/lib/api.ts`: Wrapper fetch – tự đính kèm header `Authorization` nếu có token.
+- `src/data/movies.ts`: Dữ liệu fallback khi backend tắt.
+- `backend/`: Express API (MongoDB) – cần chạy trước để front lấy dữ liệu thật.
 
-## Cài đặt & chạy
+## Chạy dự án
 
-1. Backend
+1. Backend (yêu cầu MongoDB chạy nền)
    ```bash
    cd backend
    npm install
-   npm run dev   # chạy ở http://localhost:4000
+   npm run seed   # tùy chọn – đổ dữ liệu mẫu (có admin@lumi.ai/admin123)
+   npm run dev    # http://localhost:4000
    ```
 2. Frontend
    ```bash
    cd web-film-app
-   cp .env.example .env
+   cp .env.example .env   # chỉnh VITE_API_BASE_URL nếu backend không chạy ở localhost:4000
    npm install
-   npm run dev   # http://localhost:5173
+   npm run dev            # http://localhost:5173
    ```
 
-Để build production:
-
+Build production:
 ```bash
 npm run build
 npm run preview
 ```
 
-- Nếu deploy tách biệt, cập nhật `VITE_API_BASE_URL` trong `.env`.
-- Frontend gọi API qua `src/lib/api.ts`, chỉ cần đổi base URL là xong.
+## Chức năng đã có
 
-## Ghi chú triển khai tiếp
+- Home + recommend + chatbot mock – gọi trực tiếp `/api/movies`, `/api/ai/*`.
+- Form đánh giá gửi đến `/api/ratings`.
+- Đăng ký/đăng nhập lấy JWT, lưu token & user vào localStorage. Navbar/Profile phản ánh trạng thái đăng nhập.
+- Admin Dashboard và Admin Manage gọi các endpoint `/api/admin/*` (yêu cầu token admin).
+- Trang “Quản lý phim” có thể thêm, xóa và **sửa phim qua modal** (gọi `PUT /api/movies/:id`).
 
-- Thêm bảo mật JWT + refresh token, gắn middleware cho các route `/admin/*`.
-- Thay JSON DB bằng SQLite/Postgres để hỗ trợ concurrency.
-- Streaming video thực tế (HLS/DRM) thay vì link MP4 demo.
-- Triển khai model AI thật (recommendation + chatbot) rồi cập nhật service Python tương ứng.
+## Hướng phát triển thêm
+
+- Tách context auth/global store để tránh reload sau khi đăng nhập.
+- Bổ sung refresh token + logout backend thật, phân quyền chi tiết cho từng trang.
+- Streaming video thực tế (HLS/DRM) thay vì link MP4 demo; đồng bộ lịch sử xem/favorites.
+- Kết nối service AI thật (recommend/chat) và sentiment analysis thay vì mock dữ liệu.
