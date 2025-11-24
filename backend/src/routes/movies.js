@@ -1,15 +1,17 @@
+// src/routes/movies.js
 import { Router } from "express";
 import {
   listMovies,
   getMovie,
   getRandomMovies,
   insertMovie,
-  updateMovie as updateMovieRecord,
-  deleteMovie as deleteMovieRecord,
+  updateMovie,
+  deleteMovie,
   listReviewsByMovie,
   insertReview,
 } from "../db.js";
 import { generateId } from "../utils/id.js";
+import { verifyToken, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -23,51 +25,42 @@ const slugify = (text) =>
 const orDefault = (value, fallback) =>
   value === undefined || value === null ? fallback : value;
 
-router.get("/", (req, res) => {
+//Lấy danh sách phim
+router.get("/", async (req, res) => {
   const { q, mood, tag, limit = 12 } = req.query;
-  const items = listMovies({
+  const items = await listMovies({
     q,
     mood,
     tag,
     limit: Number(limit) || 12,
   });
-  res.json({
-    items,
-    meta: {
-      total: items.length,
-      query: orDefault(q, ""),
-    },
-  });
+  res.json({ items });
 });
 
-router.get("/:id", (req, res) => {
-  const { id } = req.params;
+//Chi tiết phim
+router.get("/:id", async (req, res) => {
+  const movie = await getMovie(req.params.id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
-  const movie = getMovie(id);
+  const reviews = await listReviewsByMovie(movie.id, 5);
+  const suggestions = await getRandomMovies({ excludeId: movie.id, limit: 4 });
 
-  if (!movie) {
-    return res.status(404).json({ message: "Không tìm thấy phim" });
-  }
-
-  const reviews = listReviewsByMovie(movie.id, 5);
-  const suggestions = getRandomMovies({ excludeId: movie.id, limit: 4 });
-
-  res.json({
-    movie,
-    reviews,
-    suggestions,
-  });
+  res.json({ movie, reviews, suggestions });
 });
 
-router.get("/:id/watch", (req, res) => {
+//XEM PHIM
+router.get("/:id/watch", async (req, res) => {
   const { id } = req.params;
-  const movie = getMovie(id);
 
-  if (!movie) {
-    return res.status(404).json({ message: "Không tìm thấy phim" });
-  }
+  const movie = await getMovie(id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
-  const nextUp = getRandomMovies({ excludeId: movie.id, limit: 3 }).map((item) => ({
+  const nextUp = (
+    await getRandomMovies({
+      excludeId: movie.id,
+      limit: 3,
+    })
+  ).map((item) => ({
     id: item.id,
     title: item.title,
     duration: item.duration,
@@ -86,48 +79,14 @@ router.get("/:id/watch", (req, res) => {
   });
 });
 
-router.post("/:id/reviews", (req, res) => {
-  const { id } = req.params;
-  const { rating, comment, userId = "demo-user" } = req.body;
-
-  if (!rating) {
-    return res.status(400).json({ message: "Thiếu rating" });
-  }
-
-  const movie = getMovie(id);
-
-  if (!movie) {
-    return res.status(404).json({ message: "Không tìm thấy phim" });
-  }
-
-  const reviewId = generateId("rv");
-  const sentiment =
-    rating >= 4 ? "positive" : rating >= 3 ? "neutral" : "negative";
-
-  insertReview({
-    id: reviewId,
-    user_id: userId,
-    movie_id: movie.id,
-    rating,
-    comment,
-    sentiment,
-  });
-
-  res.status(201).json({
-    id: reviewId,
-    rating,
-    comment,
-    sentiment,
-  });
-});
-
-router.post("/", (req, res) => {
+// Thêm phim (ADMIN)
+router.post("/", verifyToken, requireAdmin, async (req, res) => {
   const payload = req.body;
-  if (!payload.title) {
-    return res.status(400).json({ message: "Thiếu tiêu đề" });
-  }
+
+  if (!payload.title) return res.status(400).json({ message: "Thiếu tiêu đề" });
 
   const id = orDefault(payload.id, slugify(payload.title));
+
   const newMovie = {
     id,
     slug: slugify(orDefault(payload.slug, payload.title)),
@@ -146,35 +105,25 @@ router.post("/", (req, res) => {
     director: orDefault(payload.director, ""),
   };
 
-  insertMovie(newMovie);
-
-  res.status(201).json({ movie: newMovie });
+  const result = await insertMovie(newMovie);
+  res.status(201).json({ movie: result });
 });
 
-router.put("/:id", (req, res) => {
+// Sửa phim (ADMIN)
+router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const movie = getMovie(id);
-  if (!movie) {
-    return res.status(404).json({ message: "Không tìm thấy phim" });
-  }
+  const movie = await getMovie(id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
-  const payload = {
-    ...movie,
-    ...req.body,
-    trailerUrl: orDefault(req.body.trailerUrl, movie.trailerUrl),
-    videoUrl: orDefault(req.body.videoUrl, movie.videoUrl),
-    tags: orDefault(req.body.tags, movie.tags),
-    moods: orDefault(req.body.moods, movie.moods),
-    cast: orDefault(req.body.cast, movie.cast),
-  };
+  const payload = { ...movie, ...req.body };
+  const updated = await updateMovie(id, payload);
 
-  const updated = updateMovieRecord(id, payload);
   res.json({ movie: updated });
 });
 
-router.delete("/:id", (req, res) => {
-  const { id } = req.params;
-  deleteMovieRecord(id);
+// Xóa phim (ADMIN)
+router.delete("/:id", verifyToken, requireAdmin, async (req, res) => {
+  await deleteMovie(req.params.id);
   res.status(204).send();
 });
 

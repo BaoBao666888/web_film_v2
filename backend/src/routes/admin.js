@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { getStats, listUsers, listMovies } from "../db.js";
+import { verifyToken, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/stats", (req, res) => {
-  const stats = getStats();
+router.get("/stats", verifyToken, requireAdmin, async (req, res) => {
+  const stats = await getStats();
   const topMoods = Object.entries(stats.moods)
     .map(([mood, total]) => ({ mood, total }))
     .sort((a, b) => b.total - a.total)
@@ -20,12 +21,12 @@ router.get("/stats", (req, res) => {
   });
 });
 
-router.get("/users", (req, res) => {
-  res.json({ users: listUsers() });
+router.get("/users", verifyToken, requireAdmin, async (req, res) => {
+  res.json({ users: await listUsers() });
 });
 
-router.get("/movies", (req, res) => {
-  res.json({ movies: listMovies({ limit: 50 }) });
+router.get("/movies", verifyToken, requireAdmin, async (req, res) => {
+  res.json({ movies: await listMovies({ limit: 50 }) });
 });
 
 export default router;

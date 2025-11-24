@@ -1,33 +1,29 @@
+// src/routes/feedback.js
+
 import { Router } from "express";
+import { verifyToken } from "../middleware/auth.js";
 import { getMovie, insertReview, listReviewsByMovie } from "../db.js";
 import { generateId } from "../utils/id.js";
 
 const router = Router();
 
-router.post("/ratings", (req, res) => {
-  const { movieId, rating, comment = "", userId = "demo-user", sentimentHint } = req.body;
+// ⭐ Chỉ USER đăng nhập mới được đánh giá
+router.post("/ratings", verifyToken, async (req, res) => {
+  const userId = req.user.id; // 🔥 user ID lấy từ token
+  const { movieId, rating, comment = "", sentimentHint } = req.body;
 
-  if (!movieId || !rating) {
+  if (!movieId || !rating)
     return res.status(400).json({ message: "Thiếu movieId hoặc rating" });
-  }
 
-  const movie = getMovie(movieId);
-
-  if (!movie) {
-    return res.status(404).json({ message: "Không tìm thấy phim" });
-  }
+  const movie = await getMovie(movieId);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
   const reviewId = generateId("rv");
   const sentiment =
-    sentimentHint !== undefined && sentimentHint !== null
-      ? sentimentHint
-      : rating >= 4
-      ? "positive"
-      : rating >= 3
-      ? "neutral"
-      : "negative";
+    sentimentHint ??
+    (rating >= 4 ? "positive" : rating >= 3 ? "neutral" : "negative");
 
-  insertReview({
+  await insertReview({
     id: reviewId,
     user_id: userId,
     movie_id: movie.id,
@@ -38,19 +34,19 @@ router.post("/ratings", (req, res) => {
 
   res.status(201).json({
     id: reviewId,
-    movieId: movie.id,
+    movieId,
+    userId,
     rating,
     comment,
     sentiment,
-    createdAt: new Date().toISOString(),
   });
 });
 
-router.get("/reviews/:movieId", (req, res) => {
+// ⭐ Lấy danh sách review theo phim
+router.get("/reviews/:movieId", async (req, res) => {
   const { movieId } = req.params;
-  res.json({
-    items: listReviewsByMovie(movieId, 20),
-  });
+  const items = await listReviewsByMovie(movieId, 20);
+  res.json({ items });
 });
 
 export default router;

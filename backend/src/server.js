@@ -1,11 +1,17 @@
+// src/server.js
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import dotenv from "dotenv";
+
 import moviesRouter from "./routes/movies.js";
 import authRouter from "./routes/auth.js";
 import aiRouter from "./routes/ai.js";
 import adminRouter from "./routes/admin.js";
 import feedbackRouter from "./routes/feedback.js";
+import { connectDB } from "./config/mongo.js";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,6 +39,11 @@ app.use((req, res) => {
   res.status(404).json({ message: `Không tìm thấy route ${req.path}` });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Lumi AI backend đang chạy tại http://localhost:${PORT}`);
-});
+const start = async () => {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`Lumi AI backend đang chạy tại http://localhost:${PORT}`);
+  });
+};
+
+start();

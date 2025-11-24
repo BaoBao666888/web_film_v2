@@ -43,15 +43,21 @@ export async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+
+  //THÊM TOKEN TỰ ĐỘNG
+  const token = localStorage.getItem("authToken");
+
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   const response = await fetch(url, {
     ...options,
     headers,
   });
+
   return handleResponse<T>(response);
 }
 
@@ -104,8 +110,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    reviews: (movieId: string) =>
-      apiFetch(`/reviews/${movieId}`),
+    reviews: (movieId: string) => apiFetch(`/reviews/${movieId}`),
   },
   auth: {
     login: (payload: unknown) =>
