@@ -7,9 +7,9 @@ import { generateId } from "../utils/id.js";
 
 const router = Router();
 
-// ⭐ Chỉ USER đăng nhập mới được đánh giá
+// Chỉ USER đăng nhập mới được đánh giá
 router.post("/ratings", verifyToken, async (req, res) => {
-  const userId = req.user.id; // 🔥 user ID lấy từ token
+  const userId = req.user.id; // user ID lấy từ token
   const { movieId, rating, comment = "", sentimentHint } = req.body;
 
   if (!movieId || !rating)

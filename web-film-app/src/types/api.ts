@@ -107,6 +107,7 @@ export interface ProfileResponse {
   favorites: MovieSummary[];
   history: Array<{
     id: string;
+    movieId: string;
     title: string;
     thumbnail: string;
     lastWatchedAt?: string;

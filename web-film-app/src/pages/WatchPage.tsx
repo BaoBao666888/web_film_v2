@@ -2,17 +2,36 @@ import { Link, useParams } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import type { MovieDetailResponse, WatchResponse } from "../types/api";
 import { StatusBadge } from "../components/StatusBadge";
+import { useAuth } from "../hooks/useAuth";
+import { useEffect } from "react";
+import { api } from "../lib/api";
 
 export function WatchPage() {
   const { id } = useParams();
-  const { data: watchData, loading, error } = useFetch<WatchResponse>(
-    id ? `/movies/${id}/watch` : null,
-    [id]
-  );
+  const { user } = useAuth();
+  const {
+    data: watchData,
+    loading,
+    error,
+  } = useFetch<WatchResponse>(id ? `/movies/${id}/watch` : null, [id]);
   const { data: detailData } = useFetch<MovieDetailResponse>(
     id ? `/movies/${id}` : null,
     [id]
   );
+
+  // Thêm vào lịch sử xem khi người dùng vào trang xem phim
+  useEffect(() => {
+    if (id && user) {
+      // Gọi API để thêm vào lịch sử sau 3 giây (đảm bảo user đã thực sự xem)
+      const timer = setTimeout(() => {
+        api.history.add(id).catch((err) => {
+          console.error("Không thể thêm vào lịch sử:", err);
+        });
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [id, user]);
 
   if (loading) {
     return (
@@ -144,7 +163,9 @@ export function WatchPage() {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Danh sách tiếp theo</h3>
+          <h3 className="text-lg font-semibold text-white">
+            Danh sách tiếp theo
+          </h3>
           <p className="text-xs text-slate-400">
             Hệ thống chọn ngẫu nhiên theo mood bạn đang xem
           </p>
@@ -233,7 +254,9 @@ export function WatchPage() {
                   className="h-16 w-16 rounded-xl object-cover"
                 />
                 <div>
-                  <p className="text-sm font-semibold text-white">{movie.title}</p>
+                  <p className="text-sm font-semibold text-white">
+                    {movie.title}
+                  </p>
                   <p className="text-xs text-slate-400 line-clamp-2">
                     {movie.synopsis}
                   </p>

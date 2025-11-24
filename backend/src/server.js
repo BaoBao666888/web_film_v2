@@ -10,7 +10,7 @@ import aiRouter from "./routes/ai.js";
 import adminRouter from "./routes/admin.js";
 import feedbackRouter from "./routes/feedback.js";
 import { connectDB } from "./config/mongo.js";
-
+import historyRouter from "./routes/history.js";
 dotenv.config();
 
 const app = express();
@@ -34,7 +34,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api", feedbackRouter);
-
+app.use("/api/history", historyRouter);
 app.use((req, res) => {
   res.status(404).json({ message: `Không tìm thấy route ${req.path}` });
 });
