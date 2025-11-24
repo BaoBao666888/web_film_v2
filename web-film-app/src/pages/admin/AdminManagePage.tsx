@@ -18,6 +18,7 @@ export function AdminManagePage() {
     rating: "",
     tags: "",
     moods: "",
+    cast: "",
     director: "",
     trailerUrl: "",
     videoUrl: "",
@@ -62,7 +63,10 @@ export function AdminManagePage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={5} className="px-6 py-6 text-center text-slate-400">
+                <td
+                  colSpan={5}
+                  className="px-6 py-6 text-center text-slate-400"
+                >
                   Đang tải danh sách phim…
                 </td>
               </tr>
@@ -97,7 +101,9 @@ export function AdminManagePage() {
                 <td className="px-6 py-4 text-xs text-slate-300">
                   {movie.tags?.join(", ")}
                 </td>
-                <td className="px-6 py-4 text-xs text-slate-300">{movie.year}</td>
+                <td className="px-6 py-4 text-xs text-slate-300">
+                  {movie.year}
+                </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
                   {movie.rating?.toFixed(1)}
                 </td>
@@ -114,6 +120,7 @@ export function AdminManagePage() {
                         rating: movie.rating ? String(movie.rating) : "",
                         tags: movie.tags?.join(", ") ?? "",
                         moods: movie.moods?.join(", ") ?? "",
+                        cast: movie.cast?.join(", ") ?? "",
                         director: movie.director ?? "",
                         trailerUrl: movie.trailerUrl ?? "",
                         videoUrl: movie.videoUrl ?? "",
@@ -186,6 +193,10 @@ export function AdminManagePage() {
                       .split(",")
                       .map((mood) => mood.trim())
                       .filter(Boolean),
+                    cast: formData.cast
+                      .split(",")
+                      .map((actor) => actor.trim())
+                      .filter(Boolean),
                     director: formData.director,
                     trailerUrl: formData.trailerUrl,
                     videoUrl: formData.videoUrl,
@@ -207,227 +218,244 @@ export function AdminManagePage() {
               }}
               className="flex-1 space-y-4 overflow-y-auto px-6 py-6"
             >
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Tên phim
-                </label>
-                <input
-                  value={formData.title}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      title: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Tên phim
+                  </label>
+                  <input
+                    value={formData.title}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        title: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Đạo diễn
+                  </label>
+                  <input
+                    value={formData.director}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        director: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Đạo diễn
-                </label>
-                <input
-                  value={formData.director}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      director: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-              </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
               <div>
                 <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Năm
+                  Diễn viên (cách nhau bằng dấu phẩy)
                 </label>
                 <input
-                  type="number"
-                  value={formData.year}
+                  value={formData.cast}
                   onChange={(event) =>
                     setFormData((prev) => ({
                       ...prev,
-                      year: event.target.value,
+                      cast: event.target.value,
                     }))
                   }
+                  placeholder="Nhập tên các diễn viên..."
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                 />
               </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Thời lượng
-                </label>
-                <input
-                  value={formData.duration}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      duration: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Rating
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.rating}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      rating: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-              </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Tags (cách nhau bởi dấu phẩy)
-                </label>
-                <input
-                  value={formData.tags}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      tags: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Năm
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.year}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        year: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Thời lượng
+                  </label>
+                  <input
+                    value={formData.duration}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        duration: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Rating
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.rating}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        rating: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Moods (cách nhau bởi dấu phẩy)
-                </label>
-                <input
-                  value={formData.moods}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      moods: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-              </div>
-            </div>
 
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
-                Mô tả
-              </label>
-              <textarea
-                rows={3}
-                value={formData.synopsis}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    synopsis: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-              />
-            </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Tags (cách nhau bởi dấu phẩy)
+                  </label>
+                  <input
+                    value={formData.tags}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        tags: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Moods (cách nhau bởi dấu phẩy)
+                  </label>
+                  <input
+                    value={formData.moods}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        moods: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+              </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Link poster
+                  Mô tả
                 </label>
-                <input
-                  value={formData.poster}
+                <textarea
+                  rows={3}
+                  value={formData.synopsis}
                   onChange={(event) =>
                     setFormData((prev) => ({
                       ...prev,
-                      poster: event.target.value,
+                      synopsis: event.target.value,
                     }))
                   }
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                 />
               </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Link thumbnail
-                </label>
-                <input
-                  value={formData.thumbnail}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      thumbnail: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-              </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Trailer URL
-                </label>
-                <input
-                  value={formData.trailerUrl}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      trailerUrl: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Link poster
+                  </label>
+                  <input
+                    value={formData.poster}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        poster: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Link thumbnail
+                  </label>
+                  <input
+                    value={formData.thumbnail}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        thumbnail: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Video URL
-                </label>
-                <input
-                  value={formData.videoUrl}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      videoUrl: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-              </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
-            >
-              {submitting ? "Đang lưu..." : "Lưu thay đổi"}
-            </button>
-            {submitStatus && (
-              <p
-                className={`text-sm ${
-                  submitStatus.startsWith("✔")
-                    ? "text-emerald-400"
-                    : "text-red-400"
-                }`}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Trailer URL
+                  </label>
+                  <input
+                    value={formData.trailerUrl}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        trailerUrl: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Video URL
+                  </label>
+                  <input
+                    value={formData.videoUrl}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        videoUrl: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
               >
-                {submitStatus}
-              </p>
-            )}
-          </form>
+                {submitting ? "Đang lưu..." : "Lưu thay đổi"}
+              </button>
+              {submitStatus && (
+                <p
+                  className={`text-sm ${
+                    submitStatus.startsWith("✔")
+                      ? "text-emerald-400"
+                      : "text-red-400"
+                  }`}
+                >
+                  {submitStatus}
+                </p>
+              )}
+            </form>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );
