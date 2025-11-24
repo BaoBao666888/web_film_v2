@@ -1,0 +1,8 @@
+backend/data/
+node_modules/
+web-film-app/node_modules/
+backend/node_modules/
+dist/
+.env
+.env.*
+*.log
