@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, Navigate, Outlet } from "react-router-dom";
 import { MainLayout } from "./layouts/MainLayout";
 import { HomePage } from "./pages/HomePage";
 import { SearchPage } from "./pages/SearchPage";
@@ -17,6 +17,25 @@ import { AdminAddMoviePage } from "./pages/admin/AdminAddMoviePage";
 import { AdminManagePage } from "./pages/admin/AdminManagePage";
 import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminStatsPage } from "./pages/admin/AdminStatsPage";
+import { useAuth } from "./hooks/useAuth";
+
+function AdminGuard() {
+  const { user, isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-300">
+        Đang kiểm tra quyền truy cập...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || user?.role !== "admin") {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+}
 
 function App() {
   return (
@@ -34,7 +53,7 @@ function App() {
         <Route path="logout" element={<LogoutPage />} />
         <Route path="watch/:id" element={<WatchPage />} />
 
-        <Route path="admin">
+        <Route path="admin" element={<AdminGuard />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="add-movie" element={<AdminAddMoviePage />} />
           <Route path="manage" element={<AdminManagePage />} />

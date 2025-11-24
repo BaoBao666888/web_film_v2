@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 const footerLinks = [
   {
@@ -30,6 +31,14 @@ const footerLinks = [
 ];
 
 export function Footer() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  const visibleLinks = footerLinks.filter((column) => {
+    if (column.heading === "Quản trị" && !isAdmin) return false;
+    return true;
+  });
+
   return (
     <footer className="border-t border-white/10 bg-dark/80 py-12">
       <div className="mx-auto flex max-w-7xl flex-wrap gap-10 px-4 text-sm text-slate-300">
@@ -42,7 +51,7 @@ export function Footer() {
             thông minh – tất cả trong một nền tảng.
           </p>
         </div>
-        {footerLinks.map((column) => (
+        {visibleLinks.map((column) => (
           <div key={column.heading} className="min-w-[140px] flex-1">
             <p className="text-sm font-semibold text-slate-200 uppercase tracking-wide">
               {column.heading}

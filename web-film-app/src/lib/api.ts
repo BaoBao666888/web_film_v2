@@ -124,6 +124,14 @@ export const api = {
         body: JSON.stringify(payload),
       }),
     profile: (id: string) => apiFetch<ProfileResponse>(`/auth/profile/${id}`),
+    updateProfile: (
+      id: string,
+      payload: { avatar?: string; currentPassword?: string; newPassword?: string }
+    ) =>
+      apiFetch<{ user: ProfileResponse["user"] }>(`/auth/profile/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
   },
   admin: {
     stats: () => apiFetch<AdminStatsResponse>(`/admin/stats`),

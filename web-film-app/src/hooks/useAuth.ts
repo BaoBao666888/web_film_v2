@@ -5,6 +5,8 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  created_at?: string;
+  favorite_moods?: string[];
   role?: string;
 }
 
