@@ -8,6 +8,7 @@ export function AdminAddMoviePage() {
   const [form, setForm] = useState({
     title: "",
     director: "",
+    cast: "",
     year: new Date().getFullYear(),
     duration: "1h 55m",
     rating: 4.5,
@@ -18,9 +19,9 @@ export function AdminAddMoviePage() {
     thumbnail:
       "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=80",
     trailerUrl: "",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+    videoUrl: "", // <-- admin nhập link phim để chiếu
   });
+
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,13 +33,18 @@ export function AdminAddMoviePage() {
     event.preventDefault();
     setLoading(true);
     setStatus(null);
+
     try {
       await api.movies.create({
         ...form,
         tags: form.tags.split(",").map((item) => item.trim()),
         moods: ["Hành động", "Khoa học viễn tưởng"],
-        cast: ["Đang cập nhật"],
+        cast: form.cast
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
       });
+
       setStatus("Đã thêm phim mới! Bạn có thể kiểm tra ở mục Quản lý phim.");
     } catch (err) {
       setStatus(
@@ -93,6 +99,19 @@ export function AdminAddMoviePage() {
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-400">
+            Diễn viên
+          </label>
+          <input
+            type="text"
+            value={form.cast}
+            onChange={(event) => updateField("cast", event.target.value)}
+            placeholder="Nhập tên các diễn viên, cách nhau bằng dấu phẩy..."
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -164,7 +183,7 @@ export function AdminAddMoviePage() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Link poster
@@ -177,6 +196,7 @@ export function AdminAddMoviePage() {
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
           </div>
+
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Link trailer
@@ -191,6 +211,19 @@ export function AdminAddMoviePage() {
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
           </div>
+
+          <div>
+            <label className="text-xs uppercase tracking-wide text-slate-400">
+              Link phim (video)
+            </label>
+            <input
+              type="url"
+              value={form.videoUrl}
+              onChange={(event) => updateField("videoUrl", event.target.value)}
+              placeholder="https://.../movie.mp4"
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+            />
+          </div>
         </div>
 
         <button
@@ -200,11 +233,8 @@ export function AdminAddMoviePage() {
         >
           {loading ? "Đang lưu..." : "Lưu phim"}
         </button>
-        {status && (
-          <p className="text-xs text-emerald-400">
-            {status}
-          </p>
-        )}
+
+        {status && <p className="text-xs text-emerald-400">{status}</p>}
       </form>
     </div>
   );
