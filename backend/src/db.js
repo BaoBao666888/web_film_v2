@@ -234,3 +234,13 @@ export const listFavorites = async (userId, limit = 6) => {
 
   return favs.map((fav) => movieMap[fav.movie_id]).filter(Boolean);
 };
+
+export const removeFavorite = async ({ userId, movieId }) => {
+  await Favorite.deleteOne({ user_id: userId, movie_id: movieId });
+};
+
+export const isFavorite = async ({ userId, movieId }) => {
+  if (!userId) return false;
+  const exists = await Favorite.findOne({ user_id: userId, movie_id: movieId });
+  return Boolean(exists);
+};

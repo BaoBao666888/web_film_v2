@@ -92,6 +92,18 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    favorite: (id: string) =>
+      apiFetch<{ message: string; movieId: string }>(`/movies/${id}/favorite`, {
+        method: "POST",
+      }),
+    unfavorite: (id: string) =>
+      apiFetch<{ message: string; movieId: string }>(`/movies/${id}/favorite`, {
+        method: "DELETE",
+      }),
+    favoriteStatus: (id: string) =>
+      apiFetch<{ favorite: boolean }>(`/movies/${id}/favorite`, {
+        method: "GET",
+      }),
   },
   ai: {
     recommendations: () =>

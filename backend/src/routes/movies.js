@@ -8,6 +8,9 @@ import {
   deleteMovie,
   listReviewsByMovie,
   insertReview,
+  addFavorite,
+  removeFavorite,
+  isFavorite,
 } from "../db.js";
 import { generateId } from "../utils/id.js";
 import { verifyToken, requireAdmin } from "../middleware/auth.js";
@@ -76,6 +79,38 @@ router.get("/:id/watch", async (req, res) => {
     tags: movie.tags || [],
     nextUp,
   });
+});
+
+router.get("/:id/favorite", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const movie = await getMovie(id);
+  if (!movie) {
+    return res.status(404).json({ message: "Không tìm thấy phim" });
+  }
+
+  const favorite = await isFavorite({ userId: req.user.id, movieId: movie.id });
+  res.json({ favorite });
+});
+
+router.post("/:id/favorite", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const movie = await getMovie(id);
+  if (!movie) {
+    return res.status(404).json({ message: "Không tìm thấy phim" });
+  }
+
+  await addFavorite({ userId: req.user.id, movieId: movie.id });
+  res.status(201).json({ message: "Đã lưu vào yêu thích", movieId: movie.id });
+});
+
+router.delete("/:id/favorite", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const movie = await getMovie(id);
+  if (!movie) {
+    return res.status(404).json({ message: "Không tìm thấy phim" });
+  }
+  await removeFavorite({ userId: req.user.id, movieId: movie.id });
+  res.status(200).json({ message: "Đã xoá khỏi yêu thích", movieId: movie.id });
 });
 
 // Thêm phim (ADMIN)

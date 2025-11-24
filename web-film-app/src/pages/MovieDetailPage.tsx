@@ -1,15 +1,73 @@
 import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { StatusBadge } from "../components/StatusBadge";
 import { useFetch } from "../hooks/useFetch";
 import type { MovieDetailResponse } from "../types/api";
 import { PageHeader } from "../components/PageHeader";
+import { useAuth } from "../hooks/useAuth";
+import { api } from "../lib/api";
 
 export function MovieDetailPage() {
   const { id } = useParams();
+  const { user: authUser } = useAuth();
   const { data, loading, error } = useFetch<MovieDetailResponse>(
     id ? `/movies/${id}` : null,
     [id]
   );
+  const [favoriteStatus, setFavoriteStatus] = useState<string | null>(null);
+  const [savingFavorite, setSavingFavorite] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  const movie = data?.movie;
+  const reviews = data?.reviews ?? [];
+  const suggestions = data?.suggestions ?? [];
+  const trailerUrl = movie?.trailerUrl ?? "";
+  const movieId = movie?.id ?? "";
+
+  useEffect(() => {
+    const checkFavorite = async () => {
+      if (!authUser || !movieId) {
+        setIsFavorite(false);
+        return;
+      }
+      try {
+        const response = await api.movies.favoriteStatus(movieId);
+        setIsFavorite(response.favorite);
+      } catch {
+        setIsFavorite(false);
+      }
+    };
+    checkFavorite();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?.id, movieId]);
+
+  const handleSaveFavorite = async () => {
+    if (!authUser) {
+      setFavoriteStatus("Bạn cần đăng nhập để lưu phim vào yêu thích.");
+      return;
+    }
+    setSavingFavorite(true);
+    setFavoriteStatus(null);
+    try {
+      if (isFavorite) {
+        await api.movies.unfavorite(movieId);
+        setFavoriteStatus("Đã xoá phim khỏi danh sách yêu thích.");
+        setIsFavorite(false);
+      } else {
+        await api.movies.favorite(movieId);
+        setFavoriteStatus("✔ Đã lưu phim vào danh sách yêu thích.");
+        setIsFavorite(true);
+      }
+    } catch (err) {
+      setFavoriteStatus(
+        err instanceof Error
+          ? err.message
+          : "Không thể cập nhật trạng thái yêu thích."
+      );
+    } finally {
+      setSavingFavorite(false);
+    }
+  };
 
   if (loading) {
     return <p>Đang tải thông tin phim…</p>;
@@ -19,12 +77,9 @@ export function MovieDetailPage() {
     return <p className="text-red-400">Không thể tải phim: {error}</p>;
   }
 
-  if (!data) {
+  if (!movie) {
     return <p>Không tìm thấy phim.</p>;
   }
-
-  const { movie, reviews, suggestions } = data;
-  const trailerUrl = movie.trailerUrl ?? "";
 
   return (
     <div className="space-y-10">
@@ -32,7 +87,7 @@ export function MovieDetailPage() {
         title={movie.title}
         description={movie.synopsis}
         actions={
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <a
               href={movie.trailerUrl}
               target="_blank"
@@ -50,8 +105,30 @@ export function MovieDetailPage() {
           </div>
         }
       />
+      {favoriteStatus && (
+        <p
+          className={`text-sm ${
+            favoriteStatus.startsWith("✔") ? "text-emerald-400" : "text-red-400"
+          }`}
+        >
+          {favoriteStatus}
+        </p>
+      )}
 
-      <section className="grid gap-8 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl shadow-black/30 md:grid-cols-[1fr_1.3fr]">
+      <section className="relative grid gap-8 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl shadow-black/30 md:grid-cols-[1fr_1.3fr]">
+        <button
+          type="button"
+          onClick={handleSaveFavorite}
+          disabled={savingFavorite}
+          aria-label="Lưu vào yêu thích"
+          className={`absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full border text-2xl transition disabled:opacity-60 ${
+            isFavorite
+              ? "border-primary bg-primary/20 text-primary"
+              : "border-white/20 bg-dark/50 text-white"
+          } hover:border-primary hover:text-primary`}
+        >
+          {savingFavorite ? "…" : isFavorite ? "❤️" : "🤍"}
+        </button>
         <div className="space-y-6">
           <div className="overflow-hidden rounded-3xl border border-white/10">
             <img
