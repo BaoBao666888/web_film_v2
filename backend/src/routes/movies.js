@@ -27,6 +27,34 @@ const slugify = (text) =>
 const orDefault = (value, fallback) =>
   value === undefined || value === null ? fallback : value;
 
+const parseHeadersPayload = (value, fallback = {}) => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      console.warn("Không thể parse videoHeaders:", error.message);
+      return fallback;
+    }
+  }
+  return fallback;
+};
+
+const detectVideoType = (explicitType, url) => {
+  if (explicitType === "hls" || explicitType === "mp4") {
+    return explicitType;
+  }
+  if (typeof url === "string" && url.toLowerCase().includes(".m3u8")) {
+    return "hls";
+  }
+  return "mp4";
+};
+
 //Lấy danh sách phim
 router.get("/", async (req, res) => {
   const { q, mood, tag, limit = 12 } = req.query;
@@ -74,9 +102,18 @@ router.get("/:id/watch", async (req, res) => {
     title: movie.title,
     synopsis: movie.synopsis,
     videoUrl: movie.videoUrl,
+    playbackType: detectVideoType(movie.videoType, movie.videoUrl),
+    stream: movie.videoUrl
+      ? {
+          type: detectVideoType(movie.videoType, movie.videoUrl),
+          url: movie.videoUrl,
+          headers: movie.videoHeaders || {},
+        }
+      : null,
     poster: movie.poster,
     trailerUrl: movie.trailerUrl,
     tags: movie.tags || [],
+    videoHeaders: movie.videoHeaders || {},
     nextUp,
   });
 });
@@ -133,6 +170,8 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     poster: orDefault(payload.poster, ""),
     trailerUrl: orDefault(payload.trailerUrl, ""),
     videoUrl: orDefault(payload.videoUrl, ""),
+    videoType: detectVideoType(payload.videoType, payload.videoUrl),
+    videoHeaders: parseHeadersPayload(payload.videoHeaders, {}),
     tags: orDefault(payload.tags, []),
     moods: orDefault(payload.moods, []),
     cast: orDefault(payload.cast, []),
@@ -150,6 +189,16 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
   const payload = { ...movie, ...req.body };
+  if (req.body.videoHeaders !== undefined) {
+    payload.videoHeaders = parseHeadersPayload(
+      req.body.videoHeaders,
+      movie.videoHeaders || {}
+    );
+  }
+  payload.videoType = detectVideoType(
+    req.body.videoType ?? movie.videoType,
+    payload.videoUrl
+  );
   const updated = await updateMovie(id, payload);
 
   res.json({ movie: updated });

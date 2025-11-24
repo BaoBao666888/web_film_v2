@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { api } from "../../lib/api";
+import type { Movie } from "../../types/api";
 
 export function AdminAddMoviePage() {
   const [form, setForm] = useState({
@@ -19,7 +20,10 @@ export function AdminAddMoviePage() {
     thumbnail:
       "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=80",
     trailerUrl: "",
-    videoUrl: "", // <-- admin nhập link phim để chiếu
+    videoUrl: "",
+    videoType: "hls" as Movie["videoType"],
+    videoHeaders:
+      '{"Referer":"https://rophim.net/","Origin":"https://rophim.net"}',
   });
 
   const [status, setStatus] = useState<string | null>(null);
@@ -34,6 +38,17 @@ export function AdminAddMoviePage() {
     setLoading(true);
     setStatus(null);
 
+    let parsedHeaders: Record<string, string> = {};
+    try {
+      parsedHeaders = form.videoHeaders
+        ? (JSON.parse(form.videoHeaders) as Record<string, string>)
+        : {};
+    } catch (err) {
+      setStatus("Headers JSON không hợp lệ. Kiểm tra lại cú pháp.");
+      setLoading(false);
+      return;
+    }
+
     try {
       await api.movies.create({
         ...form,
@@ -43,6 +58,7 @@ export function AdminAddMoviePage() {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
+        videoHeaders: parsedHeaders,
       });
 
       setStatus("Đã thêm phim mới! Bạn có thể kiểm tra ở mục Quản lý phim.");
@@ -220,10 +236,40 @@ export function AdminAddMoviePage() {
               type="url"
               value={form.videoUrl}
               onChange={(event) => updateField("videoUrl", event.target.value)}
-              placeholder="https://.../movie.mp4"
+              placeholder="https://.../playlist.m3u8"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
           </div>
+          <div>
+            <label className="text-xs uppercase tracking-wide text-slate-400">
+              Định dạng nguồn
+            </label>
+            <select
+              value={form.videoType}
+              onChange={(event) => updateField("videoType", event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="hls">HLS (.m3u8)</option>
+              <option value="mp4">MP4 trực tiếp</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-400">
+            Headers (JSON) cho nguồn được bảo vệ
+          </label>
+          <textarea
+            rows={3}
+            value={form.videoHeaders}
+            onChange={(event) => updateField("videoHeaders", event.target.value)}
+            placeholder='{"Referer":"https://rophim.net/"}'
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+          />
+          <p className="mt-2 text-xs text-slate-400">
+            Các nguồn như Rophim yêu cầu Referer/Origin hợp lệ (ví dụ:
+            https://rophim.net/). Bạn có thể thêm token khác nếu cần.
+          </p>
         </div>
 
         <button

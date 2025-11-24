@@ -13,8 +13,9 @@ export const seedMovies = [
     poster:
       "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80",
     trailerUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    videoUrl: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    videoType: "hls",
+    videoHeaders: {},
     tags: ["Sci-fi", "Thriller", "Mystery"],
     moods: ["Hành động", "Huyền bí"],
     cast: ["Liam Anderson", "Zoey Carter", "Ken Watanabe"],
@@ -34,8 +35,9 @@ export const seedMovies = [
     poster:
       "https://images.unsplash.com/photo-1526498460520-4c246339dccb?auto=format&fit=crop&w=900&q=80",
     trailerUrl: "https://www.youtube.com/watch?v=XfR9iY5y94s",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    videoUrl: "https://test-streams.mux.dev/low-latency/index.m3u8",
+    videoType: "hls",
+    videoHeaders: {},
     tags: ["Romance", "Drama"],
     moods: ["Lãng mạn"],
     cast: ["Haruka Abe", "Kei Tanaka", "Lucy Liu"],
@@ -55,8 +57,9 @@ export const seedMovies = [
     poster:
       "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80",
     trailerUrl: "https://www.youtube.com/watch?v=kXYiU_JCYtU",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+    videoUrl: "https://test-streams.mux.dev/dai-discontinuity/dai.m3u8",
+    videoType: "hls",
+    videoHeaders: {},
     tags: ["Comedy", "Sci-fi"],
     moods: ["Hài hước", "Khoa học viễn tưởng"],
     cast: ["Ryan Reynolds", "Awkwafina", "John Boyega"],
@@ -76,8 +79,9 @@ export const seedMovies = [
     poster:
       "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80",
     trailerUrl: "https://www.youtube.com/watch?v=Zi_XLOBDo_Y",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+    videoUrl: "https://bitdash-a.akamaihd.net/content/MI201109210084_1/playlist.m3u8",
+    videoType: "hls",
+    videoHeaders: {},
     tags: ["Adventure", "Drama"],
     moods: ["Hành động", "Tài liệu"],
     cast: ["Gemma Chan", "Mahershala Ali", "Timothée Chalamet"],
@@ -97,8 +101,9 @@ export const seedMovies = [
     poster:
       "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80",
     trailerUrl: "https://www.youtube.com/watch?v=E7wJTI-1dvQ",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+    videoUrl: "https://test-streams.mux.dev/pts_switching/master.m3u8",
+    videoType: "hls",
+    videoHeaders: {},
     tags: ["Neo noir", "Crime"],
     moods: ["Huyền bí"],
     cast: ["Johnny Trí Nguyễn", "Ngô Thanh Vân", "Lana Condor"],
@@ -118,8 +123,9 @@ export const seedMovies = [
     poster:
       "https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&w=900&q=80",
     trailerUrl: "https://www.youtube.com/watch?v=3fumBcKC6RE",
-    videoUrl:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    videoUrl: "https://test-streams.mux.dev/bbb-360p.m3u8",
+    videoType: "hls",
+    videoHeaders: {},
     tags: ["Reality", "Cooking", "Sci-fi"],
     moods: ["Hài hước", "Hoạt hình"],
     cast: ["Padma Lakshmi", "Simu Liu"],

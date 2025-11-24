@@ -13,6 +13,15 @@ const MovieSchema = new mongoose.Schema(
     poster: String,
     trailerUrl: String,
     videoUrl: String,
+    videoType: {
+      type: String,
+      enum: ["mp4", "hls"],
+      default: "mp4",
+    },
+    videoHeaders: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     tags: [String],
     moods: [String],
     cast: [String],

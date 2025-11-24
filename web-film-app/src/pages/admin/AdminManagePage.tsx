@@ -22,6 +22,8 @@ export function AdminManagePage() {
     director: "",
     trailerUrl: "",
     videoUrl: "",
+    videoType: "hls",
+    videoHeaders: "",
     thumbnail: "",
     poster: "",
   });
@@ -124,6 +126,10 @@ export function AdminManagePage() {
                         director: movie.director ?? "",
                         trailerUrl: movie.trailerUrl ?? "",
                         videoUrl: movie.videoUrl ?? "",
+                        videoType: movie.videoType ?? "mp4",
+                        videoHeaders: movie.videoHeaders
+                          ? JSON.stringify(movie.videoHeaders, null, 2)
+                          : "",
                         thumbnail: movie.thumbnail ?? "",
                         poster: movie.poster ?? "",
                       });
@@ -178,6 +184,19 @@ export function AdminManagePage() {
                 if (!editingMovie) return;
                 setSubmitting(true);
                 setSubmitStatus(null);
+                let parsedHeaders: Record<string, string> = {};
+                try {
+                  parsedHeaders = formData.videoHeaders
+                    ? (JSON.parse(
+                        formData.videoHeaders
+                      ) as Record<string, string>)
+                    : {};
+                } catch (err) {
+                  setSubmitStatus("Headers JSON không hợp lệ.");
+                  setSubmitting(false);
+                  return;
+                }
+
                 try {
                   await api.movies.update(editingMovie.id, {
                     title: formData.title,
@@ -200,6 +219,8 @@ export function AdminManagePage() {
                     director: formData.director,
                     trailerUrl: formData.trailerUrl,
                     videoUrl: formData.videoUrl,
+                    videoType: formData.videoType as Movie["videoType"],
+                    videoHeaders: parsedHeaders,
                     thumbnail: formData.thumbnail,
                     poster: formData.poster,
                   });
@@ -433,6 +454,46 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Định dạng nguồn
+                  </label>
+                  <select
+                    value={formData.videoType}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        videoType: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  >
+                    <option value="hls">HLS (.m3u8)</option>
+                    <option value="mp4">MP4 trực tiếp</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Headers (JSON) để vượt qua Referer/Origin
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.videoHeaders}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      videoHeaders: event.target.value,
+                    }))
+                  }
+                  placeholder='{"Referer":"https://rophim.net/"}'
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Copy trực tiếp headers lấy từ note Rophim hoặc các tool khác
+                  để player phía client có thể gọi qua proxy bảo mật.
+                </p>
               </div>
 
               <button

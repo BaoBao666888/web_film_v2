@@ -14,6 +14,8 @@ export interface Movie extends MovieSummary {
   poster: string;
   trailerUrl?: string;
   videoUrl?: string;
+  videoType?: "mp4" | "hls";
+  videoHeaders?: Record<string, string>;
   moods: string[];
   cast: string[];
   director: string;
@@ -51,6 +53,13 @@ export interface WatchResponse {
   title: string;
   synopsis: string;
   videoUrl: string;
+  playbackType: "mp4" | "hls";
+  stream?: {
+    type: "mp4" | "hls";
+    url: string;
+    headers?: Record<string, string>;
+  } | null;
+  videoHeaders?: Record<string, string>;
   poster: string;
   trailerUrl?: string;
   tags: string[];
@@ -159,4 +168,19 @@ export interface AiDashboardResponse {
   watchCount: number;
   reviewCount: number;
   avgMoodScore: number;
+}
+
+export interface HlsQuality {
+  id: string;
+  resolution?: string;
+  bitrate?: number;
+  proxiedUrl: string;
+  url?: string;
+}
+
+export interface HlsAnalyzeResponse {
+  type: "master" | "direct";
+  qualities?: HlsQuality[];
+  proxiedUrl?: string;
+  url?: string;
 }

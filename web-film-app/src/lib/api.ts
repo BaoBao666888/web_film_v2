@@ -13,10 +13,22 @@ import type {
   AuthResponse,
   AiDashboardResponse,
   Movie,
+  HlsAnalyzeResponse,
 } from "../types/api";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+
+const API_ROOT_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
+export const buildApiUrl = (path: string) => {
+  if (!path) return API_ROOT_URL;
+  if (path.startsWith("http")) return path;
+  if (path.startsWith("/api/")) {
+    return `${API_ROOT_URL}${path}`;
+  }
+  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+};
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -103,6 +115,13 @@ export const api = {
     favoriteStatus: (id: string) =>
       apiFetch<{ favorite: boolean }>(`/movies/${id}/favorite`, {
         method: "GET",
+      }),
+  },
+  hls: {
+    analyze: (payload: { url: string; headers?: Record<string, string> }) =>
+      apiFetch<HlsAnalyzeResponse>(`/hls/analyze`, {
+        method: "POST",
+        body: JSON.stringify(payload),
       }),
   },
   ai: {
