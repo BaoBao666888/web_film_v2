@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 const linkBaseClasses =
   "px-3 py-2 text-sm font-medium transition-colors duration-200 hover:text-primary";
@@ -13,6 +14,8 @@ interface NavItem {
 }
 
 export function Navbar() {
+  const { user, isAuthenticated, logout } = useAuth();
+
   const navItems = useMemo<NavItem[]>(
     () => [
       { label: "Trang chủ", to: "/" },
@@ -56,18 +59,43 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <NavLink
-            to="/login"
-            className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
-          >
-            Đăng nhập
-          </NavLink>
-          <NavLink
-            to="/register"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
-          >
-            Đăng ký
-          </NavLink>
+          {isAuthenticated ? (
+            <>
+              <NavLink
+                to="/profile"
+                className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
+              >
+                <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-dark text-xs font-bold">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </div>
+                {user?.name}
+              </NavLink>
+              <button
+                onClick={() => {
+                  logout();
+                  window.location.reload();
+                }}
+                className="rounded-full bg-red-500/20 border border-red-500/30 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/30"
+              >
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <>
+              <NavLink
+                to="/login"
+                className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
+              >
+                Đăng nhập
+              </NavLink>
+              <NavLink
+                to="/register"
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
+              >
+                Đăng ký
+              </NavLink>
+            </>
+          )}
         </div>
       </nav>
     </header>

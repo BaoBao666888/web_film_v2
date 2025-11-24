@@ -27,11 +27,12 @@ const moodPlaylists = [
   },
 ];
 
-router.get("/recommendations", (req, res) => {
+router.get("/recommendations", async (req, res) => {
   const { userId = "demo-user", mood } = req.query;
-  let rows = listMovies({ mood, limit: 6 });
+  let rows = await listMovies({ mood, limit: 6 });
+
   if (!rows.length) {
-    rows = listMovies({ limit: 6 });
+    rows = await listMovies({ limit: 6 });
   }
 
   res.json({
@@ -42,11 +43,11 @@ router.get("/recommendations", (req, res) => {
   });
 });
 
-router.get("/playlists", (req, res) => {
+router.get("/playlists", async (_req, res) => {
   res.json({ items: moodPlaylists });
 });
 
-router.post("/chat", (req, res) => {
+router.post("/chat", async (req, res) => {
   const { message = "", userId = "demo-user" } = req.body;
   const sanitized = message.trim().toLowerCase();
 
@@ -55,7 +56,7 @@ router.post("/chat", (req, res) => {
   if (sanitized.includes("kinh dị")) mood = "Kinh dị";
   if (sanitized.includes("hài")) mood = "Hài hước";
 
-  const suggestions = listMovies({ mood, limit: 3 }).map((movie) => ({
+  const suggestions = (await listMovies({ mood, limit: 3 })).map((movie) => ({
     id: movie.id,
     title: movie.title,
     synopsis: movie.synopsis,
@@ -69,8 +70,8 @@ router.post("/chat", (req, res) => {
   });
 });
 
-router.get("/dashboard", (req, res) => {
-  const stats = getStats();
+router.get("/dashboard", async (req, res) => {
+  const stats = await getStats();
   const avgMoodScore = Math.min(100, 60 + stats.reviews * 2);
 
   res.json({
