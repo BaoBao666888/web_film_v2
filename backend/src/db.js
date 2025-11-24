@@ -188,6 +188,14 @@ export const addWatchHistory = async ({ userId, movieId }) => {
   await doc.save();
 };
 
+export const removeWatchHistory = async ({ userId, historyId }) => {
+  await WatchHistory.deleteOne({ id: historyId, user_id: userId });
+};
+
+export const clearWatchHistory = async (userId) => {
+  await WatchHistory.deleteMany({ user_id: userId });
+};
+
 // Favorites
 
 export const addFavorite = async ({ userId, movieId }) => {

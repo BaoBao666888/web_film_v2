@@ -1,4 +1,3 @@
-// src/routes/movies.js
 import { Router } from "express";
 import {
   listMovies,

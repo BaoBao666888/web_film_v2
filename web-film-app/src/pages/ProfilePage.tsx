@@ -3,13 +3,45 @@ import { PageHeader } from "../components/PageHeader";
 import { featuredMovies } from "../data/movies";
 import { useFetch } from "../hooks/useFetch";
 import { useAuth } from "../hooks/useAuth";
+import { useState } from "react";
+import { api } from "../lib/api";
 import type { ProfileResponse } from "../types/api";
 
 export function ProfilePage() {
   const { user: authUser } = useAuth();
-  const { data, loading, error } = useFetch<ProfileResponse>(
+  const { data, loading, error, refetch } = useFetch<ProfileResponse>(
     authUser?.id ? `/auth/profile/${authUser.id}` : null
   );
+  const [deletingHistory, setDeletingHistory] = useState<string | null>(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
+
+  const handleDeleteHistory = async (historyId: string) => {
+    if (!authUser) return;
+    setDeletingHistory(historyId);
+    try {
+      await api.history.remove(historyId);
+      refetch();
+    } catch (error) {
+      console.error("Không thể xóa lịch sử:", error);
+    } finally {
+      setDeletingHistory(null);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (!authUser || !confirm("Bạn có chắc muốn xóa toàn bộ lịch sử xem?"))
+      return;
+    setClearingHistory(true);
+    try {
+      await api.history.clear();
+      refetch();
+    } catch (error) {
+      console.error("Không thể xóa toàn bộ lịch sử:", error);
+    } finally {
+      setClearingHistory(false);
+    }
+  };
+
   const user = data?.user || authUser;
   const favorites = data?.favorites?.length ? data.favorites : featuredMovies;
   const history = data?.history ?? [];
@@ -41,7 +73,7 @@ export function ProfilePage() {
     <div className="space-y-10">
       <PageHeader
         title={`Hồ sơ của ${user?.name}`}
-        description="Thông tin cá nhân, phim yêu thích và lịch sử xem lấy từ API auth."
+        description="Thông tin cá nhân, phim yêu thích và lịch sử xem từ API."
         actions={
           <Link
             to="/logout"
@@ -53,6 +85,7 @@ export function ProfilePage() {
       />
 
       <section className="grid gap-6 md:grid-cols-[0.9fr_1.1fr]">
+        {/* THÔNG TIN USER */}
         <div className="space-y-5 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
           <div className="flex items-center gap-4">
             {user?.avatar ? (
@@ -82,7 +115,9 @@ export function ProfilePage() {
           </div>
         </div>
 
+        {/* PHIM YÊU THÍCH & LỊCH SỬ */}
         <div className="space-y-5">
+          {/* FAVORITES */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
             <p className="text-sm font-semibold text-white">Phim yêu thích</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -92,6 +127,7 @@ export function ProfilePage() {
                   typeof (movie as { poster?: string }).poster === "string"
                     ? (movie as { poster?: string }).poster
                     : movie.thumbnail;
+
                 return (
                   <Link
                     key={movie.id}
@@ -120,28 +156,71 @@ export function ProfilePage() {
             </div>
           </div>
 
+          {/* HISTORY */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-            <p className="text-sm font-semibold text-white">
-              Lịch sử xem gần đây
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">
+                Lịch sử xem gần đây
+              </p>
+              {history.length > 0 && (
+                <button
+                  onClick={handleClearHistory}
+                  disabled={clearingHistory}
+                  className="rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                >
+                  {clearingHistory ? "Đang xóa..." : "Xóa tất cả"}
+                </button>
+              )}
+            </div>
             <div className="mt-4 flex flex-col gap-3 text-xs text-slate-300">
               {history.length === 0 && (
                 <p className="text-slate-500">
                   Chưa có lịch sử. Xem phim để hệ thống ghi nhận nhé!
                 </p>
               )}
+
               {history.map((item) => (
                 <div
                   key={`history-${item.id}`}
                   className="flex items-center justify-between rounded-2xl border border-white/5 bg-dark/50 px-4 py-3"
                 >
-                  <span>{item.title}</span>
-                  <span className="text-slate-500">
-                    Đã xem:{" "}
-                    {item.lastWatchedAt
-                      ? new Date(item.lastWatchedAt).toLocaleDateString("vi-VN")
-                      : "Gần đây"}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {item.thumbnail && (
+                      <img
+                        src={item.thumbnail}
+                        alt={item.title}
+                        className="h-8 w-8 rounded-lg object-cover"
+                      />
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-medium text-white">
+                        {item.title ?? "Không xác định"}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        Đã xem:{" "}
+                        {item.lastWatchedAt
+                          ? new Date(item.lastWatchedAt).toLocaleDateString(
+                              "vi-VN"
+                            )
+                          : "Gần đây"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/watch/${item.movieId}`}
+                      className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-dark transition hover:bg-primary/90"
+                    >
+                      Xem lại
+                    </Link>
+                    <button
+                      onClick={() => handleDeleteHistory(item.id)}
+                      disabled={deletingHistory === item.id}
+                      className="rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      {deletingHistory === item.id ? "Xóa..." : "×"}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

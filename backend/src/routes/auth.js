@@ -66,7 +66,8 @@ router.get("/profile/:id", async (req, res) => {
 
   const favorites = await listFavorites(id, 6);
   const history = (await listWatchHistory(id)).slice(0, 6).map((item) => ({
-    id: item.movie_id,
+    id: item.id,
+    movieId: item.movie_id,
     title: item.movie?.title || "",
     thumbnail: item.movie?.thumbnail || "",
     lastWatchedAt: item.last_watched_at,

@@ -130,4 +130,20 @@ export const api = {
     users: () => apiFetch<AdminUsersResponse>(`/admin/users`),
     movies: () => apiFetch<AdminMoviesResponse>(`/admin/movies`),
   },
+  history: {
+    list: () => apiFetch(`/history`),
+    add: (movieId: string) =>
+      apiFetch(`/history`, {
+        method: "POST",
+        body: JSON.stringify({ movieId }),
+      }),
+    remove: (historyId: string) =>
+      apiFetch(`/history/${historyId}`, {
+        method: "DELETE",
+      }),
+    clear: () =>
+      apiFetch(`/history`, {
+        method: "DELETE",
+      }),
+  },
 };
