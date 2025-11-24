@@ -16,16 +16,18 @@ interface NavItem {
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
 
-  const navItems = useMemo<NavItem[]>(
-    () => [
+  const navItems = useMemo<NavItem[]>(() => {
+    const items: NavItem[] = [
       { label: "Trang chủ", to: "/" },
       { label: "Tìm kiếm", to: "/search" },
       { label: "Gợi ý AI", to: "/recommend" },
       { label: "Chatbot", to: "/chat" },
-      { label: "Dashboard", to: "/admin" },
-    ],
-    []
-  );
+    ];
+    if (user?.role === "admin") {
+      items.push({ label: "Dashboard", to: "/admin" });
+    }
+    return items;
+  }, [user?.role]);
 
   return (
     <header className="sticky top-0 z-40 bg-dark/80 backdrop-blur-md border-b border-white/10">

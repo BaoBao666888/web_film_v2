@@ -6,8 +6,8 @@ import { api } from "../lib/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("minhanh@example.com");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 

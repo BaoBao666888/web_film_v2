@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, unique: true, index: true },
     avatar: String,
     role: { type: String, default: "user" },
+    favorite_moods: { type: [String], default: [] },
     password_hash: String,
     created_at: { type: Date, default: Date.now },
   },

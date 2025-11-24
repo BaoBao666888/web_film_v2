@@ -102,6 +102,7 @@ export interface ProfileResponse {
     avatar?: string;
     role: string;
     created_at?: string;
+    favorite_moods?: string[];
   };
   favorites: MovieSummary[];
   history: Array<{
@@ -124,6 +125,7 @@ export interface AdminUsersResponse {
     email: string;
     role: string;
     created_at?: string;
+    favorite_moods?: string[];
   }>;
 }
 
@@ -148,6 +150,7 @@ export interface AuthResponse {
     email: string;
     avatar?: string;
     role?: string;
+    favorite_moods?: string[];
   };
 }
 

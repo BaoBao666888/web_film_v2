@@ -107,6 +107,7 @@ export const addUser = async ({ name, email, password }) => {
     name,
     email,
     role: "user",
+    favorite_moods: [],
     password_hash: bcrypt.hashSync(password, 10),
     created_at: new Date(),
   });
@@ -122,6 +123,15 @@ export const getUserById = async (id) => {
   return User.findOne({ id }).lean();
 };
 
+export const updateUser = async (id, updates = {}) => {
+  const user = await User.findOneAndUpdate(
+    { id },
+    { $set: updates },
+    { new: true }
+  );
+  return user ? user.toObject() : null;
+};
+
 export const listUsers = async () => {
   const users = await User.find().lean();
   return users.map((user) => ({
@@ -130,6 +140,7 @@ export const listUsers = async () => {
     email: user.email,
     role: user.role,
     created_at: user.created_at,
+    favorite_moods: user.favorite_moods || [],
   }));
 };
 

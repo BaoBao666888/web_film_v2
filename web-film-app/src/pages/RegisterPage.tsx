@@ -6,11 +6,11 @@ import { api } from "../lib/api";
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const [name, setName] = useState("Nguyễn Minh Anh");
-  const [nickname, setNickname] = useState("minhanh.07");
-  const [email, setEmail] = useState("minhanh@example.com");
-  const [password, setPassword] = useState("123456");
-  const [confirmPassword, setConfirmPassword] = useState("123456");
+  const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
