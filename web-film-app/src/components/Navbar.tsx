@@ -42,7 +42,7 @@ export function Navbar() {
           <span>AI Cinema</span>
         </NavLink>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="flex items-center gap-1">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
