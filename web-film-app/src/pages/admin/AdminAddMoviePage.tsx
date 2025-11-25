@@ -22,8 +22,7 @@ export function AdminAddMoviePage() {
     trailerUrl: "",
     videoUrl: "",
     videoType: "hls" as Movie["videoType"],
-    videoHeaders:
-      '{"Referer":"https://rophim.net/","Origin":"https://rophim.net"}',
+    videoHeaders: "",
   });
 
   const [status, setStatus] = useState<string | null>(null);
@@ -263,12 +262,13 @@ export function AdminAddMoviePage() {
             rows={3}
             value={form.videoHeaders}
             onChange={(event) => updateField("videoHeaders", event.target.value)}
-            placeholder='{"Referer":"https://rophim.net/"}'
+            placeholder='{"Referer":"https://example.com/"} (bỏ trống để dùng header mặc định)'
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
           />
           <p className="mt-2 text-xs text-slate-400">
-            Các nguồn như Rophim yêu cầu Referer/Origin hợp lệ (ví dụ:
-            https://rophim.net/). Bạn có thể thêm token khác nếu cần.
+            Nếu để trống, hệ thống sẽ tự áp dụng bộ headers mặc định (Referer
+            https://goatembed.com/ + user-agent chuẩn). Điền JSON khi cần override
+            riêng cho phim.
           </p>
         </div>
 

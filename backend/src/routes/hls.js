@@ -1,23 +1,12 @@
 import { Router } from "express";
 import fetch from "node-fetch";
 import { pipeline } from "node:stream/promises";
+import { getDefaultHlsHeaders } from "../config/hlsDefaults.js";
 
 const router = Router();
 
-const DEFAULT_REFERER =
-  process.env.HLS_DEFAULT_REFERER || "https://rophim.net/";
-
-const DEFAULT_HEADERS = {
-  Accept: "*/*",
-  "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-  "Cache-Control": "no-cache",
-  Pragma: "no-cache",
-  Origin: safeOrigin(DEFAULT_REFERER),
-  Referer: DEFAULT_REFERER,
-  "Sec-Fetch-Site": "cross-site",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-};
+const DEFAULT_HEADERS = getDefaultHlsHeaders();
+const DEFAULT_REFERER = DEFAULT_HEADERS.Referer;
 
 function safeOrigin(url) {
   try {
@@ -43,12 +32,16 @@ const parseHeaders = (value) => {
 };
 
 const mergeHeaders = (customHeaders = {}) => {
-  return {
+  const merged = {
     ...DEFAULT_HEADERS,
     ...Object.fromEntries(
       Object.entries(customHeaders).map(([key, val]) => [key, String(val)])
     ),
   };
+  if (!merged.Origin) {
+    merged.Origin = safeOrigin(merged.Referer || DEFAULT_REFERER);
+  }
+  return merged;
 };
 
 const normalizeUrl = (rawUrl) => {
@@ -227,10 +220,21 @@ router.get("/proxy", async (req, res) => {
       );
     }
     res.setHeader("Content-Type", contentType);
-    await pipeline(upstream.body, res);
+    try {
+      await pipeline(upstream.body, res);
+    } catch (streamErr) {
+      console.error("HLS proxy stream error:", streamErr);
+      if (!res.headersSent) {
+        return res.status(502).send("Upstream stream closed unexpectedly.");
+      }
+      res.end();
+      return;
+    }
   } catch (error) {
     console.error("HLS proxy error:", error);
-    res.status(500).send("Lỗi proxy HLS.");
+    if (!res.headersSent) {
+      res.status(500).send("Lỗi proxy HLS.");
+    }
   }
 });
 

@@ -98,7 +98,7 @@ export function WatchPage() {
     {
       label: "Headers bảo vệ",
       value: `${Object.keys(streamSource?.headers ?? {}).length} custom`,
-      hint: "Thêm Referer/Origin theo hướng dẫn Rophim",
+      hint: "Referer/Origin giúp bảo mật tốt hơn",
     },
     {
       label: "Mức kết nối đề xuất",

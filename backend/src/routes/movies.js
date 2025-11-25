@@ -14,6 +14,7 @@ import {
 } from "../db.js";
 import { generateId } from "../utils/id.js";
 import { verifyToken, requireAdmin } from "../middleware/auth.js";
+import { getDefaultHlsHeaders } from "../config/hlsDefaults.js";
 
 const router = Router();
 
@@ -53,6 +54,16 @@ const detectVideoType = (explicitType, url) => {
     return "hls";
   }
   return "mp4";
+};
+
+const resolveVideoHeaders = (videoType, headersValue) => {
+  const parsed = parseHeadersPayload(headersValue, {});
+  const sanitized = parsed && typeof parsed === "object" ? parsed : {};
+  const hasCustomHeaders = Object.keys(sanitized).length > 0;
+  if (videoType === "hls") {
+    return hasCustomHeaders ? sanitized : getDefaultHlsHeaders();
+  }
+  return sanitized;
 };
 
 //Lấy danh sách phim
@@ -97,23 +108,29 @@ router.get("/:id/watch", async (req, res) => {
     thumbnail: item.thumbnail,
   }));
 
+  const playbackType = detectVideoType(movie.videoType, movie.videoUrl);
+  const resolvedHeaders = resolveVideoHeaders(
+    playbackType,
+    movie.videoHeaders
+  );
+
   res.json({
     movieId: movie.id,
     title: movie.title,
     synopsis: movie.synopsis,
     videoUrl: movie.videoUrl,
-    playbackType: detectVideoType(movie.videoType, movie.videoUrl),
+    playbackType,
     stream: movie.videoUrl
       ? {
-          type: detectVideoType(movie.videoType, movie.videoUrl),
+          type: playbackType,
           url: movie.videoUrl,
-          headers: movie.videoHeaders || {},
+          headers: resolvedHeaders,
         }
       : null,
     poster: movie.poster,
     trailerUrl: movie.trailerUrl,
     tags: movie.tags || [],
-    videoHeaders: movie.videoHeaders || {},
+    videoHeaders: resolvedHeaders,
     nextUp,
   });
 });
@@ -158,6 +175,12 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
 
   const id = orDefault(payload.id, slugify(payload.title));
 
+  const computedVideoType = detectVideoType(payload.videoType, payload.videoUrl);
+  const computedHeaders = resolveVideoHeaders(
+    computedVideoType,
+    payload.videoHeaders
+  );
+
   const newMovie = {
     id,
     slug: slugify(orDefault(payload.slug, payload.title)),
@@ -170,8 +193,8 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     poster: orDefault(payload.poster, ""),
     trailerUrl: orDefault(payload.trailerUrl, ""),
     videoUrl: orDefault(payload.videoUrl, ""),
-    videoType: detectVideoType(payload.videoType, payload.videoUrl),
-    videoHeaders: parseHeadersPayload(payload.videoHeaders, {}),
+    videoType: computedVideoType,
+    videoHeaders: computedHeaders,
     tags: orDefault(payload.tags, []),
     moods: orDefault(payload.moods, []),
     cast: orDefault(payload.cast, []),
@@ -189,15 +212,16 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
   const payload = { ...movie, ...req.body };
-  if (req.body.videoHeaders !== undefined) {
-    payload.videoHeaders = parseHeadersPayload(
-      req.body.videoHeaders,
-      movie.videoHeaders || {}
-    );
-  }
-  payload.videoType = detectVideoType(
+  const computedVideoType = detectVideoType(
     req.body.videoType ?? movie.videoType,
     payload.videoUrl
+  );
+  payload.videoType = computedVideoType;
+  payload.videoHeaders = resolveVideoHeaders(
+    computedVideoType,
+    req.body.videoHeaders !== undefined
+      ? req.body.videoHeaders
+      : movie.videoHeaders
   );
   const updated = await updateMovie(id, payload);
 
