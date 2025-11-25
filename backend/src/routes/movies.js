@@ -11,9 +11,17 @@ import {
   addFavorite,
   removeFavorite,
   isFavorite,
+  getTrendingMovies,
+  listNewestMovies,
+  getCommunityHighlights,
+  getMovieRatingStats,
+  listCommentsByMovie,
+  insertComment,
+  getUserById,
 } from "../db.js";
 import { generateId } from "../utils/id.js";
 import { verifyToken, requireAdmin } from "../middleware/auth.js";
+import { getDefaultHlsHeaders } from "../config/hlsDefaults.js";
 
 const router = Router();
 
@@ -55,6 +63,16 @@ const detectVideoType = (explicitType, url) => {
   return "mp4";
 };
 
+const resolveVideoHeaders = (videoType, headersValue) => {
+  const parsed = parseHeadersPayload(headersValue, {});
+  const sanitized = parsed && typeof parsed === "object" ? parsed : {};
+  const hasCustomHeaders = Object.keys(sanitized).length > 0;
+  if (videoType === "hls") {
+    return hasCustomHeaders ? sanitized : getDefaultHlsHeaders();
+  }
+  return sanitized;
+};
+
 //Lấy danh sách phim
 router.get("/", async (req, res) => {
   const { q, mood, tag, limit = 12 } = req.query;
@@ -67,15 +85,91 @@ router.get("/", async (req, res) => {
   res.json({ items });
 });
 
+router.get("/trending", async (req, res) => {
+  try {
+    const { days = 7, page = 1, limit = 12 } = req.query;
+    const payload = await getTrendingMovies({
+      days: Number(days) || 7,
+      page: Number(page) || 1,
+      limit: Number(limit) || 12,
+    });
+    res.json(payload);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách xu hướng", error);
+    res.status(500).json({ message: "Không thể lấy danh sách xu hướng" });
+  }
+});
+
+router.get("/new", async (req, res) => {
+  try {
+    const { page = 1, limit = 6 } = req.query;
+    const payload = await listNewestMovies({
+      page: Number(page) || 1,
+      limit: Number(limit) || 6,
+    });
+    res.json(payload);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách phim mới", error);
+    res.status(500).json({ message: "Không thể lấy danh sách phim mới" });
+  }
+});
+
+router.get("/community-highlights", async (_req, res) => {
+  try {
+    const data = await getCommunityHighlights();
+    res.json(data);
+  } catch (error) {
+    console.error("Lỗi lấy dữ liệu community", error);
+    res
+      .status(500)
+      .json({ message: "Không thể lấy dữ liệu cộng đồng", error: error.message });
+  }
+});
+
 //Chi tiết phim
 router.get("/:id", async (req, res) => {
   const movie = await getMovie(req.params.id);
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
-  const reviews = await listReviewsByMovie(movie.id, 5);
-  const suggestions = await getRandomMovies({ excludeId: movie.id, limit: 4 });
+  const [reviews, suggestions, ratingStats] = await Promise.all([
+    listReviewsByMovie(movie.id, 5),
+    getRandomMovies({ excludeId: movie.id, limit: 4 }),
+    getMovieRatingStats(movie.id),
+  ]);
 
-  res.json({ movie, reviews, suggestions });
+  res.json({ movie, reviews, suggestions, ratingStats });
+});
+
+router.get("/:id/comments", async (req, res) => {
+  const movie = await getMovie(req.params.id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+  const { limit = 30 } = req.query;
+  const items = await listCommentsByMovie(movie.id, Number(limit) || 30);
+  res.json({ items });
+});
+
+router.post("/:id/comments", verifyToken, async (req, res) => {
+  const movie = await getMovie(req.params.id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+  const content = (req.body?.content || "").trim();
+  if (!content) {
+    return res
+      .status(400)
+      .json({ message: "Nội dung bình luận không được để trống" });
+  }
+
+  const saved = await insertComment({
+    userId: req.user.id,
+    movieId: movie.id,
+    content,
+  });
+  const user = await getUserById(req.user.id);
+  res.status(201).json({
+    comment: {
+      ...saved,
+      user: user ? { id: user.id, name: user.name, avatar: user.avatar } : null,
+    },
+  });
 });
 
 //XEM PHIM
@@ -97,23 +191,29 @@ router.get("/:id/watch", async (req, res) => {
     thumbnail: item.thumbnail,
   }));
 
+  const playbackType = detectVideoType(movie.videoType, movie.videoUrl);
+  const resolvedHeaders = resolveVideoHeaders(
+    playbackType,
+    movie.videoHeaders
+  );
+
   res.json({
     movieId: movie.id,
     title: movie.title,
     synopsis: movie.synopsis,
     videoUrl: movie.videoUrl,
-    playbackType: detectVideoType(movie.videoType, movie.videoUrl),
+    playbackType,
     stream: movie.videoUrl
       ? {
-          type: detectVideoType(movie.videoType, movie.videoUrl),
+          type: playbackType,
           url: movie.videoUrl,
-          headers: movie.videoHeaders || {},
+          headers: resolvedHeaders,
         }
       : null,
     poster: movie.poster,
     trailerUrl: movie.trailerUrl,
     tags: movie.tags || [],
-    videoHeaders: movie.videoHeaders || {},
+    videoHeaders: resolvedHeaders,
     nextUp,
   });
 });
@@ -158,6 +258,12 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
 
   const id = orDefault(payload.id, slugify(payload.title));
 
+  const computedVideoType = detectVideoType(payload.videoType, payload.videoUrl);
+  const computedHeaders = resolveVideoHeaders(
+    computedVideoType,
+    payload.videoHeaders
+  );
+
   const newMovie = {
     id,
     slug: slugify(orDefault(payload.slug, payload.title)),
@@ -170,8 +276,8 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     poster: orDefault(payload.poster, ""),
     trailerUrl: orDefault(payload.trailerUrl, ""),
     videoUrl: orDefault(payload.videoUrl, ""),
-    videoType: detectVideoType(payload.videoType, payload.videoUrl),
-    videoHeaders: parseHeadersPayload(payload.videoHeaders, {}),
+    videoType: computedVideoType,
+    videoHeaders: computedHeaders,
     tags: orDefault(payload.tags, []),
     moods: orDefault(payload.moods, []),
     cast: orDefault(payload.cast, []),
@@ -189,15 +295,16 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
   const payload = { ...movie, ...req.body };
-  if (req.body.videoHeaders !== undefined) {
-    payload.videoHeaders = parseHeadersPayload(
-      req.body.videoHeaders,
-      movie.videoHeaders || {}
-    );
-  }
-  payload.videoType = detectVideoType(
+  const computedVideoType = detectVideoType(
     req.body.videoType ?? movie.videoType,
     payload.videoUrl
+  );
+  payload.videoType = computedVideoType;
+  payload.videoHeaders = resolveVideoHeaders(
+    computedVideoType,
+    req.body.videoHeaders !== undefined
+      ? req.body.videoHeaders
+      : movie.videoHeaders
   );
   const updated = await updateMovie(id, payload);
 

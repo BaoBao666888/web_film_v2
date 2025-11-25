@@ -4,15 +4,11 @@ import pickle
 from rapidfuzz import fuzz
 import os
 
-class MovieSearchEngine:
-    def __init__(self, 
-                 model_path=None, 
-                 index_path=None):
 
-        # === Tạo đường dẫn tuyệt đối tới thư mục "search" ===
+class MovieSearchEngine:
+    def __init__(self, model_path=None, index_path=None):
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
-        # Nếu không truyền vào → dùng mặc định
         if model_path is None:
             model_path = os.path.join(base_dir, "models", "movie_semantic_vi")
         if index_path is None:
@@ -23,17 +19,24 @@ class MovieSearchEngine:
 
         # === Load model ===
         try:
-            if os.path.isdir(model_path) and os.path.isfile(os.path.join(model_path, "config.json")):
+            if os.path.isdir(model_path) and os.path.isfile(
+                os.path.join(model_path, "config.json")
+            ):
                 print(f"✅ Đang load model fine-tune từ: {model_path}")
                 self.model = SentenceTransformer(model_path)
             else:
-                print("⚠️ Không tìm thấy model fine-tune, dùng model gốc paraphrase-multilingual-MiniLM-L12-v2.")
-                self.model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-
+                print(
+                    "⚠️ Không tìm thấy model fine-tune, dùng model gốc paraphrase-multilingual-MiniLM-L12-v2."
+                )
+                self.model = SentenceTransformer(
+                    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+                )
         except Exception as e:
             print("⚠️ Lỗi khi load model fine-tune, fallback về model gốc.")
             print(e)
-            self.model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+            self.model = SentenceTransformer(
+                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            )
 
         # === Load index ===
         print(f"🔹 Load index phim từ: {index_path}")
@@ -44,6 +47,11 @@ class MovieSearchEngine:
         self.ids = data["ids"]
         self.titles = data["titles"]
         self.texts = data["texts"]
+        # mới thêm
+        self.thumbnails = data.get(
+            "thumbnails", ["" for _ in range(len(self.ids))]
+        )
+        self.posters = data.get("posters", ["" for _ in range(len(self.ids))])
 
     # ------------------------------------------
     # SEMANTIC SEARCH
@@ -56,12 +64,16 @@ class MovieSearchEngine:
         top_idx = np.argsort(-sims)[:top_k]
         results = []
         for i in top_idx:
-            results.append({
-                "id": self.ids[i],
-                "title": self.titles[i],
-                "score": float(sims[i]),
-                "text": self.texts[i],
-            })
+            results.append(
+                {
+                    "id": self.ids[i],
+                    "title": self.titles[i],
+                    "score": float(sims[i]),
+                    "text": self.texts[i],
+                    "thumbnail": self.thumbnails[i],
+                    "poster": self.posters[i],
+                }
+            )
         return results
 
     # ------------------------------------------
@@ -76,12 +88,16 @@ class MovieSearchEngine:
 
         results = []
         for i, s in scores[:top_k]:
-            results.append({
-                "id": self.ids[i],
-                "title": self.titles[i],
-                "score": float(s) / 100.0,
-                "text": self.texts[i],
-            })
+            results.append(
+                {
+                    "id": self.ids[i],
+                    "title": self.titles[i],
+                    "score": float(s) / 100.0,
+                    "text": self.texts[i],
+                    "thumbnail": self.thumbnails[i],
+                    "poster": self.posters[i],
+                }
+            )
         return results
 
     # ------------------------------------------
@@ -104,9 +120,6 @@ class MovieSearchEngine:
         return combined
 
 
-# ------------------------------------------
-# TEST TRỰC TIẾP
-# ------------------------------------------
 if __name__ == "__main__":
     engine = MovieSearchEngine()
     while True:
@@ -116,5 +129,7 @@ if __name__ == "__main__":
         res = engine.search(q, top_k=5)
         print("Kết quả:")
         for r in res:
-            print(f"- [{r['id']}] {r['title']} (score={r['score']:.3f})")
+            print(
+                f"- [{r['id']}] {r['title']} (score={r['score']:.3f}) thumb={r['thumbnail']}"
+            )
         print()

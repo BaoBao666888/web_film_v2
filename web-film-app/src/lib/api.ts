@@ -14,6 +14,11 @@ import type {
   AiDashboardResponse,
   Movie,
   HlsAnalyzeResponse,
+  TrendingMoviesResponse,
+  NewMoviesResponse,
+  CommunityHighlightsResponse,
+  CommentListResponse,
+  Comment,
 } from "../types/api";
 
 export const API_BASE_URL =
@@ -115,6 +120,41 @@ export const api = {
     favoriteStatus: (id: string) =>
       apiFetch<{ favorite: boolean }>(`/movies/${id}/favorite`, {
         method: "GET",
+      }),
+    trending: (query: Record<string, string | number | undefined> = {}) => {
+      const params = new URLSearchParams();
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      const qs = params.toString();
+      return apiFetch<TrendingMoviesResponse>(
+        `/movies/trending${qs ? `?${qs}` : ""}`
+      );
+    },
+    latest: (query: Record<string, string | number | undefined> = {}) => {
+      const params = new URLSearchParams();
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      const qs = params.toString();
+      return apiFetch<NewMoviesResponse>(`/movies/new${qs ? `?${qs}` : ""}`);
+    },
+    communityHighlights: () =>
+      apiFetch<CommunityHighlightsResponse>(`/movies/community-highlights`),
+    comments: (movieId: string, limit?: number) =>
+      apiFetch<CommentListResponse>(
+        `/movies/${movieId}/comments${
+          limit ? `?limit=${encodeURIComponent(String(limit))}` : ""
+        }`
+      ),
+    addComment: (movieId: string, payload: { content: string }) =>
+      apiFetch<{ comment: Comment }>(`/movies/${movieId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(payload),
       }),
   },
   hls: {

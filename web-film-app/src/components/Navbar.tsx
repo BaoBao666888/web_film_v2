@@ -19,6 +19,7 @@ export function Navbar() {
   const navItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [
       { label: "Trang chủ", to: "/" },
+      { label: "Xu hướng", to: "/trending" },
       { label: "Tìm kiếm", to: "/search" },
       { label: "Gợi ý AI", to: "/recommend" },
       { label: "Chatbot", to: "/chat" },

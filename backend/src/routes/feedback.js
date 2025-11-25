@@ -12,8 +12,19 @@ router.post("/ratings", verifyToken, async (req, res) => {
   const userId = req.user.id; // user ID lấy từ token
   const { movieId, rating, comment = "", sentimentHint } = req.body;
 
-  if (!movieId || !rating)
-    return res.status(400).json({ message: "Thiếu movieId hoặc rating" });
+  if (!movieId)
+    return res.status(400).json({ message: "Thiếu movieId" });
+
+  const numericRating = Number(rating);
+  if (Number.isNaN(numericRating)) {
+    return res.status(400).json({ message: "Điểm đánh giá không hợp lệ" });
+  }
+
+  if (numericRating < 0 || numericRating > 10) {
+    return res
+      .status(400)
+      .json({ message: "Điểm hợp lệ nằm trong khoảng 0 - 10" });
+  }
 
   const movie = await getMovie(movieId);
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
@@ -21,13 +32,17 @@ router.post("/ratings", verifyToken, async (req, res) => {
   const reviewId = generateId("rv");
   const sentiment =
     sentimentHint ??
-    (rating >= 4 ? "positive" : rating >= 3 ? "neutral" : "negative");
+    (numericRating >= 7
+      ? "positive"
+      : numericRating >= 4
+      ? "neutral"
+      : "negative");
 
   await insertReview({
     id: reviewId,
     user_id: userId,
     movie_id: movie.id,
-    rating,
+    rating: numericRating,
     comment,
     sentiment,
   });
@@ -36,7 +51,7 @@ router.post("/ratings", verifyToken, async (req, res) => {
     id: reviewId,
     movieId,
     userId,
-    rating,
+    rating: numericRating,
     comment,
     sentiment,
   });

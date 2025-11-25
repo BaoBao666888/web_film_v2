@@ -6,6 +6,9 @@ import { featuredMovies, moods } from "../data/movies";
 import { useFetch } from "../hooks/useFetch";
 import type { MovieListResponse, Movie } from "../types/api";
 
+// ✅ API AI search (Flask) – chỉnh lại nếu bạn dùng port khác
+const AI_SEARCH_URL = "http://127.0.0.1:5001/api/search";
+
 const quickQueries = [
   "Phim hành động nhẹ nhàng",
   "Drama chuyển nghề cảm động",
@@ -13,40 +16,181 @@ const quickQueries = [
   "Phim gia đình vui vẻ",
 ];
 
+type AiSearchItem = {
+  id: string;
+  title: string;
+  score: number;
+  text: string;
+  thumbnail?: string;
+  poster?: string;
+
+};
+
+type AiSearchResponse = {
+  query: string;
+  count: number;
+  results: AiSearchItem[];
+};
+
+/**
+ * Heuristic:
+ * - Câu dài / nhiều từ
+ * - Có . ! ?
+ * - Có từ khóa kiểu: phim, buồn, vui, tâm trạng, gia đình, kinh dị...
+ * => xem như truy vấn tự nhiên → dùng AI search
+ */
+function looksLikeNaturalQuery(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  if (trimmed.length >= 40) return true;
+  if (/[.!?]/.test(trimmed)) return true;
+
+  const wordCount = trimmed.split(/\s+/).length;
+  if (wordCount >= 6) return true;
+
+  if (
+    /phim|buồn|vui|tâm trạng|mood|căng thẳng|kinh dị|hài|gia đình|lãng mạn|tình cảm/i.test(
+      trimmed
+    )
+  ) {
+    return true;
+  }
+
+  return false; // còn lại coi như tên phim
+}
+
 export function SearchPage() {
   const [inputValue, setInputValue] = useState("");
   const [keyword, setKeyword] = useState("");
+
+  // ✅ state cho AI mode
+  const [aiMode, setAiMode] = useState(false);
+  const [aiResults, setAiResults] = useState<Movie[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // ✅ fetch search cũ theo tên phim
   const { data, loading, error } = useFetch<MovieListResponse>(
-    keyword
-      ? `/movies?q=${encodeURIComponent(keyword)}`
-      : "/movies?limit=6",
+    keyword ? `/movies?q=${encodeURIComponent(keyword)}` : "/movies?limit=6",
     [keyword]
   );
 
-  const results = useMemo<Movie[]>(() => {
+  const normalResults = useMemo<Movie[]>(() => {
     if (data?.items?.length) {
       return data.items;
     }
     return featuredMovies.slice(0, 3);
   }, [data]);
 
+  // ✅ chọn kết quả hiển thị
+  const results = aiMode ? aiResults : normalResults;
+  const isLoading = aiMode ? aiLoading : loading;
+  const errorMessage = aiMode ? aiError : error;
+
+  // ✅ gọi API Flask semantic search
+  const runAiSearch = async (query: string) => {
+    setAiMode(true);
+    setAiLoading(true);
+    setAiError(null);
+    setAiResults([]);
+
+    try {
+      const res = await fetch(
+        `${AI_SEARCH_URL}?q=${encodeURIComponent(query)}&top_k=10`
+      );
+      if (!res.ok) {
+        const msg = `HTTP ${res.status}`;
+        setAiError(msg);
+        setAiLoading(false);
+        return;
+      }
+
+      const json: AiSearchResponse = await res.json();
+
+      // ✅ Map kết quả AI → Movie (đầy đủ field bắt buộc)
+      const mapped: Movie[] = json.results.map((item) => {
+        const synopsis = item.text || "";
+        const tags: string[] = [];
+
+        // ưu tiên dùng thumbnail/poster backend trả về
+        const thumb =
+          item.thumbnail && item.thumbnail.length > 0
+            ? item.thumbnail
+            : "/images/placeholder-thumb.jpg";
+
+        const poster =
+          item.poster && item.poster.length > 0 ? item.poster : thumb; // fallback dùng thumb
+
+        return {
+          // MovieSummary
+          id: item.id,
+          title: item.title,
+          thumbnail: thumb,
+          duration: undefined,
+          tags,
+
+          // Movie
+          slug: item.id,
+          synopsis,
+          year: 0,
+          rating: 0,
+          poster,
+          trailerUrl: undefined,
+          videoUrl: undefined,
+          videoType: undefined,
+          videoHeaders: undefined,
+          moods: [],
+          cast: [],
+         director: "",
+      };
+    });
+
+
+      setAiResults(mapped);
+    } catch (e: any) {
+      setAiError(e?.message ?? "Lỗi kết nối AI search");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setKeyword(inputValue.trim());
+    const q = inputValue.trim();
+    if (!q) return;
+
+    setKeyword(q);
+
+    if (looksLikeNaturalQuery(q)) {
+      // ✅ câu mô tả → AI
+      void runAiSearch(q);
+    } else {
+      // ✅ tên phim → search cũ /movies
+      setAiMode(false);
+      setAiResults([]);
+      setAiError(null);
+    }
   };
 
   const handleQuickQuery = (value: string) => {
     setInputValue(value);
     setKeyword(value);
+    void runAiSearch(value);
   };
 
   return (
     <div className="space-y-10">
       <PageHeader
         title="Tìm kiếm thông minh"
-        description="Nhập từ khóa hoặc mô tả tự nhiên để AI hiểu chính xác mood bạn muốn. Dữ liệu đang lấy trực tiếp từ API /movies và sẽ nâng cấp semantic search sau."
+        description={
+          aiMode
+            ? "AI đang được dùng cho các truy vấn mô tả tự nhiên (mood, nội dung, cảm xúc). Nếu chỉ gõ tên phim, hệ thống vẫn dùng search theo tiêu đề như cũ."
+            : "Nhập từ khóa hoặc mô tả tự nhiên. Câu dài / phức tạp sẽ dùng AI semantic search, còn tên phim ngắn sẽ search trực tiếp trong danh sách phim."
+        }
       />
 
+      {/* FORM + INFO */}
       <section className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
           <form onSubmit={handleSubmit}>
@@ -70,8 +214,11 @@ export function SearchPage() {
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Từ khóa sẽ gọi API `/movies`. Khi chưa nhập gì, hệ thống hiển thị
-              đề xuất mặc định từ backend.
+              • Câu dài / mô tả mood → gọi AI tại{" "}
+              <code>{AI_SEARCH_URL}</code>. <br />
+              • Tên phim ngắn (vd: <code>Logan</code>,{" "}
+              <code>Harry Potter</code>) → gọi <code>/movies?q=...</code> như
+              cũ.
             </p>
           </form>
 
@@ -97,13 +244,13 @@ export function SearchPage() {
               Tâm trạng hiện tại?
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {moods.map((mood) => (
+              {moods.map((m) => (
                 <span
-                  key={mood}
-                  onClick={() => handleQuickQuery(mood)}
-                  className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200"
+                  key={m}
+                  onClick={() => handleQuickQuery(m)}
+                  className="cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200"
                 >
-                  #{mood}
+                  #{m}
                 </span>
               ))}
             </div>
@@ -116,20 +263,22 @@ export function SearchPage() {
           </p>
           <div className="rounded-2xl bg-dark/60 p-6 text-sm text-slate-300">
             <p>
-              - Từ khóa được chuẩn hóa và chuyển sang embedding để so khớp với
-              mô tả phim.
+              - Truy vấn là một câu tự nhiên → gửi đến service AI (Flask) để
+              chuyển sang vector ngữ nghĩa và so khớp với mô tả phim.
             </p>
             <p className="mt-2">
-              - Những truy vấn phức tạp sẽ gọi tính năng phân tích sentiment để
-              hiểu rõ hơn cảm xúc người dùng trước khi gợi ý playlist phù hợp.
+              - Truy vấn giống tên phim → dùng API <code>/movies</code> để tìm
+              trực tiếp theo tiêu đề, đảm bảo tốc độ và độ chính xác.
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              Tính năng sẽ kết nối khi hoàn thiện service AI.
+              Nhớ chạy backend AI: <code>python api_search.py</code> (port
+              5001).
             </p>
           </div>
         </aside>
       </section>
 
+      {/* KẾT QUẢ */}
       <section>
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">
@@ -138,11 +287,22 @@ export function SearchPage() {
           {keyword && (
             <p className="text-xs text-slate-400">
               Từ khóa: <span className="text-white">{keyword}</span>
+              {aiMode && (
+                <span className="ml-2 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">
+                  AI semantic
+                </span>
+              )}
             </p>
           )}
         </div>
-        {loading && <p className="text-slate-400">Đang tìm kiếm…</p>}
-        {error && <p className="text-red-400">Lỗi: {error}</p>}
+
+        {isLoading && (
+          <p className="mt-3 text-sm text-slate-400">Đang tìm kiếm…</p>
+        )}
+        {errorMessage && (
+          <p className="mt-3 text-sm text-red-400">Lỗi: {errorMessage}</p>
+        )}
+
         <div className="mt-5 grid gap-5 md:grid-cols-3">
           {results.map((movie) => (
             <article
@@ -158,14 +318,16 @@ export function SearchPage() {
                 <p className="text-lg font-semibold text-white">
                   {movie.title}
                 </p>
-                <p className="mt-1 text-xs text-slate-300">
-                  {movie.moods?.join(" • ")}
-                </p>
+                {movie.moods && movie.moods.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-300">
+                    {movie.moods.join(" • ")}
+                  </p>
+                )}
                 <p className="mt-3 flex-1 text-sm text-slate-200">
                   {movie.synopsis}
                 </p>
                 <Link
-                  to={`/movie/${movie.id}`}
+                  to={`/movie/${movie.slug || movie.id}`}
                   className="mt-4 inline-flex items-center text-sm text-primary transition hover:text-primary/80"
                 >
                   Xem chi tiết →

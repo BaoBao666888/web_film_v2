@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { StatusBadge } from "../components/StatusBadge";
 import { useFetch } from "../hooks/useFetch";
 import type { MovieDetailResponse } from "../types/api";
@@ -10,19 +11,34 @@ import { api } from "../lib/api";
 export function MovieDetailPage() {
   const { id } = useParams();
   const { user: authUser } = useAuth();
-  const { data, loading, error } = useFetch<MovieDetailResponse>(
+  const { data, loading, error, refetch } = useFetch<MovieDetailResponse>(
     id ? `/movies/${id}` : null,
     [id]
   );
   const [favoriteStatus, setFavoriteStatus] = useState<string | null>(null);
   const [savingFavorite, setSavingFavorite] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [ratingValue, setRatingValue] = useState(8);
+  const [commentInput, setCommentInput] = useState("");
+  const [reviewStatus, setReviewStatus] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   const movie = data?.movie;
   const reviews = data?.reviews ?? [];
   const suggestions = data?.suggestions ?? [];
   const trailerUrl = movie?.trailerUrl ?? "";
   const movieId = movie?.id ?? "";
+  const ratingStats = data?.ratingStats ?? { average: 0, count: 0 };
+
+  useEffect(() => {
+    setRatingValue(8);
+    setCommentInput("");
+    setReviewStatus(null);
+    setShowRatingModal(false);
+  }, [movieId]);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -66,6 +82,53 @@ export function MovieDetailPage() {
       );
     } finally {
       setSavingFavorite(false);
+    }
+  };
+
+  const handleSubmitReview = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!movieId) return;
+    if (!authUser) {
+      setReviewStatus({
+        type: "error",
+        message: "Bạn cần đăng nhập để bình luận và chấm điểm.",
+      });
+      return;
+    }
+    if (!commentInput.trim()) {
+      setReviewStatus({
+        type: "error",
+        message: "Vui lòng nhập nội dung bình luận.",
+      });
+      return;
+    }
+
+    setSubmittingReview(true);
+    setReviewStatus(null);
+    try {
+      await api.ratings.submit({
+        movieId,
+        rating: ratingValue,
+        comment: commentInput.trim(),
+      });
+      setReviewStatus({
+        type: "success",
+        message: "Đã gửi bình luận & đánh giá.",
+      });
+      setCommentInput("");
+      setRatingValue(8);
+      setShowRatingModal(false);
+      refetch();
+    } catch (err) {
+      setReviewStatus({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Không thể gửi bình luận, vui lòng thử lại.",
+      });
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -158,6 +221,28 @@ export function MovieDetailPage() {
               tone="warning"
             />
           </div>
+          <div className="grid gap-4 text-sm text-slate-300 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-dark/60 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                Điểm IMDb
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {(movie.rating ?? 0).toFixed(1)} / 10
+              </p>
+              <p className="text-xs text-slate-400">Quản trị viên cập nhật</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-dark/60 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                Điểm người xem
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {(ratingStats.average ?? 0).toFixed(1)} / 10
+              </p>
+              <p className="text-xs text-slate-400">
+                {ratingStats.count ?? 0} lượt đánh giá
+              </p>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             {movie.tags?.map((tag) => (
               <span
@@ -206,12 +291,13 @@ export function MovieDetailPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              to="/rating"
+            <button
+              type="button"
+              onClick={() => setShowRatingModal(true)}
               className="rounded-full border border-white/20 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
             >
               Đánh giá phim này
-            </Link>
+            </button>
             <Link
               to="/chat"
               className="rounded-full border border-white/20 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
@@ -287,6 +373,97 @@ export function MovieDetailPage() {
           ))}
         </div>
       </section>
+
+      {showRatingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-dark/90 p-6 text-sm text-white shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <p className="text-lg font-semibold">Đánh giá phim này</p>
+              <button
+                type="button"
+                onClick={() => setShowRatingModal(false)}
+                className="rounded-full border border-white/20 px-3 py-1 text-xs text-white transition hover:border-primary hover:text-primary"
+              >
+                Đóng
+              </button>
+            </div>
+            <div className="mt-4">
+              {authUser ? (
+                <form className="space-y-4" onSubmit={handleSubmitReview}>
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Chấm điểm của bạn (0 - 10)
+                    </label>
+                    <div className="mt-3 flex flex-wrap items-center gap-4">
+                      <input
+                        type="range"
+                        min={0}
+                        max={10}
+                        step={0.5}
+                        value={ratingValue}
+                        onChange={(event) =>
+                          setRatingValue(Number(event.target.value))
+                        }
+                        className="flex-1 accent-primary"
+                      />
+                      <span className="text-xl font-semibold text-primary">
+                        {ratingValue.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Cảm nhận nhanh
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={commentInput}
+                      onChange={(event) => setCommentInput(event.target.value)}
+                      placeholder="Chia sẻ vài dòng sau khi xem phim này..."
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowRatingModal(false)}
+                      className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-primary hover:text-primary"
+                    >
+                      Huỷ
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {submittingReview ? "Đang gửi..." : "Gửi đánh giá"}
+                    </button>
+                  </div>
+                  {reviewStatus && (
+                    <p
+                      className={`text-sm ${
+                        reviewStatus.type === "success"
+                          ? "text-emerald-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {reviewStatus.message}
+                    </p>
+                  )}
+                </form>
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-dark/70 p-4 text-center text-sm text-slate-300">
+                  Vui lòng {" "}
+                  <Link to="/login" className="text-primary">
+                    đăng nhập
+                  </Link>{" "}
+                  để gửi đánh giá cho phim này.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

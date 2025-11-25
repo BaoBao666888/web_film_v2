@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { api, buildApiUrl } from "../../lib/api";
 import type { HlsAnalyzeResponse } from "../../types/api";
@@ -38,16 +38,6 @@ export function CinemaPlayer({ stream, title, poster }: CinemaPlayerProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
-
-  const secureHeaders = useMemo(
-    () =>
-      resolvedStream?.headers
-        ? Object.entries(resolvedStream.headers).filter(
-            ([, value]) => value && value.length > 0
-          )
-        : [],
-    [resolvedStream?.headers]
-  );
 
   useEffect(() => {
     setQualityOptions([]);
@@ -230,23 +220,6 @@ export function CinemaPlayer({ stream, title, poster }: CinemaPlayerProps) {
                   </span>
                 )}
               </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {secureHeaders.length > 0 && (
-        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-4">
-          <p className="text-xs uppercase tracking-wide text-cyan-200">
-            Headers đang sử dụng để vượt yêu cầu Rophim
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {secureHeaders.map(([key, value]) => (
-              <span
-                key={key}
-                className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-[11px] text-cyan-100"
-              >
-                {key}: <span className="text-white">{value}</span>
-              </span>
             ))}
           </div>
         </div>
