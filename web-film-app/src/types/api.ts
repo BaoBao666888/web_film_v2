@@ -40,12 +40,37 @@ export interface Review {
     name: string;
     avatar?: string;
   };
+  movie?: {
+    id: string;
+    title: string;
+    thumbnail?: string;
+  } | null;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  created_at?: string;
+  user?: {
+    id: string;
+    name: string;
+    avatar?: string;
+  } | null;
+  movie?: {
+    id: string;
+    title: string;
+    thumbnail?: string;
+  } | null;
 }
 
 export interface MovieDetailResponse {
   movie: Movie;
   reviews: Review[];
   suggestions: Movie[];
+  ratingStats?: {
+    average: number;
+    count: number;
+  };
 }
 
 export interface WatchResponse {
@@ -88,6 +113,41 @@ export interface RecommendationResponse {
   strategy: string;
   playlists: Playlist[];
   items: Movie[];
+}
+
+export interface CommentListResponse {
+  items: Comment[];
+}
+
+export interface MovieStatItem {
+  movie: Movie;
+  views?: number;
+  favorites?: number;
+  lastWatchedAt?: string;
+  lastFavoriteAt?: string;
+}
+
+export interface PaginatedMeta {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface TrendingMoviesResponse {
+  items: MovieStatItem[];
+  meta: PaginatedMeta & { days?: number };
+}
+
+export interface NewMoviesResponse {
+  items: Movie[];
+  meta: PaginatedMeta;
+}
+
+export interface CommunityHighlightsResponse {
+  mostActive: MovieStatItem[];
+  mostFavorited: MovieStatItem[];
+  recentComments: Comment[];
 }
 
 export interface ChatSuggestion {

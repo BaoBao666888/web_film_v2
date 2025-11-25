@@ -11,6 +11,13 @@ import {
   addFavorite,
   removeFavorite,
   isFavorite,
+  getTrendingMovies,
+  listNewestMovies,
+  getCommunityHighlights,
+  getMovieRatingStats,
+  listCommentsByMovie,
+  insertComment,
+  getUserById,
 } from "../db.js";
 import { generateId } from "../utils/id.js";
 import { verifyToken, requireAdmin } from "../middleware/auth.js";
@@ -78,15 +85,91 @@ router.get("/", async (req, res) => {
   res.json({ items });
 });
 
+router.get("/trending", async (req, res) => {
+  try {
+    const { days = 7, page = 1, limit = 12 } = req.query;
+    const payload = await getTrendingMovies({
+      days: Number(days) || 7,
+      page: Number(page) || 1,
+      limit: Number(limit) || 12,
+    });
+    res.json(payload);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách xu hướng", error);
+    res.status(500).json({ message: "Không thể lấy danh sách xu hướng" });
+  }
+});
+
+router.get("/new", async (req, res) => {
+  try {
+    const { page = 1, limit = 6 } = req.query;
+    const payload = await listNewestMovies({
+      page: Number(page) || 1,
+      limit: Number(limit) || 6,
+    });
+    res.json(payload);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách phim mới", error);
+    res.status(500).json({ message: "Không thể lấy danh sách phim mới" });
+  }
+});
+
+router.get("/community-highlights", async (_req, res) => {
+  try {
+    const data = await getCommunityHighlights();
+    res.json(data);
+  } catch (error) {
+    console.error("Lỗi lấy dữ liệu community", error);
+    res
+      .status(500)
+      .json({ message: "Không thể lấy dữ liệu cộng đồng", error: error.message });
+  }
+});
+
 //Chi tiết phim
 router.get("/:id", async (req, res) => {
   const movie = await getMovie(req.params.id);
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
-  const reviews = await listReviewsByMovie(movie.id, 5);
-  const suggestions = await getRandomMovies({ excludeId: movie.id, limit: 4 });
+  const [reviews, suggestions, ratingStats] = await Promise.all([
+    listReviewsByMovie(movie.id, 5),
+    getRandomMovies({ excludeId: movie.id, limit: 4 }),
+    getMovieRatingStats(movie.id),
+  ]);
 
-  res.json({ movie, reviews, suggestions });
+  res.json({ movie, reviews, suggestions, ratingStats });
+});
+
+router.get("/:id/comments", async (req, res) => {
+  const movie = await getMovie(req.params.id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+  const { limit = 30 } = req.query;
+  const items = await listCommentsByMovie(movie.id, Number(limit) || 30);
+  res.json({ items });
+});
+
+router.post("/:id/comments", verifyToken, async (req, res) => {
+  const movie = await getMovie(req.params.id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+  const content = (req.body?.content || "").trim();
+  if (!content) {
+    return res
+      .status(400)
+      .json({ message: "Nội dung bình luận không được để trống" });
+  }
+
+  const saved = await insertComment({
+    userId: req.user.id,
+    movieId: movie.id,
+    content,
+  });
+  const user = await getUserById(req.user.id);
+  res.status(201).json({
+    comment: {
+      ...saved,
+      user: user ? { id: user.id, name: user.name, avatar: user.avatar } : null,
+    },
+  });
 });
 
 //XEM PHIM

@@ -5,7 +5,6 @@ import { SearchPage } from "./pages/SearchPage";
 import { MovieDetailPage } from "./pages/MovieDetailPage";
 import { RecommendPage } from "./pages/RecommendPage";
 import { ChatPage } from "./pages/ChatPage";
-import { RatingPage } from "./pages/RatingPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -18,6 +17,7 @@ import { AdminManagePage } from "./pages/admin/AdminManagePage";
 import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminStatsPage } from "./pages/admin/AdminStatsPage";
 import { useAuth } from "./hooks/useAuth";
+import { TrendingPage } from "./pages/TrendingPage";
 
 function AdminGuard() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -42,11 +42,11 @@ function App() {
     <Routes>
       <Route path="/" element={<MainLayout />}>
         <Route index element={<HomePage />} />
+        <Route path="trending" element={<TrendingPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="movie/:id" element={<MovieDetailPage />} />
         <Route path="recommend" element={<RecommendPage />} />
         <Route path="chat" element={<ChatPage />} />
-        <Route path="rating" element={<RatingPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />

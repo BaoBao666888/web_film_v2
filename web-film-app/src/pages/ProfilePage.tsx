@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import type { FormEvent, ChangeEvent } from "react";
 import { PageHeader } from "../components/PageHeader";
-import { featuredMovies } from "../data/movies";
 import { useFetch } from "../hooks/useFetch";
 import { useAuth } from "../hooks/useAuth";
 import type { ProfileResponse } from "../types/api";
@@ -15,7 +14,7 @@ export function ProfilePage() {
   );
 
   const user = data?.user || authUser;
-  const favorites = data?.favorites?.length ? data.favorites : featuredMovies;
+  const favorites = data?.favorites ?? [];
   const history = data?.history ?? [];
 
   // --- state từ tuan_dev (history) ---
@@ -360,40 +359,43 @@ export function ProfilePage() {
           {/* FAVORITES */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
             <p className="text-sm font-semibold text-white">Phim yêu thích</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              {favorites.map((movie) => {
-                const posterSrc =
-                  "poster" in movie &&
-                  typeof (movie as { poster?: string }).poster === "string"
-                    ? (movie as { poster?: string }).poster
-                    : movie.thumbnail;
+            {favorites.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-400">
+                Bạn chưa thêm phim nào vào danh sách yêu thích.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {favorites.map((movie) => {
+                  const posterSrc =
+                    "poster" in movie &&
+                    typeof (movie as { poster?: string }).poster === "string"
+                      ? (movie as { poster?: string }).poster
+                      : movie.thumbnail;
 
-                return (
-                  <Link
-                    key={movie.id}
-                    to={`/movie/${movie.id}`}
-                    className="flex gap-3 rounded-2xl border border-white/10 bg-dark/60 p-3 transition hover:border-primary/80"
-                  >
-                    <img
-                      src={posterSrc}
-                      alt={movie.title}
-                      className="h-20 w-16 rounded-xl object-cover"
-                    />
-                    <div>
-                      <p className="text-sm font-semibold text-white">
-                        {movie.title}
-                      </p>
-                      <p className="text-xs text-slate-300">
-                        {movie.tags?.join(" • ")}
-                      </p>
-                      <p className="mt-2 text-[11px] text-slate-400">
-                        Rating gần nhất: 4.{Math.floor(Math.random() * 3 + 2)}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                  return (
+                    <Link
+                      key={movie.id}
+                      to={`/movie/${movie.id}`}
+                      className="flex gap-3 rounded-2xl border border-white/10 bg-dark/60 p-3 transition hover:border-primary/80"
+                    >
+                      <img
+                        src={posterSrc}
+                        alt={movie.title}
+                        className="h-20 w-16 rounded-xl object-cover"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {movie.title}
+                        </p>
+                        <p className="text-xs text-slate-300">
+                          {movie.tags?.join(" • ")}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* HISTORY */}

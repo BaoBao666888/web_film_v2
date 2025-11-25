@@ -1,15 +1,20 @@
 import { Link, useParams } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
-import type { MovieDetailResponse, WatchResponse } from "../types/api";
+import type {
+  CommentListResponse,
+  MovieDetailResponse,
+  WatchResponse,
+} from "../types/api";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../hooks/useAuth";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { api } from "../lib/api";
 import { CinemaPlayer } from "../components/player/CinemaPlayer";
 
 export function WatchPage() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const {
     data: watchData,
     loading,
@@ -19,6 +24,17 @@ export function WatchPage() {
     id ? `/movies/${id}` : null,
     [id]
   );
+  const {
+    data: commentData,
+    loading: commentsLoading,
+    error: commentsError,
+    refetch: refetchComments,
+  } = useFetch<CommentListResponse>(id ? `/movies/${id}/comments` : null, [id]);
+  const [commentValue, setCommentValue] = useState("");
+  const [commentStatus, setCommentStatus] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   // Thêm vào lịch sử xem khi người dùng vào trang xem phim
   useEffect(() => {
@@ -53,6 +69,43 @@ export function WatchPage() {
     return null;
   }, [watchData]);
 
+  const handleSubmitComment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!id) return;
+    if (!isAuthenticated) {
+      setCommentStatus({
+        type: "error",
+        message: "Bạn cần đăng nhập để bình luận.",
+      });
+      return;
+    }
+    if (!commentValue.trim()) {
+      setCommentStatus({
+        type: "error",
+        message: "Vui lòng nhập nội dung bình luận.",
+      });
+      return;
+    }
+    setSubmittingComment(true);
+    setCommentStatus(null);
+    try {
+      await api.movies.addComment(id, { content: commentValue.trim() });
+      setCommentValue("");
+      setCommentStatus({ type: "success", message: "Đã gửi bình luận." });
+      refetchComments();
+    } catch (err) {
+      setCommentStatus({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Không thể gửi bình luận, vui lòng thử lại.",
+      });
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-sm text-slate-300">
@@ -70,8 +123,9 @@ export function WatchPage() {
   }
 
   const detail = detailData?.movie;
-  const reviews = detailData?.reviews ?? [];
   const suggestions = detailData?.suggestions ?? [];
+  const comments = commentData?.items ?? [];
+  const ratingStats = detailData?.ratingStats ?? { average: 0, count: 0 };
 
   const backgroundPoster = detail?.poster ?? watchData.poster;
   const stats = [
@@ -79,7 +133,9 @@ export function WatchPage() {
     { label: "Thời lượng", value: detail?.duration ?? watchData?.title },
     {
       label: "Đánh giá",
-      value: `${detail?.rating?.toFixed(1) ?? "4.0"} ★`,
+      value: `${detail?.rating?.toFixed(1) ?? "0.0"}/10 IMDb • ${ratingStats.average.toFixed(
+        1
+      )}/10 người xem (${ratingStats.count})`,
     },
   ];
 
@@ -259,48 +315,91 @@ export function WatchPage() {
       <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
         <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/30">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">
-              Cảm nhận người xem
-            </h3>
+            <h3 className="text-lg font-semibold text-white">Bình luận</h3>
             <Link
               to={`/movie/${watchData.movieId}`}
               className="text-xs text-primary hover:text-primary/80"
             >
-              Xem thêm
+              Trang chi tiết
             </Link>
           </div>
-          {reviews.length === 0 && (
+          {commentsLoading && (
+            <p className="text-sm text-slate-400">Đang tải bình luận...</p>
+          )}
+          {commentsError && (
+            <p className="text-sm text-red-400">{commentsError}</p>
+          )}
+          {!commentsLoading && !comments.length && (
             <p className="text-sm text-slate-400">
-              Chưa có đánh giá nào cho phim này.
+              Chưa có bình luận nào cho phim này. Hãy là người đầu tiên!
             </p>
           )}
           <div className="space-y-4">
-            {reviews.slice(0, 3).map((review) => (
+            {comments.map((comment) => (
               <div
-                key={review.id}
+                key={comment.id}
                 className="rounded-2xl border border-white/10 bg-dark/60 p-4"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-white">
-                      {review.user?.name ?? "Ẩn danh"}
+                      {comment.user?.name ?? "Ẩn danh"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {review.sentiment ?? "—"}
+                      {comment.created_at
+                        ? new Date(comment.created_at).toLocaleString("vi-VN")
+                        : "Vừa xong"}
                     </p>
                   </div>
-                  <StatusBadge
-                    label={`${review.rating.toFixed(1)} ★`}
-                    tone="warning"
-                  />
                 </div>
-                {review.comment && (
-                  <p className="mt-3 text-sm text-slate-200">
-                    {review.comment}
-                  </p>
-                )}
+                <p className="mt-3 text-sm text-slate-200">
+                  {comment.content}
+                </p>
               </div>
             ))}
+          </div>
+          <div className="mt-6 border-t border-white/10 pt-4">
+            {isAuthenticated ? (
+              <form className="space-y-3" onSubmit={handleSubmitComment}>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Thêm bình luận
+                </label>
+                <textarea
+                  rows={3}
+                  value={commentValue}
+                  onChange={(event) => setCommentValue(event.target.value)}
+                  placeholder="Bạn nghĩ gì về phim này?"
+                  className="w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                />
+                <div className="flex items-center justify-end gap-3">
+                  {commentStatus && (
+                    <p
+                      className={`text-xs ${
+                        commentStatus.type === "success"
+                          ? "text-emerald-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {commentStatus.message}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={submittingComment}
+                    className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    {submittingComment ? "Đang gửi" : "Gửi bình luận"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <p className="rounded-2xl border border-white/10 bg-dark/60 p-4 text-xs text-slate-400">
+                <Link to="/login" className="text-primary">
+                  Đăng nhập
+                </Link>{" "}
+                để tham gia bình luận.
+              </p>
+            )}
           </div>
         </div>
 

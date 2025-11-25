@@ -8,7 +8,6 @@ const footerLinks = [
       { label: "Trang chủ", to: "/" },
       { label: "Gợi ý AI", to: "/recommend" },
       { label: "Chatbot phim", to: "/chat" },
-      { label: "Đánh giá phim", to: "/rating" },
     ],
   },
   {
