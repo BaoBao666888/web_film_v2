@@ -189,13 +189,14 @@ export function HomePage() {
     if (top < padding) top = padding;
     if (top > maxTop) top = maxTop;
 
+    const delay = 600;
     showPreviewTimeoutRef.current = window.setTimeout(() => {
       setHoverPreview({
         movie,
         position: { top, left },
       });
       showPreviewTimeoutRef.current = null;
-    }, 220);
+    }, delay);
   };
 
   const handlePreviewLeave = () => {
@@ -493,26 +494,28 @@ export function HomePage() {
           <ol className="mt-5 space-y-4">
             {community.mostActive.length ? (
               community.mostActive.slice(0, 5).map((item, index) => (
-                <li
-                  key={`active-${item.movie.id}`}
-                  className="flex items-center gap-4 rounded-2xl bg-white/5 p-3"
-                >
-                  <span className="text-lg font-bold text-primary">
-                    {index + 1}.
-                  </span>
-                  <img
-                    src={item.movie.thumbnail}
-                    alt={item.movie.title}
-                    className="h-12 w-12 rounded-xl object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-white line-clamp-1">
-                      {item.movie.title}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {formatViews(item.views)}
-                    </p>
-                  </div>
+                <li key={`active-${item.movie.id}`}>
+                  <Link
+                    to={`/movie/${item.movie.id}`}
+                    className="flex items-center gap-4 rounded-2xl bg-white/5 p-3 transition hover:border hover:border-primary/60 hover:bg-white/10"
+                  >
+                    <span className="text-lg font-bold text-primary">
+                      {index + 1}.
+                    </span>
+                    <img
+                      src={item.movie.thumbnail}
+                      alt={item.movie.title}
+                      className="h-12 w-12 rounded-xl object-cover"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-white line-clamp-1">
+                        {item.movie.title}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {formatViews(item.views)}
+                      </p>
+                    </div>
+                  </Link>
                 </li>
               ))
             ) : (
