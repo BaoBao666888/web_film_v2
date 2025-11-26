@@ -23,9 +23,29 @@ const roadmapItems = [
 ];
 
 export function RecommendPage() {
+  // LẤY USER ĐANG ĐĂNG NHẬP (tùy bạn lưu ở đâu – ví dụ localStorage)
+  const storedUser = localStorage.getItem("user"); // đổi key nếu bạn dùng key khác
+  let userId = "guest";
+
+  if (storedUser) {
+    try {
+      const parsed = JSON.parse(storedUser);
+      // Ưu tiên _id (Mongo), nếu không có thì thử id
+      userId = parsed?._id ?? parsed?.id ?? "guest";
+    } catch {
+      userId = "guest";
+    }
+  }
+
+  // Gọi API gợi ý với user_id
   const { data, loading, error } = useFetch<RecommendationResponse>(
-    "/ai/recommendations"
+    `http://localhost:5003/ai/recommendations?user_id=${encodeURIComponent(
+      userId
+    )}`,
+    [userId]
   );
+
+
   const movies = data?.items ?? featuredMovies;
   const playlists = data?.playlists ?? aiPlaylists;
 
@@ -33,7 +53,7 @@ export function RecommendPage() {
     <div className="space-y-10">
       <PageHeader
         title="Gợi ý phim AI"
-        description="Playlist này lấy trực tiếp từ API hybrid recommendation (demo). Khi gắn model thật, chỉ cần thay đổi service AI là front hoạt động."
+        description="Playlist này lấy trực tiếp từ API hybrid recommendation. Khi gắn model thật, chỉ cần thay đổi service AI là front hoạt động."
       />
 
       <section className="grid gap-6 md:grid-cols-[1fr_0.9fr]">
@@ -42,11 +62,15 @@ export function RecommendPage() {
             Playlist hôm nay dành cho bạn
           </h3>
           <p className="text-sm text-slate-300">
-            Dựa trên mood “cần phiêu lưu nhẹ nhàng” + lịch sử xem gần đây.
-            Hệ thống sẽ cập nhật theo rating mới nhất của bạn.
+            Dựa trên mood “cần phiêu lưu nhẹ nhàng” + lịch sử xem gần đây. Hệ
+            thống sẽ cập nhật theo rating mới nhất của bạn.
           </p>
-          {loading && <p className="text-slate-400">Đang tính toán playlist…</p>}
+
+          {loading && (
+            <p className="text-slate-400">Đang tính toán playlist…</p>
+          )}
           {error && <p className="text-red-400">Lỗi: {error}</p>}
+
           <div className="grid gap-5 md:grid-cols-2">
             {movies.map((movie) => (
               <div
@@ -99,7 +123,8 @@ export function RecommendPage() {
           <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-xs text-slate-200">
             <p className="font-semibold text-white">Lưu ý triển khai</p>
             <p className="mt-2">
-              - API gợi ý sẽ viêt bằng Python FastAPI, trả về danh sách id phim.
+              - API gợi ý viết bằng Python FastAPI, trả về danh sách phim đã
+              chấm điểm theo user.
             </p>
             <p className="mt-1">
               - Front-end hiển thị skeleton trong lúc đợi response, fallback sang
@@ -110,9 +135,7 @@ export function RecommendPage() {
       </section>
 
       <section>
-        <h3 className="text-lg font-semibold text-white">
-          Mood playlist khác
-        </h3>
+        <h3 className="text-lg font-semibold text-white">Mood playlist khác</h3>
         <div className="mt-5 grid gap-5 md:grid-cols-3">
           {playlists.map((playlist) => (
             <div

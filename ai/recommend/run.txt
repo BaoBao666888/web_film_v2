@@ -1,0 +1,4 @@
+(chay truoc 1 lan)
+python ai/recommend/train_recommender.py
+
+uvicorn api_main:app --reload --port 5003
