@@ -48,6 +48,7 @@ const MovieSchema = new mongoose.Schema(
     moods: [String],
     cast: [String],
     director: String,
+    country: String,
   },
   { timestamps: true }
 );

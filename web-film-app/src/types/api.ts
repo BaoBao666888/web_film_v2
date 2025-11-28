@@ -21,6 +21,7 @@ export interface Movie extends MovieSummary {
   cast: string[];
   director: string;
   episodes?: Episode[];
+  country?: string;
 }
 
 export interface Episode {

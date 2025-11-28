@@ -421,6 +421,7 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     moods: orDefault(payload.moods, []),
     cast: orDefault(payload.cast, []),
     director: orDefault(payload.director, ""),
+    country: orDefault(payload.country, ""),
   };
 
   const result = await insertMovie(newMovie);
@@ -454,6 +455,7 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
           payload.videoHeaders
         )
       : [];
+  payload.country = orDefault(req.body.country, movie.country ?? "");
 
   const updated = await updateMovie(id, payload);
 

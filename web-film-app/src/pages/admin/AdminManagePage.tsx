@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
@@ -10,12 +10,33 @@ type EpisodeInput = Episode & {
   videoType: Movie["videoType"];
 };
 
+type FormState = {
+  title: string;
+  synopsis: string;
+  year: string;
+  duration: string;
+  rating: string;
+  tags: string;
+  moods: string;
+  cast: string;
+  director: string;
+  trailerUrl: string;
+  videoUrl: string;
+  videoType: Movie["videoType"];
+  videoHeaders: string;
+  thumbnail: string;
+  poster: string;
+  type: "single" | "series";
+  episodes: EpisodeInput[];
+  country: string;
+};
+
 export function AdminManagePage() {
   const { data, loading, error, refetch } =
     useFetch<AdminMoviesResponse>("/admin/movies");
   const movies = data?.movies ?? [];
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormState>({
     title: "",
     synopsis: "",
     year: "",
@@ -31,11 +52,35 @@ export function AdminManagePage() {
     videoHeaders: "",
     thumbnail: "",
     poster: "",
-    type: "single" as "single" | "series",
-    episodes: [] as EpisodeInput[],
+    type: "single",
+    episodes: [],
+    country: "",
   });
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    let didLoad = false;
+    fetch("/countries.json")
+      .then((res) => res.json())
+      .then((list: Array<{ name?: string } | string>) => {
+        if (didLoad) return;
+        const names = (list || [])
+          .map((item) =>
+            typeof item === "string"
+              ? item.trim()
+              : (item?.name || "").trim()
+          )
+          .filter((name) => Boolean(name));
+        setCountryOptions(Array.from(new Set(names)));
+        didLoad = true;
+      })
+      .catch(() => setCountryOptions([]));
+    return () => {
+      didLoad = true;
+    };
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Bạn chắc chắn muốn xoá phim này?")) return;
@@ -65,16 +110,19 @@ export function AdminManagePage() {
   const updateEpisodeField = (
     index: number,
     key: "title" | "videoUrl" | "videoType" | "duration",
-    value: string
+    value: string | undefined
   ) => {
     setFormData((prev) => ({
       ...prev,
       episodes: prev.episodes.map((ep, idx) => {
         if (idx !== index) return ep;
         if (key === "videoType") {
-          return { ...ep, videoType: value as Movie["videoType"] };
+          return {
+            ...ep,
+            videoType: (value || "hls") as Movie["videoType"],
+          };
         }
-        return { ...ep, [key]: value };
+        return { ...ep, [key]: value ?? "" };
       }),
     }));
   };
@@ -183,13 +231,15 @@ export function AdminManagePage() {
                         director: movie.director ?? "",
                         trailerUrl: movie.trailerUrl ?? "",
                         videoUrl: movie.videoUrl ?? "",
-                        videoType: movie.videoType ?? "mp4",
+                        videoType:
+                          (movie.videoType as Movie["videoType"]) ?? "hls",
                         videoHeaders: movie.videoHeaders
                           ? JSON.stringify(movie.videoHeaders, null, 2)
                           : "",
                         thumbnail: movie.thumbnail ?? "",
                         poster: movie.poster ?? "",
                         type: movie.type ?? "single",
+                        country: movie.country ?? "",
                         episodes:
                           movie.episodes?.map((ep, idx) => ({
                             number: ep.number ?? idx + 1,
@@ -197,8 +247,8 @@ export function AdminManagePage() {
                             videoUrl: ep.videoUrl ?? "",
                             videoType:
                               (ep.videoType as Movie["videoType"]) ??
-                              movie.videoType ??
-                              "mp4",
+                              ((movie.videoType as Movie["videoType"]) ??
+                                "hls"),
                             duration: ep.duration ?? "",
                           })) ?? [],
                       });
@@ -293,6 +343,7 @@ export function AdminManagePage() {
                     thumbnail: formData.thumbnail,
                     poster: formData.poster,
                     type: formData.type,
+                    country: formData.country,
                     episodes:
                       formData.type === "series"
                         ? formData.episodes
@@ -302,7 +353,8 @@ export function AdminManagePage() {
                               videoUrl: ep.videoUrl,
                               videoType:
                                 (ep.videoType as Movie["videoType"]) ??
-                                formData.videoType,
+                                (formData.videoType as Movie["videoType"]) ??
+                                "hls",
                               duration: ep.duration,
                             }))
                             .filter((ep) => ep.videoUrl)
@@ -566,7 +618,7 @@ export function AdminManagePage() {
                     onChange={(event) =>
                       setFormData((prev) => ({
                         ...prev,
-                        videoType: event.target.value,
+                        videoType: event.target.value as Movie["videoType"],
                       }))
                     }
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
@@ -652,8 +704,8 @@ export function AdminManagePage() {
                           <label className="text-[11px] uppercase tracking-wide text-slate-500">
                             Định dạng
                           </label>
-                          <select
-                            value={ep.videoType}
+                    <select
+                      value={ep.videoType || formData.videoType || "hls"}
                             onChange={(event) =>
                               updateEpisodeField(
                                 index,
@@ -681,6 +733,30 @@ export function AdminManagePage() {
                   </div>
                 </div>
               )}
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Quốc gia (không bắt buộc)
+                </label>
+                <input
+                  type="text"
+                  list="country-options"
+                  value={formData.country}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      country: event.target.value,
+                    }))
+                  }
+                  placeholder="Nhập hoặc chọn nhanh..."
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                />
+                <datalist id="country-options">
+                  {countryOptions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </div>
 
               <div>
                 <label className="text-xs uppercase tracking-wide text-slate-400">

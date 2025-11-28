@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
@@ -10,8 +10,28 @@ type EpisodeInput = Episode & {
   videoType: Movie["videoType"];
 };
 
+type FormState = {
+  title: string;
+  director: string;
+  cast: string;
+  year: number;
+  duration: string;
+  rating: number;
+  tags: string;
+  synopsis: string;
+  poster: string;
+  thumbnail: string;
+  trailerUrl: string;
+  videoUrl: string;
+  videoType: Movie["videoType"];
+  videoHeaders: string;
+  type: "single" | "series";
+  episodes: EpisodeInput[];
+  country: string;
+};
+
 export function AdminAddMoviePage() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     title: "",
     director: "",
     cast: "",
@@ -26,14 +46,38 @@ export function AdminAddMoviePage() {
       "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=80",
     trailerUrl: "",
     videoUrl: "",
-    videoType: "hls" as Movie["videoType"],
+    videoType: "hls",
     videoHeaders: "",
-    type: "single" as "single" | "series",
-    episodes: [] as EpisodeInput[],
+    type: "single",
+    episodes: [],
+    country: "",
   });
 
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    let didLoad = false;
+    fetch("/countries.json")
+      .then((res) => res.json())
+      .then((list: Array<{ name?: string } | string>) => {
+        if (didLoad) return;
+        const names = (list || [])
+          .map((item) =>
+            typeof item === "string"
+              ? item.trim()
+              : (item?.name || "").trim()
+          )
+          .filter((name) => Boolean(name));
+        setCountryOptions(Array.from(new Set(names)));
+        didLoad = true;
+      })
+      .catch(() => setCountryOptions([]));
+    return () => {
+      didLoad = true;
+    };
+  }, []);
 
   const updateField = (key: string, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -61,16 +105,19 @@ export function AdminAddMoviePage() {
   const updateEpisodeField = (
     index: number,
     key: "title" | "videoUrl" | "videoType" | "duration",
-    value: string
+    value: string | undefined
   ) => {
     setForm((prev) => ({
       ...prev,
       episodes: prev.episodes.map((ep, idx) => {
         if (idx !== index) return ep;
         if (key === "videoType") {
-          return { ...ep, videoType: value as Movie["videoType"] };
+          return {
+            ...ep,
+            videoType: (value || "hls") as Movie["videoType"],
+          };
         }
-        return { ...ep, [key]: value };
+        return { ...ep, [key]: value ?? "" };
       }),
     }));
   };
@@ -102,6 +149,7 @@ export function AdminAddMoviePage() {
       await api.movies.create({
         ...form,
         type: form.type,
+        country: form.country,
         tags: form.tags.split(",").map((item) => item.trim()),
         moods: ["Hành động", "Khoa học viễn tưởng"],
         cast: form.cast
@@ -117,7 +165,9 @@ export function AdminAddMoviePage() {
                   title: ep.title || `Tập ${idx + 1}`,
                   videoUrl: ep.videoUrl,
                   videoType:
-                    (ep.videoType as Movie["videoType"]) ?? form.videoType,
+                    (ep.videoType as Movie["videoType"]) ??
+                    (form.videoType as Movie["videoType"]) ??
+                    "hls",
                   duration: ep.duration,
                 }))
                 .filter((ep) => ep.videoUrl)
@@ -153,10 +203,13 @@ export function AdminAddMoviePage() {
         onSubmit={handleSubmit}
         className="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl shadow-black/30"
       >
+        <p className="text-xs text-slate-400">
+          <span className="text-red-400">*</span> là trường bắt buộc.
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Tên phim
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Tên phim <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -195,8 +248,8 @@ export function AdminAddMoviePage() {
 
         <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Năm sản xuất
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Năm sản xuất <span className="text-red-400">*</span>
             </label>
             <input
               type="number"
@@ -208,8 +261,8 @@ export function AdminAddMoviePage() {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Thời lượng
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Thời lượng <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -220,8 +273,8 @@ export function AdminAddMoviePage() {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Rating
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Rating <span className="text-red-400">*</span>
             </label>
             <input
               type="number"
@@ -280,14 +333,27 @@ export function AdminAddMoviePage() {
 
         <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Link poster
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Link poster <span className="text-red-400">*</span>
             </label>
             <input
               type="url"
               value={form.poster}
               onChange={(event) => updateField("poster", event.target.value)}
               placeholder="https://..."
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Link thumbnail <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="url"
+              value={form.thumbnail}
+              onChange={(event) => updateField("thumbnail", event.target.value)}
+              placeholder="https://.../thumbnail.jpg"
               className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
             />
           </div>
@@ -308,8 +374,8 @@ export function AdminAddMoviePage() {
           </div>
 
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Link phim (video)
+            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+              Link phim (video) <span className="text-red-400">*</span>
             </label>
             <input
               type="url"
@@ -332,6 +398,25 @@ export function AdminAddMoviePage() {
               <option value="mp4">MP4 trực tiếp</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-400">
+            Quốc gia (không bắt buộc)
+          </label>
+          <input
+            type="text"
+            list="country-options"
+            value={form.country}
+            onChange={(event) => updateField("country", event.target.value)}
+            placeholder="Nhập hoặc chọn nhanh..."
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+          />
+          <datalist id="country-options">
+            {countryOptions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </div>
 
         {form.type === "series" && (
@@ -408,7 +493,7 @@ export function AdminAddMoviePage() {
                       Định dạng
                     </label>
                     <select
-                      value={ep.videoType}
+                      value={ep.videoType || form.videoType || "hls"}
                       onChange={(event) =>
                         updateEpisodeField(
                           index,
