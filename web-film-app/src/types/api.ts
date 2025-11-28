@@ -22,6 +22,7 @@ export interface Movie extends MovieSummary {
   director: string;
   episodes?: Episode[];
   country?: string;
+  seriesStatus?: "Còn tiếp" | "Hoàn thành" | "Tạm ngưng" | "";
 }
 
 export interface Episode {
@@ -218,6 +219,7 @@ export interface AdminUsersResponse {
 
 export interface AdminMoviesResponse {
   movies: Movie[];
+  meta?: PaginatedMeta;
 }
 
 export interface RatingResponse {

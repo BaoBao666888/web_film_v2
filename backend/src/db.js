@@ -37,7 +37,7 @@ const hydrateMovies = async (stats) => {
 
 // Movies
 
-export const listMovies = async ({ q, mood, tag, limit = 12 } = {}) => {
+export const listMovies = async ({ q, mood, tag, limit = 12, page = 1 } = {}) => {
   const query = {};
 
   if (q) {
@@ -55,7 +55,14 @@ export const listMovies = async ({ q, mood, tag, limit = 12 } = {}) => {
     query.tags = tag;
   }
 
-  return Movie.find(query).limit(Math.min(limit, 50)).lean();
+  const sanitizedLimit = Math.min(limit, 50);
+  const sanitizedPage = Math.max(Number(page) || 1, 1);
+  const skip = (sanitizedPage - 1) * sanitizedLimit;
+
+  return Movie.find(query)
+    .skip(skip)
+    .limit(sanitizedLimit)
+    .lean();
 };
 
 export const getMovie = async (idOrSlug) => {

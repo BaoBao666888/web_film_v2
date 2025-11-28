@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getStats, listUsers, listMovies } from "../db.js";
+import { Movie } from "../models/Movie.js";
 import { verifyToken, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
@@ -26,7 +27,36 @@ router.get("/users", verifyToken, requireAdmin, async (req, res) => {
 });
 
 router.get("/movies", verifyToken, requireAdmin, async (req, res) => {
-  res.json({ movies: await listMovies({ limit: 50 }) });
+  const { page = 1, limit = 20, q } = req.query;
+  const sanitizedPage = Math.max(Number(page) || 1, 1);
+  const sanitizedLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const query = { page: sanitizedPage, limit: sanitizedLimit, q };
+
+  const mongoQuery = q
+    ? {
+        $or: [
+          { title: new RegExp(q, "i") },
+          { synopsis: new RegExp(q, "i") },
+        ],
+      }
+    : {};
+
+  const [movies, totalItems] = await Promise.all([
+    listMovies(query),
+    Movie.countDocuments(mongoQuery),
+  ]);
+
+  res.json({
+    movies,
+    meta: {
+      page: sanitizedPage,
+      limit: sanitizedLimit,
+      totalItems,
+      totalPages: sanitizedLimit
+        ? Math.max(1, Math.ceil(totalItems / sanitizedLimit))
+        : 1,
+    },
+  });
 });
 
 export default router;

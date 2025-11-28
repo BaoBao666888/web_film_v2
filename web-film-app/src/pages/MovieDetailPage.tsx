@@ -32,6 +32,10 @@ export function MovieDetailPage() {
   const trailerUrl = movie?.trailerUrl ?? "";
   const movieId = movie?.id ?? "";
   const ratingStats = data?.ratingStats ?? { average: 0, count: 0 };
+  const statusLabel =
+    movie?.type === "series" && movie.seriesStatus
+      ? movie.seriesStatus
+      : null;
 
   useEffect(() => {
     setRatingValue(8);
@@ -216,6 +220,7 @@ export function MovieDetailPage() {
           <div className="flex flex-wrap items-center gap-3">
             <StatusBadge label={`${movie.year}`} tone="info" />
             <StatusBadge label={movie.duration ?? "Không rõ"} tone="success" />
+            {statusLabel && <StatusBadge label={statusLabel} tone="info" />}
             <StatusBadge
               label={`${movie.rating?.toFixed(1) ?? "4.0"} ★`}
               tone="warning"

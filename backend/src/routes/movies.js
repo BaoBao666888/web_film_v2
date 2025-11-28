@@ -422,6 +422,7 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     cast: orDefault(payload.cast, []),
     director: orDefault(payload.director, ""),
     country: orDefault(payload.country, ""),
+    seriesStatus: type === "series" ? orDefault(payload.seriesStatus, "") : "",
   };
 
   const result = await insertMovie(newMovie);
@@ -456,6 +457,10 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
         )
       : [];
   payload.country = orDefault(req.body.country, movie.country ?? "");
+  payload.seriesStatus =
+    type === "series"
+      ? orDefault(req.body.seriesStatus, movie.seriesStatus ?? "")
+      : "";
 
   const updated = await updateMovie(id, payload);
 

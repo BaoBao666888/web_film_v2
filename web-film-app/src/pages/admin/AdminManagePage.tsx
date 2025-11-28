@@ -29,12 +29,18 @@ type FormState = {
   type: "single" | "series";
   episodes: EpisodeInput[];
   country: string;
+  seriesStatus: "" | "Còn tiếp" | "Hoàn thành" | "Tạm ngưng";
 };
 
 export function AdminManagePage() {
-  const { data, loading, error, refetch } =
-    useFetch<AdminMoviesResponse>("/admin/movies");
+  const [page, setPage] = useState(1);
+  const limit = 12;
+  const { data, loading, error, refetch } = useFetch<AdminMoviesResponse>(
+    `/admin/movies?page=${page}&limit=${limit}`,
+    [page]
+  );
   const movies = data?.movies ?? [];
+  const meta = data?.meta;
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
   const [formData, setFormData] = useState<FormState>({
     title: "",
@@ -55,6 +61,7 @@ export function AdminManagePage() {
     type: "single",
     episodes: [],
     country: "",
+    seriesStatus: "",
   });
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -150,6 +157,34 @@ export function AdminManagePage() {
       />
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-black/30">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 text-sm text-slate-300">
+          <span>
+            Trang {meta?.page ?? page} / {meta?.totalPages ?? "?"} •{" "}
+            {meta?.totalItems ?? movies.length} phim
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded-full border border-white/20 px-3 py-1 text-xs text-white transition hover:border-primary disabled:opacity-50"
+            >
+              ← Trang trước
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setPage((p) =>
+                  meta?.totalPages ? Math.min(meta.totalPages, p + 1) : p + 1
+                )
+              }
+              disabled={meta?.totalPages ? page >= meta.totalPages : false}
+              className="rounded-full border border-white/20 px-3 py-1 text-xs text-white transition hover:border-primary disabled:opacity-50"
+            >
+              Trang sau →
+            </button>
+          </div>
+        </div>
         <table className="w-full border-collapse text-left text-sm text-slate-200">
           <thead className="bg-white/5 text-xs uppercase tracking-wide text-slate-400">
             <tr>
@@ -231,19 +266,25 @@ export function AdminManagePage() {
                         director: movie.director ?? "",
                         trailerUrl: movie.trailerUrl ?? "",
                         videoUrl: movie.videoUrl ?? "",
-                        videoType:
-                          (movie.videoType as Movie["videoType"]) ?? "hls",
-                        videoHeaders: movie.videoHeaders
-                          ? JSON.stringify(movie.videoHeaders, null, 2)
-                          : "",
-                        thumbnail: movie.thumbnail ?? "",
-                        poster: movie.poster ?? "",
-                        type: movie.type ?? "single",
-                        country: movie.country ?? "",
-                        episodes:
-                          movie.episodes?.map((ep, idx) => ({
-                            number: ep.number ?? idx + 1,
-                            title: ep.title ?? `Tập ${idx + 1}`,
+                    videoType:
+                      (movie.videoType as Movie["videoType"]) ?? "hls",
+                    videoHeaders: movie.videoHeaders
+                      ? JSON.stringify(movie.videoHeaders, null, 2)
+                      : "",
+                    thumbnail: movie.thumbnail ?? "",
+                    poster: movie.poster ?? "",
+                    type: movie.type ?? "single",
+                    country: movie.country ?? "",
+                    seriesStatus:
+                      (movie.seriesStatus as FormState["seriesStatus"]) ??
+                      ((movie.tags ?? []).find((t) =>
+                        ["Còn tiếp", "Hoàn thành", "Tạm ngưng"].includes(t)
+                      ) as FormState["seriesStatus"]) ??
+                      "",
+                    episodes:
+                      movie.episodes?.map((ep, idx) => ({
+                        number: ep.number ?? idx + 1,
+                        title: ep.title ?? `Tập ${idx + 1}`,
                             videoUrl: ep.videoUrl ?? "",
                             videoType:
                               (ep.videoType as Movie["videoType"]) ??
@@ -317,16 +358,43 @@ export function AdminManagePage() {
                 }
 
                 try {
+                  const episodes =
+                    formData.type === "series"
+                      ? formData.episodes
+                          .map((ep, idx) => ({
+                            number: ep.number || idx + 1,
+                            title: ep.title || `Tập ${idx + 1}`,
+                            videoUrl: ep.videoUrl,
+                            videoType:
+                              (ep.videoType as Movie["videoType"]) ??
+                              (formData.videoType as Movie["videoType"]) ??
+                              "hls",
+                            duration: ep.duration,
+                          }))
+                          .filter((ep) => ep.videoUrl)
+                      : [];
+
+                  if (formData.type === "series" && episodes.length === 0) {
+                    setSubmitStatus("Phim bộ cần ít nhất 1 tập với link video.");
+                    setSubmitting(false);
+                    return;
+                  }
+
+                  const tagList = formData.tags
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean);
+                  if (formData.type === "series" && formData.seriesStatus) {
+                    tagList.push(formData.seriesStatus);
+                  }
+
                   await api.movies.update(editingMovie.id, {
                     title: formData.title,
                     synopsis: formData.synopsis,
                     year: Number(formData.year) || editingMovie.year,
                     duration: formData.duration,
                     rating: Number(formData.rating) || editingMovie.rating,
-                    tags: formData.tags
-                      .split(",")
-                      .map((tag) => tag.trim())
-                      .filter(Boolean),
+                    tags: tagList,
                     moods: formData.moods
                       .split(",")
                       .map((mood) => mood.trim())
@@ -344,21 +412,11 @@ export function AdminManagePage() {
                     poster: formData.poster,
                     type: formData.type,
                     country: formData.country,
-                    episodes:
+                    seriesStatus:
                       formData.type === "series"
-                        ? formData.episodes
-                            .map((ep, idx) => ({
-                              number: ep.number || idx + 1,
-                              title: ep.title || `Tập ${idx + 1}`,
-                              videoUrl: ep.videoUrl,
-                              videoType:
-                                (ep.videoType as Movie["videoType"]) ??
-                                (formData.videoType as Movie["videoType"]) ??
-                                "hls",
-                              duration: ep.duration,
-                            }))
-                            .filter((ep) => ep.videoUrl)
-                        : [],
+                        ? formData.seriesStatus
+                        : "",
+                    episodes,
                   });
                   setSubmitStatus("✔ Đã cập nhật phim thành công.");
                   setEditingMovie(null);
@@ -578,11 +636,11 @@ export function AdminManagePage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-400">
-                    Trailer URL
-                  </label>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Trailer URL
+              </label>
                   <input
                     value={formData.trailerUrl}
                     onChange={(event) =>
@@ -594,21 +652,27 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-400">
-                    Video URL
-                  </label>
-                  <input
-                    value={formData.videoUrl}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        videoUrl: event.target.value,
-                      }))
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                  />
-                </div>
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Video URL
+              </label>
+              <input
+                value={formData.videoUrl}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    videoUrl: event.target.value,
+                  }))
+                }
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                disabled={formData.type === "series"}
+                placeholder={
+                  formData.type === "series"
+                    ? "Phim bộ: điền link ở từng tập"
+                    : ""
+                }
+              />
+            </div>
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Định dạng nguồn
@@ -631,6 +695,31 @@ export function AdminManagePage() {
 
               {formData.type === "series" && (
                 <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Trạng thái phim bộ
+                    </label>
+                    <select
+                      value={formData.seriesStatus}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          seriesStatus:
+                            event.target.value as FormState["seriesStatus"],
+                        }))
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                    >
+                      <option value="">-- Chọn trạng thái --</option>
+                      <option value="Còn tiếp">Còn tiếp</option>
+                      <option value="Hoàn thành">Hoàn Thành</option>
+                      <option value="Tạm ngưng">Tạm Ngưng</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Trạng thái sẽ tự thêm vào tag của phim bộ.
+                    </p>
+                  </div>
+
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-white">

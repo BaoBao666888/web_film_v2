@@ -18,6 +18,7 @@ type FormState = {
   duration: string;
   rating: number;
   tags: string;
+  seriesStatus: "" | "Còn tiếp" | "Hoàn thành" | "Tạm ngưng";
   synopsis: string;
   poster: string;
   thumbnail: string;
@@ -39,6 +40,7 @@ export function AdminAddMoviePage() {
     duration: "1h 55m",
     rating: 4.5,
     tags: "Hành động, Sci-fi",
+    seriesStatus: "",
     synopsis: "",
     poster:
       "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=900&q=80",
@@ -79,7 +81,7 @@ export function AdminAddMoviePage() {
     };
   }, []);
 
-  const updateField = (key: string, value: string | number) => {
+  const updateField = (key: keyof FormState, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -146,32 +148,49 @@ export function AdminAddMoviePage() {
     }
 
     try {
+      const episodes =
+        form.type === "series"
+          ? form.episodes
+              .map((ep, idx) => ({
+                number: ep.number || idx + 1,
+                title: ep.title || `Tập ${idx + 1}`,
+                videoUrl: ep.videoUrl,
+                videoType:
+                  (ep.videoType as Movie["videoType"]) ??
+                  (form.videoType as Movie["videoType"]) ??
+                  "hls",
+                duration: ep.duration,
+              }))
+              .filter((ep) => ep.videoUrl)
+          : [];
+
+      if (form.type === "series" && episodes.length === 0) {
+        setStatus("Phim bộ cần ít nhất 1 tập với link video.");
+        setLoading(false);
+        return;
+      }
+
+      const tagList = form.tags
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (form.type === "series" && form.seriesStatus) {
+        tagList.push(form.seriesStatus);
+      }
+
       await api.movies.create({
         ...form,
         type: form.type,
         country: form.country,
-        tags: form.tags.split(",").map((item) => item.trim()),
+        seriesStatus: form.type === "series" ? form.seriesStatus : "",
+        tags: tagList,
         moods: ["Hành động", "Khoa học viễn tưởng"],
         cast: form.cast
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
         videoHeaders: parsedHeaders,
-        episodes:
-          form.type === "series"
-            ? form.episodes
-                .map((ep, idx) => ({
-                  number: ep.number || idx + 1,
-                  title: ep.title || `Tập ${idx + 1}`,
-                  videoUrl: ep.videoUrl,
-                  videoType:
-                    (ep.videoType as Movie["videoType"]) ??
-                    (form.videoType as Movie["videoType"]) ??
-                    "hls",
-                  duration: ep.duration,
-                }))
-                .filter((ep) => ep.videoUrl)
-            : [],
+        episodes,
       });
 
       setStatus("Đã thêm phim mới! Bạn có thể kiểm tra ở mục Quản lý phim.");
@@ -305,6 +324,32 @@ export function AdminAddMoviePage() {
           </select>
         </div>
 
+        {form.type === "series" && (
+          <div>
+            <label className="text-xs uppercase tracking-wide text-slate-400">
+              Trạng thái phim bộ
+            </label>
+            <select
+              value={form.seriesStatus}
+              onChange={(event) =>
+                updateField(
+                  "seriesStatus",
+                  event.target.value as FormState["seriesStatus"]
+                )
+              }
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="">-- Chọn trạng thái --</option>
+              <option value="Còn tiếp">Còn tiếp</option>
+              <option value="Hoàn thành">Hoàn Thành</option>
+              <option value="Tạm ngưng">Tạm Ngưng</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Trạng thái sẽ tự thêm vào tag của phim bộ.
+            </p>
+          </div>
+        )}
+
         <div>
           <label className="text-xs uppercase tracking-wide text-slate-400">
             Thể loại
@@ -382,7 +427,8 @@ export function AdminAddMoviePage() {
               value={form.videoUrl}
               onChange={(event) => updateField("videoUrl", event.target.value)}
               placeholder="https://.../playlist.m3u8"
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+              disabled={form.type === "series"}
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 disabled:opacity-50"
             />
           </div>
           <div>
