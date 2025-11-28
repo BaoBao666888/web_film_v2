@@ -18,9 +18,11 @@ import {
   listCommentsByMovie,
   insertComment,
   getUserById,
+  addWatchHistory,
+  countMovieViews,
 } from "../db.js";
 import { generateId } from "../utils/id.js";
-import { verifyToken, requireAdmin } from "../middleware/auth.js";
+import { verifyToken, requireAdmin, optionalAuth } from "../middleware/auth.js";
 import { getDefaultHlsHeaders } from "../config/hlsDefaults.js";
 
 const router = Router();
@@ -71,6 +73,30 @@ const resolveVideoHeaders = (videoType, headersValue) => {
     return hasCustomHeaders ? sanitized : getDefaultHlsHeaders();
   }
   return sanitized;
+};
+
+const sanitizeEpisodes = (episodes = [], fallbackHeaders = {}) => {
+  if (!Array.isArray(episodes)) return [];
+  return episodes
+    .map((episode, index) => {
+      const number = Number(episode.number ?? index + 1);
+      const videoUrl = episode.videoUrl || "";
+      if (!videoUrl) return null;
+      const videoType = detectVideoType(episode.videoType, videoUrl);
+      return {
+        number,
+        title: episode.title || `Tập ${number}`,
+        videoUrl,
+        videoType,
+        videoHeaders: resolveVideoHeaders(
+          videoType,
+          episode.videoHeaders ?? fallbackHeaders
+        ),
+        duration: episode.duration || "",
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.number - b.number);
 };
 
 //Lấy danh sách phim
@@ -175,38 +201,91 @@ router.post("/:id/comments", verifyToken, async (req, res) => {
 //XEM PHIM
 router.get("/:id/watch", async (req, res) => {
   const { id } = req.params;
+  const episodeQuery = Number(req.query.ep);
 
   const movie = await getMovie(id);
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
-  const nextUp = (
-    await getRandomMovies({
-      excludeId: movie.id,
-      limit: 3,
-    })
-  ).map((item) => ({
-    id: item.id,
-    title: item.title,
-    duration: item.duration,
-    thumbnail: item.thumbnail,
-  }));
-
-  const playbackType = detectVideoType(movie.videoType, movie.videoUrl);
-  const resolvedHeaders = resolveVideoHeaders(
-    playbackType,
+  const movieType = movie.type || "single";
+  const existingEpisodes = sanitizeEpisodes(
+    movie.episodes || [],
     movie.videoHeaders
   );
+  const episodes =
+    movieType === "series" && existingEpisodes.length === 0 && movie.videoUrl
+      ? sanitizeEpisodes(
+          [
+            {
+              number: 1,
+              title: "Tập 1",
+              videoUrl: movie.videoUrl,
+              videoType: movie.videoType,
+            },
+          ],
+          movie.videoHeaders
+        )
+      : existingEpisodes;
+
+  const selectedEpisode =
+    movieType === "series"
+      ? episodes.find((ep) => ep.number === episodeQuery) ||
+        episodes[0] ||
+        null
+      : null;
+
+  const streamSource = selectedEpisode?.videoUrl ?? movie.videoUrl ?? "";
+  const playbackType = detectVideoType(
+    selectedEpisode?.videoType ?? movie.videoType,
+    streamSource
+  );
+  const resolvedHeaders = resolveVideoHeaders(
+    playbackType,
+    selectedEpisode?.videoHeaders ?? movie.videoHeaders
+  );
+
+  const nextUp =
+    movieType === "series" && episodes.length
+      ? episodes
+          .filter(
+            (ep) =>
+              selectedEpisode &&
+              typeof selectedEpisode.number === "number" &&
+              ep.number > selectedEpisode.number
+          )
+          .slice(0, 12)
+          .map((ep) => ({
+            id: movie.id,
+            movieId: movie.id,
+            episodeNumber: ep.number,
+            title: ep.title,
+            duration: ep.duration || `Tập ${ep.number}`,
+            thumbnail: movie.thumbnail,
+          }))
+      : (
+          await getRandomMovies({
+            excludeId: movie.id,
+            limit: 3,
+          })
+        ).map((item) => ({
+          id: item.id,
+          movieId: item.id,
+          title: item.title,
+          duration: item.duration,
+          thumbnail: item.thumbnail,
+        }));
+
+  const views = await countMovieViews(movie.id);
 
   res.json({
     movieId: movie.id,
     title: movie.title,
     synopsis: movie.synopsis,
-    videoUrl: movie.videoUrl,
+    videoUrl: streamSource,
     playbackType,
-    stream: movie.videoUrl
+    stream: streamSource
       ? {
           type: playbackType,
-          url: movie.videoUrl,
+          url: streamSource,
           headers: resolvedHeaders,
         }
       : null,
@@ -214,8 +293,46 @@ router.get("/:id/watch", async (req, res) => {
     trailerUrl: movie.trailerUrl,
     tags: movie.tags || [],
     videoHeaders: resolvedHeaders,
+    episodes:
+      movieType === "series"
+        ? episodes.map((ep) => ({
+            number: ep.number,
+            title: ep.title,
+            duration: ep.duration,
+          }))
+        : [],
+    currentEpisode:
+      movieType === "series" && selectedEpisode
+        ? {
+            number: selectedEpisode.number,
+            title: selectedEpisode.title,
+            duration: selectedEpisode.duration,
+          }
+        : null,
+    type: movieType,
+    views,
     nextUp,
   });
+});
+
+router.post("/:id/view", optionalAuth, async (req, res) => {
+  const { id } = req.params;
+  const { viewerId, episode } = req.body || {};
+  const movie = await getMovie(id);
+  if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
+
+  const episodeNumber = Number(episode);
+  await addWatchHistory({
+    userId: req.user?.id,
+    viewerId: viewerId || null,
+    movieId: movie.id,
+    episode:
+      Number.isFinite(episodeNumber) && episodeNumber > 0
+        ? episodeNumber
+        : undefined,
+  });
+
+  res.status(201).json({ success: true });
 });
 
 router.get("/:id/favorite", verifyToken, async (req, res) => {
@@ -258,15 +375,21 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
 
   const id = orDefault(payload.id, slugify(payload.title));
 
+  const type = payload.type === "series" ? "series" : "single";
   const computedVideoType = detectVideoType(payload.videoType, payload.videoUrl);
   const computedHeaders = resolveVideoHeaders(
     computedVideoType,
     payload.videoHeaders
   );
+  const sanitizedEpisodes =
+    type === "series"
+      ? sanitizeEpisodes(payload.episodes, computedHeaders)
+      : [];
 
   const newMovie = {
     id,
     slug: slugify(orDefault(payload.slug, payload.title)),
+    type,
     title: payload.title,
     synopsis: orDefault(payload.synopsis, ""),
     year: orDefault(payload.year, new Date().getFullYear()),
@@ -278,6 +401,22 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     videoUrl: orDefault(payload.videoUrl, ""),
     videoType: computedVideoType,
     videoHeaders: computedHeaders,
+    episodes:
+      type === "series" && sanitizedEpisodes.length
+        ? sanitizedEpisodes
+        : type === "series" && payload.videoUrl
+        ? sanitizeEpisodes(
+            [
+              {
+                number: 1,
+                title: "Tập 1",
+                videoUrl: payload.videoUrl,
+                videoType: computedVideoType,
+              },
+            ],
+            computedHeaders
+          )
+        : [],
     tags: orDefault(payload.tags, []),
     moods: orDefault(payload.moods, []),
     cast: orDefault(payload.cast, []),
@@ -295,6 +434,8 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
   if (!movie) return res.status(404).json({ message: "Không tìm thấy phim" });
 
   const payload = { ...movie, ...req.body };
+  const type = payload.type === "series" ? "series" : "single";
+  payload.type = type;
   const computedVideoType = detectVideoType(
     req.body.videoType ?? movie.videoType,
     payload.videoUrl
@@ -306,6 +447,14 @@ router.put("/:id", verifyToken, requireAdmin, async (req, res) => {
       ? req.body.videoHeaders
       : movie.videoHeaders
   );
+  payload.episodes =
+    type === "series"
+      ? sanitizeEpisodes(
+          req.body.episodes ?? movie.episodes ?? [],
+          payload.videoHeaders
+        )
+      : [];
+
   const updated = await updateMovie(id, payload);
 
   res.json({ movie: updated });

@@ -3,7 +3,12 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { api } from "../../lib/api";
-import type { Movie } from "../../types/api";
+import type { Episode, Movie } from "../../types/api";
+
+type EpisodeInput = Episode & {
+  videoUrl: string;
+  videoType: Movie["videoType"];
+};
 
 export function AdminAddMoviePage() {
   const [form, setForm] = useState({
@@ -23,6 +28,8 @@ export function AdminAddMoviePage() {
     videoUrl: "",
     videoType: "hls" as Movie["videoType"],
     videoHeaders: "",
+    type: "single" as "single" | "series",
+    episodes: [] as EpisodeInput[],
   });
 
   const [status, setStatus] = useState<string | null>(null);
@@ -30,6 +37,49 @@ export function AdminAddMoviePage() {
 
   const updateField = (key: string, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const addEpisodeRow = () => {
+    setForm((prev) => {
+      const nextNumber = (prev.episodes?.length || 0) + 1;
+      return {
+        ...prev,
+        episodes: [
+          ...(prev.episodes || []),
+          {
+            number: nextNumber,
+            title: `Tập ${nextNumber}`,
+            videoUrl: "",
+            videoType: prev.videoType,
+            duration: "",
+          },
+        ],
+      };
+    });
+  };
+
+  const updateEpisodeField = (
+    index: number,
+    key: "title" | "videoUrl" | "videoType" | "duration",
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      episodes: prev.episodes.map((ep, idx) => {
+        if (idx !== index) return ep;
+        if (key === "videoType") {
+          return { ...ep, videoType: value as Movie["videoType"] };
+        }
+        return { ...ep, [key]: value };
+      }),
+    }));
+  };
+
+  const removeEpisode = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      episodes: prev.episodes.filter((_, idx) => idx !== index),
+    }));
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -51,6 +101,7 @@ export function AdminAddMoviePage() {
     try {
       await api.movies.create({
         ...form,
+        type: form.type,
         tags: form.tags.split(",").map((item) => item.trim()),
         moods: ["Hành động", "Khoa học viễn tưởng"],
         cast: form.cast
@@ -58,6 +109,19 @@ export function AdminAddMoviePage() {
           .map((item) => item.trim())
           .filter(Boolean),
         videoHeaders: parsedHeaders,
+        episodes:
+          form.type === "series"
+            ? form.episodes
+                .map((ep, idx) => ({
+                  number: ep.number || idx + 1,
+                  title: ep.title || `Tập ${idx + 1}`,
+                  videoUrl: ep.videoUrl,
+                  videoType:
+                    (ep.videoType as Movie["videoType"]) ?? form.videoType,
+                  duration: ep.duration,
+                }))
+                .filter((ep) => ep.videoUrl)
+            : [],
       });
 
       setStatus("Đã thêm phim mới! Bạn có thể kiểm tra ở mục Quản lý phim.");
@@ -174,6 +238,22 @@ export function AdminAddMoviePage() {
 
         <div>
           <label className="text-xs uppercase tracking-wide text-slate-400">
+            Loại phim
+          </label>
+          <select
+            value={form.type}
+            onChange={(event) =>
+              updateField("type", event.target.value as "single" | "series")
+            }
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+          >
+            <option value="single">Phim lẻ</option>
+            <option value="series">Phim bộ</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-400">
             Thể loại
           </label>
           <input
@@ -253,6 +333,109 @@ export function AdminAddMoviePage() {
             </select>
           </div>
         </div>
+
+        {form.type === "series" && (
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-dark/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">Danh sách tập</p>
+                <p className="text-xs text-slate-400">
+                  Điền link và tiêu đề, mặc định tiêu đề sẽ là “Tập + số thứ tự”.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addEpisodeRow}
+                className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-primary hover:text-primary"
+              >
+                + Thêm tập
+              </button>
+            </div>
+
+            {form.episodes.length === 0 && (
+              <p className="text-xs text-slate-400">
+                Chưa có tập nào. Bấm &quot;+ Thêm tập&quot; để bắt đầu với Tập 1.
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {form.episodes.map((ep, index) => (
+                <div
+                  key={`ep-${ep.number}-${index}`}
+                  className="grid gap-3 rounded-xl border border-white/10 bg-black/30 p-3 md:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_auto]"
+                >
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Tiêu đề tập
+                    </label>
+                    <input
+                      value={ep.title}
+                      onChange={(event) =>
+                        updateEpisodeField(index, "title", event.target.value)
+                      }
+                      placeholder={`Tập ${ep.number || index + 1}`}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Link video
+                    </label>
+                    <input
+                      value={ep.videoUrl}
+                      onChange={(event) =>
+                        updateEpisodeField(index, "videoUrl", event.target.value)
+                      }
+                      placeholder="https://..."
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Thời lượng
+                    </label>
+                    <input
+                      value={ep.duration ?? ""}
+                      onChange={(event) =>
+                        updateEpisodeField(index, "duration", event.target.value)
+                      }
+                      placeholder="45m"
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Định dạng
+                    </label>
+                    <select
+                      value={ep.videoType}
+                      onChange={(event) =>
+                        updateEpisodeField(
+                          index,
+                          "videoType",
+                          event.target.value as Movie["videoType"]
+                        )
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                    >
+                      <option value="hls">HLS</option>
+                      <option value="mp4">MP4</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end justify-end">
+                    <button
+                      type="button"
+                      onClick={() => removeEpisode(index)}
+                      className="rounded-full border border-red-400/50 px-3 py-2 text-xs text-red-300 transition hover:bg-red-500/10"
+                    >
+                      Xoá
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="text-xs uppercase tracking-wide text-slate-400">

@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import type {
   CommentListResponse,
@@ -7,7 +7,7 @@ import type {
 } from "../types/api";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../hooks/useAuth";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { api } from "../lib/api";
 import { CinemaPlayer } from "../components/player/CinemaPlayer";
@@ -17,13 +17,20 @@ const COMMENT_FILTER_URL = "http://127.0.0.1:5002/api/moderate";
 
 export function WatchPage() {
   const { id } = useParams();
-  const { user, isAuthenticated } = useAuth();
+  const [searchParams] = useSearchParams();
+  const episodeParam = Number(searchParams.get("ep") ?? "1");
+  const episodeNumber =
+    Number.isFinite(episodeParam) && episodeParam > 0 ? episodeParam : 1;
+  const { isAuthenticated } = useAuth();
 
   const {
     data: watchData,
     loading,
     error,
-  } = useFetch<WatchResponse>(id ? `/movies/${id}/watch` : null, [id]);
+  } = useFetch<WatchResponse>(
+    id ? `/movies/${id}/watch${episodeNumber ? `?ep=${episodeNumber}` : ""}` : null,
+    [id, episodeNumber]
+  );
 
   const { data: detailData } = useFetch<MovieDetailResponse>(
     id ? `/movies/${id}` : null,
@@ -42,19 +49,29 @@ export function WatchPage() {
     { type: "success" | "error"; message: string } | null
   >(null);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const viewerIdRef = useRef<string | null>(null);
 
-  // Thêm vào lịch sử xem sau 3s
   useEffect(() => {
-    if (id && user) {
-      const timer = setTimeout(() => {
-        api.history.add(id).catch((err) =>
-          console.error("Không thể thêm vào lịch sử:", err)
-        );
-      }, 3000);
-
-      return () => clearTimeout(timer);
+    let viewerId = localStorage.getItem("viewerId");
+    if (!viewerId) {
+      viewerId =
+        (crypto.randomUUID && crypto.randomUUID()) ||
+        `viewer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem("viewerId", viewerId);
     }
-  }, [id, user]);
+    viewerIdRef.current = viewerId;
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    const timer = setTimeout(() => {
+      api.movies
+        .addView(id, { viewerId: viewerIdRef.current || undefined, episode: episodeNumber })
+        .catch((err) => console.error("Không thể ghi nhận lượt xem:", err));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [id, episodeNumber]);
+
 
   const streamSource = useMemo(() => {
     if (watchData?.stream?.url) return watchData.stream;
@@ -172,17 +189,33 @@ export function WatchPage() {
   const suggestions = detailData?.suggestions ?? [];
   const comments = commentData?.items ?? [];
   const ratingStats = detailData?.ratingStats ?? { average: 0, count: 0 };
+  const viewFormatter = new Intl.NumberFormat("vi-VN");
+  const isSeries = watchData.type === "series";
+  const episodes = watchData.episodes ?? [];
+  const currentEpisodeNumber =
+    watchData.currentEpisode?.number ?? episodeNumber;
+  const currentEpisodeTitle =
+    watchData.currentEpisode?.title ?? `Tập ${currentEpisodeNumber}`;
 
   const backgroundPoster = detail?.poster ?? watchData.poster;
 
   const stats = [
     { label: "Năm", value: detail?.year ?? "—" },
-    { label: "Thời lượng", value: detail?.duration ?? watchData?.title },
+    {
+      label: isSeries ? "Tập đang phát" : "Thời lượng",
+      value: isSeries
+        ? `${currentEpisodeTitle}`
+        : detail?.duration ?? watchData?.title,
+    },
     {
       label: "Đánh giá",
       value: `${detail?.rating?.toFixed(1) ?? "0.0"}/10 IMDb • ${ratingStats.average.toFixed(
         1
       )}/10 người xem (${ratingStats.count})`,
+    },
+    {
+      label: "Lượt xem",
+      value: `${viewFormatter.format(watchData.views ?? 0)} lượt`,
     },
   ];
 
@@ -205,6 +238,45 @@ export function WatchPage() {
               title={detail?.title ?? watchData.title}
               poster={backgroundPoster}
             />
+
+            {isSeries && episodes.length > 0 && (
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      Chọn tập ({episodes.length})
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Đang xem: {currentEpisodeTitle}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-slate-300">
+                    Tập {Math.min(currentEpisodeNumber, episodes.length)} / {episodes.length}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {episodes.map((episode) => {
+                    const isActive = episode.number === currentEpisodeNumber;
+                    return (
+                      <Link
+                        key={`ep-${episode.number}`}
+                        to={`/watch/${watchData.movieId}?ep=${episode.number}`}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                          isActive
+                            ? "border-primary/60 bg-primary/20 text-white"
+                            : "border-white/10 bg-white/5 text-slate-200 hover:border-primary/50 hover:bg-white/10"
+                        }`}
+                      >
+                        <span className="text-xs">▶</span>
+                        <span className="line-clamp-1">
+                          {episode.title || `Tập ${episode.number}`}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* INFO CARDS */}
             <div className="grid gap-4 text-sm text-slate-300 md:grid-cols-3">

@@ -2,8 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
-import type { AdminMoviesResponse, Movie } from "../../types/api";
+import type { AdminMoviesResponse, Episode, Movie } from "../../types/api";
 import { api } from "../../lib/api";
+
+type EpisodeInput = Episode & {
+  videoUrl: string;
+  videoType: Movie["videoType"];
+};
 
 export function AdminManagePage() {
   const { data, loading, error, refetch } =
@@ -26,6 +31,8 @@ export function AdminManagePage() {
     videoHeaders: "",
     thumbnail: "",
     poster: "",
+    type: "single" as "single" | "series",
+    episodes: [] as EpisodeInput[],
   });
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +41,49 @@ export function AdminManagePage() {
     if (!confirm("Bạn chắc chắn muốn xoá phim này?")) return;
     await api.movies.delete(id);
     refetch();
+  };
+
+  const addEpisodeRow = () => {
+    setFormData((prev) => {
+      const nextNumber = (prev.episodes?.length || 0) + 1;
+      return {
+        ...prev,
+        episodes: [
+          ...(prev.episodes || []),
+          {
+            number: nextNumber,
+            title: `Tập ${nextNumber}`,
+            videoUrl: "",
+            videoType: prev.videoType as Movie["videoType"],
+            duration: "",
+          },
+        ],
+      };
+    });
+  };
+
+  const updateEpisodeField = (
+    index: number,
+    key: "title" | "videoUrl" | "videoType" | "duration",
+    value: string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      episodes: prev.episodes.map((ep, idx) => {
+        if (idx !== index) return ep;
+        if (key === "videoType") {
+          return { ...ep, videoType: value as Movie["videoType"] };
+        }
+        return { ...ep, [key]: value };
+      }),
+    }));
+  };
+
+  const removeEpisode = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      episodes: prev.episodes.filter((_, idx) => idx !== index),
+    }));
   };
 
   return (
@@ -56,7 +106,7 @@ export function AdminManagePage() {
           <thead className="bg-white/5 text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-6 py-4">Phim</th>
-              <th className="px-6 py-4">Thể loại</th>
+              <th className="px-6 py-4">Loại / Tags</th>
               <th className="px-6 py-4">Năm</th>
               <th className="px-6 py-4">Rating</th>
               <th className="px-6 py-4 text-right">Hành động</th>
@@ -101,7 +151,14 @@ export function AdminManagePage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
-                  {movie.tags?.join(", ")}
+                  <div className="space-y-1">
+                    <p className="font-semibold text-white">
+                      {movie.type === "series" ? "Phim bộ" : "Phim lẻ"}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {movie.tags?.join(", ")}
+                    </p>
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
                   {movie.year}
@@ -132,6 +189,18 @@ export function AdminManagePage() {
                           : "",
                         thumbnail: movie.thumbnail ?? "",
                         poster: movie.poster ?? "",
+                        type: movie.type ?? "single",
+                        episodes:
+                          movie.episodes?.map((ep, idx) => ({
+                            number: ep.number ?? idx + 1,
+                            title: ep.title ?? `Tập ${idx + 1}`,
+                            videoUrl: ep.videoUrl ?? "",
+                            videoType:
+                              (ep.videoType as Movie["videoType"]) ??
+                              movie.videoType ??
+                              "mp4",
+                            duration: ep.duration ?? "",
+                          })) ?? [],
                       });
                     }}
                     className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary"
@@ -223,6 +292,21 @@ export function AdminManagePage() {
                     videoHeaders: parsedHeaders,
                     thumbnail: formData.thumbnail,
                     poster: formData.poster,
+                    type: formData.type,
+                    episodes:
+                      formData.type === "series"
+                        ? formData.episodes
+                            .map((ep, idx) => ({
+                              number: ep.number || idx + 1,
+                              title: ep.title || `Tập ${idx + 1}`,
+                              videoUrl: ep.videoUrl,
+                              videoType:
+                                (ep.videoType as Movie["videoType"]) ??
+                                formData.videoType,
+                              duration: ep.duration,
+                            }))
+                            .filter((ep) => ep.videoUrl)
+                        : [],
                   });
                   setSubmitStatus("✔ Đã cập nhật phim thành công.");
                   setEditingMovie(null);
@@ -338,6 +422,25 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Loại phim
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      type: event.target.value as "single" | "series",
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                >
+                  <option value="single">Phim lẻ</option>
+                  <option value="series">Phim bộ</option>
+                </select>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -473,6 +576,111 @@ export function AdminManagePage() {
                   </select>
                 </div>
               </div>
+
+              {formData.type === "series" && (
+                <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        Danh sách tập ({formData.episodes.length})
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Thêm/xoá tập, mặc định tiêu đề sẽ là Tập + số thứ tự.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addEpisodeRow}
+                      className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-primary hover:text-primary"
+                    >
+                      + Thêm tập
+                    </button>
+                  </div>
+
+                  {formData.episodes.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      Chưa có tập nào. Bấm &quot;+ Thêm tập&quot; để bắt đầu.
+                    </p>
+                  )}
+
+                  <div className="space-y-3">
+                    {formData.episodes.map((ep, index) => (
+                      <div
+                        key={`edit-ep-${ep.number}-${index}`}
+                        className="grid gap-3 rounded-xl border border-white/10 bg-dark/60 p-3 md:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_auto]"
+                      >
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Tiêu đề tập
+                          </label>
+                          <input
+                            value={ep.title}
+                            onChange={(event) =>
+                              updateEpisodeField(index, "title", event.target.value)
+                            }
+                            placeholder={`Tập ${ep.number || index + 1}`}
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Link video
+                          </label>
+                          <input
+                            value={ep.videoUrl}
+                            onChange={(event) =>
+                              updateEpisodeField(index, "videoUrl", event.target.value)
+                            }
+                            placeholder="https://..."
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Thời lượng
+                          </label>
+                          <input
+                            value={ep.duration ?? ""}
+                            onChange={(event) =>
+                              updateEpisodeField(index, "duration", event.target.value)
+                            }
+                            placeholder="45m"
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Định dạng
+                          </label>
+                          <select
+                            value={ep.videoType}
+                            onChange={(event) =>
+                              updateEpisodeField(
+                                index,
+                                "videoType",
+                                event.target.value as Movie["videoType"]
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          >
+                            <option value="hls">HLS</option>
+                            <option value="mp4">MP4</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeEpisode(index)}
+                            className="rounded-full border border-red-400/50 px-3 py-2 text-xs text-red-300 transition hover:bg-red-500/10"
+                          >
+                            Xoá
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="text-xs uppercase tracking-wide text-slate-400">

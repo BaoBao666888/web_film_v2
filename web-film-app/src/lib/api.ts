@@ -91,7 +91,10 @@ export const api = {
       return apiFetch<MovieListResponse>(`/movies${qs ? `?${qs}` : ""}`);
     },
     detail: (id: string) => apiFetch<MovieDetailResponse>(`/movies/${id}`),
-    watch: (id: string) => apiFetch<WatchResponse>(`/movies/${id}/watch`),
+    watch: (id: string, episode?: number) =>
+      apiFetch<WatchResponse>(
+        `/movies/${id}/watch${episode ? `?ep=${encodeURIComponent(String(episode))}` : ""}`
+      ),
     create: (payload: Partial<Movie> & { title: string }) =>
       apiFetch<{ movie: Movie }>(`/movies`, {
         method: "POST",
@@ -153,6 +156,11 @@ export const api = {
       ),
     addComment: (movieId: string, payload: { content: string }) =>
       apiFetch<{ comment: Comment }>(`/movies/${movieId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    addView: (movieId: string, payload: { viewerId?: string; episode?: number }) =>
+      apiFetch<{ success: boolean }>(`/movies/${movieId}/view`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
