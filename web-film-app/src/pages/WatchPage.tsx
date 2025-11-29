@@ -278,6 +278,14 @@ export function WatchPage() {
               >
                 Trang phim
               </Link>
+              <Link
+                to={`/watch-party/create?movieId=${watchData.movieId ?? id}${currentEpisodeNumber ? `&ep=${currentEpisodeNumber}` : ""}&title=${encodeURIComponent(
+                  detail?.title ?? watchData.title
+                )}`}
+                className="rounded-full border border-primary/50 bg-primary/15 px-4 py-2 text-xs font-semibold text-primary shadow-[0_10px_30px_rgba(255,107,107,0.25)] transition hover:bg-primary/25"
+              >
+                Xem chung
+              </Link>
             </div>
           </div>
 

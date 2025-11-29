@@ -21,6 +21,8 @@ interface CinemaPlayerProps {
   title: string;
   poster?: string;
   className?: string;
+  controlsEnabled?: boolean;
+  lockMessage?: string;
 }
 
 const formatQualityLabel = (resolution?: string) => {
@@ -31,7 +33,14 @@ const formatQualityLabel = (resolution?: string) => {
   return resolution;
 };
 
-export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerProps) {
+export function CinemaPlayer({
+  stream,
+  title,
+  poster,
+  className,
+  controlsEnabled = true,
+  lockMessage,
+}: CinemaPlayerProps) {
   const resolvedStream = stream?.url ? stream : null;
   const [status, setStatus] = useState<string>("Đang khởi tạo player...");
   const [qualityOptions, setQualityOptions] = useState<QualityOption[]>([]);
@@ -52,6 +61,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   const hlsRef = useRef<Hls | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speedPresets = [0.75, 1, 1.25, 1.5];
+  const controlsDisabled = controlsEnabled === false;
 
   useEffect(() => {
     setQualityOptions([]);
@@ -236,6 +246,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   }, [isMuted]);
 
   const handleSeek = (delta: number) => {
+    if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video) return;
     const next = Math.max(0, Math.min(video.currentTime + delta, video.duration || Infinity));
@@ -243,6 +254,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   };
 
   const handleSpeedChange = (speed: number) => {
+    if (controlsDisabled) return;
     setPlaybackSpeed(speed);
     const video = videoRef.current;
     if (video) {
@@ -251,6 +263,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   };
 
   const toggleMute = () => {
+    if (controlsDisabled) return;
     const video = videoRef.current;
     const next = !isMuted;
     if (video) {
@@ -260,6 +273,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   };
 
   const togglePictureInPicture = async () => {
+    if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video || !pipSupported) return;
     try {
@@ -274,6 +288,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   };
 
   const toggleFullscreen = async () => {
+    if (controlsDisabled) return;
     const wrapper = playerRef.current;
     if (!wrapper) return;
     try {
@@ -288,6 +303,7 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   };
 
   const togglePlayPause = () => {
+    if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
@@ -298,12 +314,14 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
   };
 
   const cycleSpeed = () => {
+    if (controlsDisabled) return;
     const currentIndex = speedPresets.findIndex((s) => s === playbackSpeed);
     const next = speedPresets[(currentIndex + 1) % speedPresets.length];
     handleSpeedChange(next);
   };
 
   const handleProgressChange = (value: number) => {
+    if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video || Number.isNaN(value)) return;
     const clamped = Math.max(0, Math.min(value, duration || 0));
@@ -448,7 +466,11 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
             </span>
           </div>
 
-          <div className="pointer-events-auto flex flex-col gap-3 text-white">
+          <div
+            className={`pointer-events-auto flex flex-col gap-3 text-white ${
+              controlsDisabled ? "pointer-events-none opacity-70" : ""
+            }`}
+          >
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-white/70">{formatTime(currentTime)}</span>
               <div className="relative flex-1 py-1">
@@ -522,6 +544,12 @@ export function CinemaPlayer({ stream, title, poster, className }: CinemaPlayerP
                 </ControlButton>
               </div>
             </div>
+
+            {controlsDisabled && (
+              <p className="mt-1 text-[11px] text-white/70">
+                {lockMessage ?? "Chủ phòng đang khóa điều khiển cho người xem."}
+              </p>
+            )}
           </div>
         </div>
       </div>

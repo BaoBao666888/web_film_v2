@@ -21,6 +21,7 @@ export function Navbar() {
       { label: "Trang chủ", to: "/" },
       { label: "Xu hướng", to: "/trending" },
       { label: "Tìm kiếm", to: "/search" },
+      { label: "Xem chung", to: "/watch-party" },
       { label: "Gợi ý AI", to: "/recommend" },
       { label: "Chatbot", to: "/chat" },
     ];

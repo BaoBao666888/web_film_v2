@@ -8,6 +8,13 @@ const router = Router();
 const DEFAULT_HEADERS = getDefaultHlsHeaders();
 const DEFAULT_REFERER = DEFAULT_HEADERS.Referer;
 
+// ==== Cache đoạn HLS để giảm tải nguồn phim ====
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 phút
+const CACHE_MAX_ITEMS = 500;
+const CACHE_MAX_BYTES = 80 * 1024 * 1024; // 80 MB
+const segmentCache = new Map(); // key -> { buffer, contentType, storedAt, size }
+let cacheSize = 0;
+
 function safeOrigin(url) {
   try {
     const parsed = new URL(url);
@@ -16,6 +23,60 @@ function safeOrigin(url) {
     return "https://rophim.net";
   }
 }
+
+const isSegment = (url, contentType) => {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes(".ts") ||
+    lower.includes(".m4s") ||
+    lower.includes(".mp4") ||
+    lower.includes(".aac") ||
+    lower.includes(".mp3") ||
+    (contentType && contentType.includes("video")) ||
+    (contentType && contentType.includes("audio"))
+  );
+};
+
+const evictCacheIfNeeded = () => {
+  const now = Date.now();
+  for (const [key, value] of segmentCache) {
+    if (now - value.storedAt > CACHE_TTL_MS) {
+      cacheSize -= value.size;
+      segmentCache.delete(key);
+    }
+  }
+  while (segmentCache.size > CACHE_MAX_ITEMS || cacheSize > CACHE_MAX_BYTES) {
+    const oldestKey = segmentCache.keys().next().value;
+    if (!oldestKey) break;
+    cacheSize -= segmentCache.get(oldestKey).size;
+    segmentCache.delete(oldestKey);
+  }
+};
+
+const getCache = (key) => {
+  const item = segmentCache.get(key);
+  if (!item) return null;
+  if (Date.now() - item.storedAt > CACHE_TTL_MS) {
+    cacheSize -= item.size;
+    segmentCache.delete(key);
+    return null;
+  }
+  segmentCache.delete(key);
+  segmentCache.set(key, item);
+  return item;
+};
+
+const setCache = (key, buffer, contentType) => {
+  const size = buffer?.byteLength ?? 0;
+  segmentCache.set(key, {
+    buffer,
+    contentType,
+    storedAt: Date.now(),
+    size,
+  });
+  cacheSize += size;
+  evictCacheIfNeeded();
+};
 
 const parseHeaders = (value) => {
   if (!value && value !== "") return {};
@@ -184,9 +245,13 @@ router.get("/proxy", async (req, res) => {
     return res.status(400).send("Thiếu hoặc sai URL.");
   }
 
-  const headerPayload = parseHeaders(
-    normalizeUrl(req.query.headers) ?? "{}"
-  );
+  const headerPayload = parseHeaders(normalizeUrl(req.query.headers) ?? "{}");
+  const cacheKey = `${target}::${req.query.headers || ""}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    res.setHeader("Content-Type", cached.contentType || "application/octet-stream");
+    return res.send(Buffer.from(cached.buffer));
+  }
 
   try {
     const upstream = await fetch(target, {
@@ -220,6 +285,12 @@ router.get("/proxy", async (req, res) => {
       );
     }
     res.setHeader("Content-Type", contentType);
+    // cache segment/binary, stream playlists
+    if (isSegment(finalUrl, contentType)) {
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      setCache(cacheKey, buffer, contentType);
+      return res.send(buffer);
+    }
     try {
       await pipeline(upstream.body, res);
     } catch (streamErr) {

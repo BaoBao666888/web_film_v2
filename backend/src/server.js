@@ -12,6 +12,7 @@ import feedbackRouter from "./routes/feedback.js";
 import { connectDB } from "./config/mongo.js";
 import historyRouter from "./routes/history.js";
 import hlsRouter from "./routes/hls.js";
+import watchPartyRouter from "./routes/watchParty.js";
 dotenv.config();
 
 const app = express();
@@ -37,6 +38,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api", feedbackRouter);
 app.use("/api/history", historyRouter);
 app.use("/api/hls", hlsRouter);
+app.use("/api/watch-party", watchPartyRouter);
 app.use((req, res) => {
   res.status(404).json({ message: `Không tìm thấy route ${req.path}` });
 });
