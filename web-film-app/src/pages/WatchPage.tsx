@@ -49,6 +49,7 @@ export function WatchPage() {
     { type: "success" | "error"; message: string } | null
   >(null);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [theaterMode, setTheaterMode] = useState(true);
   const viewerIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -224,126 +225,193 @@ export function WatchPage() {
       {/* ======================= PLAYER ======================= */}
       <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-b from-slate-900 via-slate-900/70 to-dark shadow-2xl shadow-black/40">
         <div
-          className="pointer-events-none absolute inset-0 opacity-40 blur-3xl"
+          className="pointer-events-none absolute inset-0 opacity-40 blur-[90px]"
           style={{
             backgroundImage: `url(${backgroundPoster})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
         />
-        <div className="relative grid gap-8 p-6 lg:grid-cols-[1.7fr_1fr]">
-          <div className="space-y-6">
-            <CinemaPlayer
-              stream={streamSource}
-              title={detail?.title ?? watchData.title}
-              poster={backgroundPoster}
-            />
+        <div className="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 bottom-6 h-64 w-64 rounded-full bg-secondary/15 blur-3xl" />
 
-            {isSeries && episodes.length > 0 && (
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      Chọn tập ({episodes.length})
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Đang xem: {currentEpisodeTitle}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-slate-300">
-                    Tập {Math.min(currentEpisodeNumber, episodes.length)} / {episodes.length}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {episodes.map((episode) => {
-                    const isActive = episode.number === currentEpisodeNumber;
-                    return (
-                      <Link
-                        key={`ep-${episode.number}`}
-                        to={`/watch/${watchData.movieId}?ep=${episode.number}`}
-                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                          isActive
-                            ? "border-primary/60 bg-primary/20 text-white"
-                            : "border-white/10 bg-white/5 text-slate-200 hover:border-primary/50 hover:bg-white/10"
-                        }`}
-                      >
-                        <span className="text-xs">▶</span>
-                        <span className="line-clamp-1">
-                          {episode.title || `Tập ${episode.number}`}
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
+        <div className="relative space-y-6 p-6 lg:p-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.35em] text-primary/80">
+                Rạp Lumi • {isSeries ? "Series" : "Movie"}
+              </p>
+              <h1 className="text-2xl font-semibold text-white md:text-3xl">
+                {detail?.title ?? watchData.title}
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
+                  {isSeries
+                    ? `Tập ${currentEpisodeNumber}: ${currentEpisodeTitle}`
+                    : detail?.duration ?? "Phim lẻ"}
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
+                  {viewFormatter.format(watchData.views ?? 0)} lượt xem
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
+                  IMDb {detail?.rating?.toFixed(1) ?? "0.0"} • Người xem{" "}
+                  {ratingStats.average.toFixed(1)} ({ratingStats.count})
+                </span>
               </div>
-            )}
+            </div>
 
-            {/* INFO CARDS */}
-            <div className="grid gap-4 text-sm text-slate-300 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Chế độ
-                </p>
-                <p className="mt-2 text-base font-semibold text-white">
-                  {streamSource?.type === "hls"
-                    ? "Adaptive HLS"
-                    : "Direct MP4 playback"}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Headers bảo vệ
-                </p>
-                <p className="mt-2 text-base font-semibold text-white">
-                  {Object.keys(streamSource?.headers ?? {}).length} custom
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Băng thông tốt nhất
-                </p>
-                <p className="mt-2 text-base font-semibold text-white">
-                  {streamSource?.type === "hls" ? "≥ 10 Mbps" : "≥ 5 Mbps"}
-                </p>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTheaterMode((mode) => !mode)}
+                className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                  theaterMode
+                    ? "border-primary bg-primary/15 text-primary shadow-[0_10px_30px_rgba(255,107,107,0.25)]"
+                    : "border-white/15 bg-white/10 text-white hover:border-primary/60 hover:text-primary"
+                }`}
+              >
+                {theaterMode ? "Thu gọn bố cục" : "Chế độ rạp"}
+              </button>
+              <Link
+                to={`/movie/${watchData.movieId ?? id}`}
+                className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:border-primary/60 hover:text-primary"
+              >
+                Trang phim
+              </Link>
             </div>
           </div>
 
-          {/* MOVIE INFO */}
-          <aside className="space-y-5 rounded-[28px] border border-white/10 bg-black/60 p-6 backdrop-blur">
-            <div className="flex gap-4">
-              <img
-                src={detail?.poster ?? watchData.poster}
-                alt={detail?.title ?? watchData.title}
-                className="h-32 w-24 rounded-2xl object-cover"
-              />
-              <div className="space-y-3">
-                <h2 className="text-xl font-semibold text-white">
-                  {detail?.title ?? watchData.title}
-                </h2>
-                <p className="text-xs text-slate-300 line-clamp-5">
-                  {detail?.synopsis ?? watchData.synopsis}
-                </p>
+          <div
+            className={`grid gap-6 ${
+              theaterMode ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1.65fr)_0.9fr]"
+            }`}
+          >
+            <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-black/60 p-2 shadow-[0_40px_90px_rgba(0,0,0,0.65)]">
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-35 blur-3xl"
+                  style={{
+                    backgroundImage: `url(${backgroundPoster})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/60" />
+                <div className="relative">
+                  <CinemaPlayer
+                    stream={streamSource}
+                    title={detail?.title ?? watchData.title}
+                    poster={backgroundPoster}
+                  />
+                </div>
+              </div>
+
+              {isSeries && episodes.length > 0 && (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        Chọn tập ({episodes.length})
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Đang xem: {currentEpisodeTitle}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-slate-300">
+                      Tập {Math.min(currentEpisodeNumber, episodes.length)} / {episodes.length}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {episodes.map((episode) => {
+                      const isActive = episode.number === currentEpisodeNumber;
+                      return (
+                        <Link
+                          key={`ep-${episode.number}`}
+                          to={`/watch/${watchData.movieId}?ep=${episode.number}`}
+                          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                            isActive
+                              ? "border-primary/70 bg-primary/15 text-white shadow-[0_10px_30px_rgba(255,107,107,0.25)]"
+                              : "border-white/10 bg-white/5 text-slate-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/10"
+                          }`}
+                        >
+                          <span className="text-xs">▶</span>
+                          <span className="line-clamp-1">
+                            {episode.title || `Tập ${episode.number}`}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* INFO CARDS */}
+              <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/20">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Chế độ phát
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-white">
+                    {streamSource?.type === "hls"
+                      ? "Adaptive HLS + proxy"
+                      : "Direct MP4 playback"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/20">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Headers bảo vệ
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-white">
+                    {Object.keys(streamSource?.headers ?? {}).length} custom
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/20">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Băng thông gợi ý
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-white">
+                    {streamSource?.type === "hls" ? "≥ 10 Mbps" : "≥ 5 Mbps"}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-2 text-xs text-slate-300">
-              {stats.map((item) => (
-                <p key={item.label}>
-                  {item.label}:{" "}
-                  <span className="font-medium text-white">{item.value}</span>
-                </p>
-              ))}
-            </div>
+            {/* MOVIE INFO */}
+            <aside className="space-y-5 rounded-[28px] border border-white/10 bg-black/60 p-6 backdrop-blur lg:sticky lg:top-24">
+              <div className="flex gap-4">
+                <img
+                  src={detail?.poster ?? watchData.poster}
+                  alt={detail?.title ?? watchData.title}
+                  className="h-32 w-24 rounded-2xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
+                />
+                <div className="space-y-3">
+                  <h2 className="text-xl font-semibold text-white">
+                    {detail?.title ?? watchData.title}
+                  </h2>
+                  <p className="text-xs text-slate-300 line-clamp-5">
+                    {detail?.synopsis ?? watchData.synopsis}
+                  </p>
+                </div>
+              </div>
 
-            <div className="flex flex-wrap gap-2 text-xs text-white/80">
-              {detail?.moods?.map((m) => (
-                <StatusBadge key={m} label={m} tone="info" />
-              ))}
-            </div>
-          </aside>
+              <div className="grid gap-2 text-xs text-slate-300">
+                {stats.map((item) => (
+                  <p key={item.label}>
+                    {item.label}:{" "}
+                    <span className="font-medium text-white">{item.value}</span>
+                  </p>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-xs text-white/80">
+                {detail?.moods?.map((m) => (
+                  <StatusBadge key={m} label={m} tone="info" />
+                ))}
+              </div>
+            </aside>
+          </div>
         </div>
       </section>
 
