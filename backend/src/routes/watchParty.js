@@ -1,9 +1,12 @@
 import { Router } from "express";
 import crypto from "crypto";
+import mongoose from "mongoose";
 import { WatchParty } from "../models/WatchParty.js";
+import { optionalAuth, verifyToken } from "../middleware/auth.js";
 
 const router = Router();
 const STALE_MS = 15000;
+const MAX_SAVE_RETRIES = 3;
 
 const makeId = (len = 10) =>
   crypto
@@ -13,194 +16,315 @@ const makeId = (len = 10) =>
 
 const pruneParticipants = (party) => {
   const now = Date.now();
-  const alive = (party.participants || []).filter((p) => now - (p.lastSeen || 0) < STALE_MS);
-  let hostId = party.hostId;
-  let hostName = party.hostName;
-  if (!alive.find((p) => p.userId === hostId) && alive.length) {
-    const next = [...alive].sort((a, b) => a.joinedAt - b.joinedAt)[0];
-    hostId = next.userId;
-    hostName = next.name;
+  const participants = party.participants || [];
+  const alive = participants.filter((p) => now - (p.lastSeen || 0) < STALE_MS);
+  if (alive.length !== participants.length) {
+    party.participants = alive;
   }
-  party.participants = alive;
-  party.hostId = hostId;
-  party.hostName = hostName;
   return party;
 };
 
-router.post("/", async (req, res) => {
-  const {
-    movieId,
-    episodeNumber,
-    title,
-    poster,
-    hostId,
-    hostName,
-    allowViewerControl = false,
-    allowDownload = false,
-    isPrivate = false,
-    autoStart = true,
-    currentPosition = 0,
-    participant,
-  } = req.body || {};
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-  if (!movieId || !title || !hostId || !hostName) {
-    return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc." });
+// Retry saves when optimistic concurrency detects conflicts
+const savePartyWithRetry = async (roomId, mutator, initialRoom) => {
+  let attempts = 0;
+  let lastError = null;
+  let room = initialRoom;
+
+  while (attempts < MAX_SAVE_RETRIES) {
+    const currentRoom = room || (await WatchParty.findOne({ roomId }));
+    if (!currentRoom) return null;
+
+    pruneParticipants(currentRoom);
+    await mutator(currentRoom);
+
+    try {
+      await currentRoom.save();
+      return currentRoom;
+    } catch (err) {
+      if (err instanceof mongoose.Error.VersionError) {
+        attempts += 1;
+        lastError = err;
+        room = null; // fetch fresh version on next attempt
+        continue;
+      }
+      throw err;
+    }
   }
 
-  const roomId = makeId(10);
-  const participants = participant
-    ? [
-        {
-          userId: participant.userId || hostId,
-          name: participant.name || hostName,
-          joinedAt: Date.now(),
-          lastSeen: Date.now(),
-        },
-      ]
-    : [];
+  throw lastError;
+};
 
-  const created = await WatchParty.create({
-    roomId,
-    movieId,
-    episodeNumber,
-    title,
-    poster,
-    hostId,
-    hostName,
-    allowViewerControl,
-    allowDownload,
-    isPrivate,
-    autoStart,
-    currentPosition,
-    participants,
-    lastActive: Date.now(),
-  });
+// Attach user info when token is present (used for stable viewerId)
+router.use(optionalAuth);
 
-  return res.json(created);
-});
+router.post(
+  "/",
+  verifyToken,
+  asyncHandler(async (req, res) => {
+    const {
+      movieId,
+      episodeNumber,
+      title,
+      poster,
+      isLive = false,
+      isPrivate = false,
+      autoStart = true,
+      currentPosition = 0,
+      participant,
+    } = req.body || {};
 
-router.get("/public", async (_req, res) => {
-  const rooms = await WatchParty.find({ isPrivate: false }).sort({ lastActive: -1 }).limit(100);
-  rooms.forEach(pruneParticipants);
-  res.json(rooms);
-});
+    if (!movieId || !title) {
+      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc." });
+    }
 
-router.get("/private", async (req, res) => {
-  const viewerId = req.query.viewerId;
-  if (!viewerId) return res.status(400).json({ message: "Thiếu viewerId" });
-  const rooms = await WatchParty.find({
-    isPrivate: true,
-    $or: [{ hostId: viewerId }, { "participants.userId": viewerId }],
-  })
-    .sort({ lastActive: -1 })
-    .limit(50);
-  rooms.forEach(pruneParticipants);
-  res.json(rooms);
-});
+    const hostId = req.user?.id;
+    const hostName = req.user?.name || "Ẩn danh";
+    if (!hostId) {
+      return res.status(401).json({ message: "Bạn cần đăng nhập để tạo phòng" });
+    }
 
-router.get("/:id", async (req, res) => {
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-  pruneParticipants(room);
-  await room.save();
-  res.json(room);
-});
+    const roomId = makeId(10);
+    const participants = participant
+      ? [
+          {
+            userId: participant.userId || hostId,
+            name: participant.name || hostName,
+            joinedAt: Date.now(),
+            lastSeen: Date.now(),
+          },
+        ]
+      : [
+          {
+            userId: hostId,
+            name: hostName,
+            joinedAt: Date.now(),
+            lastSeen: Date.now(),
+          },
+        ];
 
-router.post("/:id/join", async (req, res) => {
-  const { viewerId, name } = req.body || {};
-  if (!viewerId) return res.status(400).json({ message: "Thiếu viewerId" });
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-
-  pruneParticipants(room);
-  const existing = room.participants.find((p) => p.userId === viewerId);
-  if (existing) {
-    existing.lastSeen = Date.now();
-    existing.name = name || existing.name;
-  } else {
-    room.participants.push({
-      userId: viewerId,
-      name: name || "Khách",
-      joinedAt: Date.now(),
-      lastSeen: Date.now(),
+    const created = await WatchParty.create({
+      roomId,
+      movieId,
+      episodeNumber,
+      title,
+      poster,
+      hostId,
+      hostName,
+      allowViewerControl: false,
+      allowDownload: false, // legacy field, kept false
+      isLive,
+      isPrivate,
+      autoStart,
+      currentPosition,
+      state: {
+        position: Number(currentPosition) || 0,
+        isPlaying: Boolean(autoStart),
+        playbackRate: 1,
+        updatedAt: Date.now(),
+      },
+      participants,
+      lastActive: Date.now(),
     });
-  }
-  room.lastActive = Date.now();
-  await room.save();
-  res.json(room);
-});
 
-router.post("/:id/heartbeat", async (req, res) => {
-  const { viewerId } = req.body || {};
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-  pruneParticipants(room);
-  const target = room.participants.find((p) => p.userId === viewerId);
-  if (target) target.lastSeen = Date.now();
-  room.lastActive = Date.now();
-  await room.save();
-  res.json(room);
-});
+    res.json(created);
+  })
+);
 
-router.post("/:id/state", async (req, res) => {
-  const { viewerId, position, isPlaying, playbackRate } = req.body || {};
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-  const isHost = viewerId && viewerId === room.hostId;
-  if (!isHost && !room.allowViewerControl) {
-    return res.status(403).json({ message: "Chỉ host được chỉnh." });
-  }
-  room.state = {
-    position: Number(position) || 0,
-    isPlaying: Boolean(isPlaying),
-    playbackRate: Number(playbackRate) || 1,
-    updatedAt: Date.now(),
-  };
-  room.lastActive = Date.now();
-  await room.save();
-  res.json(room.state);
-});
+router.get(
+  "/public",
+  asyncHandler(async (_req, res) => {
+    const rooms = await WatchParty.find({ isPrivate: false }).sort({ lastActive: -1 }).limit(100);
+    rooms.forEach(pruneParticipants);
+    res.json(rooms);
+  })
+);
 
-router.patch("/:id/settings", async (req, res) => {
-  const { viewerId, allowViewerControl, allowDownload } = req.body || {};
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-  if (!viewerId || viewerId !== room.hostId) {
-    return res.status(403).json({ message: "Chỉ host được chỉnh cài đặt" });
-  }
-  if (typeof allowViewerControl === "boolean") room.allowViewerControl = allowViewerControl;
-  if (typeof allowDownload === "boolean") room.allowDownload = allowDownload;
-  room.lastActive = Date.now();
-  await room.save();
-  res.json(room);
-});
+router.get(
+  "/private",
+  asyncHandler(async (req, res) => {
+    const viewerId = req.query.viewerId;
+    if (!viewerId) return res.status(400).json({ message: "Thiếu viewerId" });
+    const rooms = await WatchParty.find({
+      isPrivate: true,
+      $or: [{ hostId: viewerId }, { "participants.userId": viewerId }],
+    })
+      .sort({ lastActive: -1 })
+      .limit(50);
+    rooms.forEach(pruneParticipants);
+    res.json(rooms);
+  })
+);
 
-router.post("/:id/chat", async (req, res) => {
-  const { viewerId, userName, content } = req.body || {};
-  if (!viewerId || !content) return res.status(400).json({ message: "Thiếu viewerId hoặc nội dung" });
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-  room.messages.push({
-    userId: viewerId,
-    userName: userName || "Ẩn danh",
-    content: String(content).slice(0, 500),
-    createdAt: Date.now(),
-  });
-  room.messages = room.messages.slice(-50);
-  room.lastActive = Date.now();
-  await room.save();
-  res.json(room.messages);
-});
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const room = await savePartyWithRetry(req.params.id, async () => {});
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    res.json(room);
+  })
+);
 
-router.delete("/:id", async (req, res) => {
-  const { viewerId } = req.body || {};
-  const room = await WatchParty.findOne({ roomId: req.params.id });
-  if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
-  if (!viewerId || viewerId !== room.hostId) {
-    return res.status(403).json({ message: "Chỉ host được xóa phòng" });
-  }
-  await WatchParty.deleteOne({ roomId: req.params.id });
-  res.json({ message: "Đã xóa phòng" });
+router.post(
+  "/:id/join",
+  asyncHandler(async (req, res) => {
+    const viewerId = req.body?.viewerId || req.user?.id;
+    const { name } = req.body || {};
+    if (!viewerId) return res.status(400).json({ message: "Thiếu viewerId" });
+    const now = Date.now();
+
+    const room = await savePartyWithRetry(req.params.id, async (party) => {
+      const existing = party.participants.find((p) => p.userId === viewerId);
+      if (existing) {
+        existing.lastSeen = now;
+        existing.name = name || req.user?.name || existing.name;
+      } else {
+        party.participants.push({
+          userId: viewerId,
+          name: name || req.user?.name || "Khách",
+          joinedAt: now,
+          lastSeen: now,
+        });
+      }
+      party.lastActive = now;
+    });
+
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    res.json(room);
+  })
+);
+
+router.post(
+  "/:id/heartbeat",
+  asyncHandler(async (req, res) => {
+    const viewerId = req.body?.viewerId || req.user?.id;
+    if (!viewerId) return res.status(400).json({ message: "Thiếu viewerId" });
+    const now = Date.now();
+
+    const room = await savePartyWithRetry(req.params.id, async (party) => {
+      const target = party.participants.find((p) => p.userId === viewerId);
+      if (target) target.lastSeen = now;
+      party.lastActive = now;
+    });
+
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    res.json(room);
+  })
+);
+
+router.post(
+  "/:id/state",
+  asyncHandler(async (req, res) => {
+    const { position, isPlaying, playbackRate } = req.body || {};
+    const viewerId = req.body?.viewerId || req.user?.id;
+    const roomId = req.params.id;
+    const now = Date.now();
+    const room = await WatchParty.findOne({ roomId });
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    if (!viewerId) return res.status(400).json({ message: "Thiếu viewerId" });
+
+    const isHost = viewerId === room.hostId;
+    if (room.isLive && !isHost) {
+      return res.status(403).json({ message: "Phòng đang ở chế độ Live, chỉ host được chỉnh." });
+    }
+    if (isHost && req.user?.id !== room.hostId) {
+      return res.status(403).json({ message: "Bạn cần đăng nhập bằng tài khoản host" });
+    }
+
+    const updated = await savePartyWithRetry(
+      roomId,
+      async (party) => {
+        party.state = {
+          position: Number(position) || 0,
+          isPlaying: Boolean(isPlaying),
+          playbackRate: Number(playbackRate) || 1,
+          updatedAt: now,
+        };
+        party.lastActive = now;
+      },
+      room
+    );
+
+    if (!updated) return res.status(404).json({ message: "Phòng không tồn tại" });
+    res.json(updated.state);
+  })
+);
+
+router.patch(
+  "/:id/settings",
+  asyncHandler(async (req, res) => {
+    const { isLive } = req.body || {};
+    const roomId = req.params.id;
+    const now = Date.now();
+    const room = await WatchParty.findOne({ roomId });
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    if (!req.user || req.user.id !== room.hostId) {
+      return res.status(403).json({ message: "Chỉ host (đã đăng nhập) được chỉnh cài đặt" });
+    }
+
+    const updated = await savePartyWithRetry(
+      roomId,
+      async (party) => {
+        if (typeof isLive === "boolean") {
+          party.isLive = isLive;
+        }
+        party.lastActive = now;
+      },
+      room
+    );
+
+    if (!updated) return res.status(404).json({ message: "Phòng không tồn tại" });
+    res.json(updated);
+  })
+);
+
+router.post(
+  "/:id/chat",
+  asyncHandler(async (req, res) => {
+    const { userName, content } = req.body || {};
+    const viewerId = req.body?.viewerId || req.user?.id;
+    if (!viewerId || !content) return res.status(400).json({ message: "Thiếu viewerId hoặc nội dung" });
+    const now = Date.now();
+
+    const room = await savePartyWithRetry(req.params.id, async (party) => {
+      party.messages.push({
+        userId: viewerId,
+        userName: userName || req.user?.name || "Ẩn danh",
+        content: String(content).slice(0, 500),
+        createdAt: now,
+      });
+      party.messages = party.messages.slice(-50);
+      party.lastActive = now;
+    });
+
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    res.json(room.messages);
+  })
+);
+
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const room = await WatchParty.findOne({ roomId: req.params.id });
+    if (!room) return res.status(404).json({ message: "Phòng không tồn tại" });
+    if (!req.user || req.user.id !== room.hostId) {
+      return res.status(403).json({ message: "Chỉ host (đã đăng nhập) được xóa phòng" });
+    }
+    await WatchParty.deleteOne({ roomId: req.params.id });
+    try {
+      const { clearHlsCache } = await import("./hls.js");
+      clearHlsCache?.();
+    } catch (err) {
+      console.warn("Không thể xóa cache HLS khi xóa phòng:", err?.message || err);
+    }
+    res.json({ message: "Đã xóa phòng" });
+  })
+);
+
+router.use((err, _req, res, _next) => {
+  console.error("Watch party error:", err);
+  res.status(500).json({ message: "Đã có lỗi xảy ra khi xử lý phòng xem chung" });
 });
 
 export default router;

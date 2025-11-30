@@ -1,4 +1,5 @@
 export type WatchPartyParticipant = {
+  id?: string;
   userId: string;
   name: string;
   joinedAt: number;
@@ -6,6 +7,7 @@ export type WatchPartyParticipant = {
 };
 
 export type WatchPartyMessage = {
+  id?: string;
   userId: string;
   userName: string;
   content: string;
@@ -13,6 +15,7 @@ export type WatchPartyMessage = {
 };
 
 export type WatchPartyRoom = {
+  id?: string;
   _id?: string;
   roomId: string;
   movieId: string;
@@ -21,8 +24,9 @@ export type WatchPartyRoom = {
   poster?: string;
   hostId: string;
   hostName: string;
-  allowViewerControl: boolean;
-  allowDownload: boolean;
+  allowViewerControl?: boolean;
+  allowDownload?: boolean;
+  isLive: boolean;
   isPrivate: boolean;
   autoStart: boolean;
   currentPosition: number;
@@ -35,6 +39,6 @@ export type WatchPartyRoom = {
   participants: WatchPartyParticipant[];
   messages: WatchPartyMessage[];
   lastActive: number;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: number | string;
+  updatedAt?: number | string;
 };

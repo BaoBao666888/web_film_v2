@@ -7,10 +7,9 @@ export const watchPartyApi = {
     episodeNumber?: number;
     title: string;
     poster?: string;
-    hostId: string;
-    hostName: string;
-    allowViewerControl?: boolean;
-    allowDownload?: boolean;
+    hostId?: string;
+    hostName?: string;
+    isLive?: boolean;
     isPrivate?: boolean;
     autoStart?: boolean;
     currentPosition?: number;
@@ -40,7 +39,7 @@ export const watchPartyApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  updateSettings: (roomId: string, payload: { viewerId: string; allowViewerControl?: boolean; allowDownload?: boolean }) =>
+  updateSettings: (roomId: string, payload: { viewerId: string; isLive?: boolean }) =>
     apiFetch<WatchPartyRoom>(`/watch-party/${roomId}/settings`, {
       method: "PATCH",
       body: JSON.stringify(payload),

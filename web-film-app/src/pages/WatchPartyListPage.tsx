@@ -62,8 +62,8 @@ export function WatchPartyListPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {rooms.map((room) => (
           <Link
-            key={room.id}
-            to={`/watch-party/room/${room.id}`}
+            key={room.roomId}
+            to={`/watch-party/room/${room.roomId}`}
             className="group overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-primary/50"
           >
             <div className="relative h-44 w-full overflow-hidden">
@@ -82,11 +82,8 @@ export function WatchPartyListPage() {
                   Auto start: {room.autoStart ? "On" : "Off"}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                  Viewer control: {room.allowViewerControl ? "On" : "Off"}
+                  Live: {room.isLive ? "On" : "Off"}
                 </span>
-                {room.allowDownload && (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">Cho tải</span>
-                )}
               </div>
             </div>
           </Link>
@@ -108,8 +105,8 @@ export function WatchPartyListPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {privateRooms.map((room) => (
               <Link
-                key={`private-${room.id}`}
-                to={`/watch-party/room/${room.id}`}
+                key={`private-${room.roomId}`}
+                to={`/watch-party/room/${room.roomId}`}
                 className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:-translate-y-1 hover:border-primary/60"
               >
                 <img src={room.poster} alt={room.title} className="h-16 w-16 rounded-xl object-cover" />

@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import type { MovieDetailResponse } from "../types/api";
-import { ensureViewerId } from "../lib/watchPartyStorage";
 import { watchPartyApi } from "../lib/watchPartyApi";
 
 export function WatchPartyCreatePage() {
@@ -12,6 +11,7 @@ export function WatchPartyCreatePage() {
   const ep = searchParams.get("ep");
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isLoggedIn = Boolean(user?.id);
 
   const { data: detailData } = useFetch<MovieDetailResponse>(
     movieId ? `/movies/${movieId}` : null,
@@ -24,8 +24,7 @@ export function WatchPartyCreatePage() {
     () => searchParams.get("title") || movie?.title || "Cùng xem phim này nhé"
   );
   const [autoStart, setAutoStart] = useState(true);
-  const [allowViewerControl, setAllowViewerControl] = useState(false);
-  const [allowDownload, setAllowDownload] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
 
   const posterOptions = useMemo(() => {
@@ -50,23 +49,21 @@ export function WatchPartyCreatePage() {
   }, [posterOptions, selectedPoster]);
 
   const handleCreate = async () => {
-    if (!movieId || !movie) return;
+    if (!movieId || !movie || !user?.id) return;
     setCreating(true);
-    const viewerId = ensureViewerId();
     try {
       const room = await watchPartyApi.create({
         movieId,
         episodeNumber: ep ? Number(ep) : undefined,
         title: title.trim() || `Cùng xem ${movie.title}`,
-        hostId: user?.id ?? viewerId,
+        hostId: user.id,
         hostName: user?.name ?? "Ẩn danh",
         poster: selectedPoster || movie.poster || movie.thumbnail,
         autoStart,
-        allowViewerControl,
-        allowDownload,
+        isLive,
         isPrivate,
         currentPosition: 0,
-        participant: { userId: user?.id ?? viewerId, name: user?.name ?? "Ẩn danh" },
+        participant: { userId: user.id, name: user?.name ?? "Ẩn danh" },
       });
       navigate(`/watch-party/room/${room.roomId}`);
     } catch (error) {
@@ -123,9 +120,9 @@ export function WatchPartyCreatePage() {
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-inner shadow-black/30">
           <p className="text-sm font-semibold text-white">2. Chọn poster hiển thị</p>
           <div className="mt-4 flex gap-3">
-            {posterOptions.map((p) => (
+            {posterOptions.map((p, idx) => (
               <button
-                key={p}
+                key={`${p}-${idx}`}
                 type="button"
                 onClick={() => setSelectedPoster(p)}
                 className={`overflow-hidden rounded-xl border-2 transition ${
@@ -155,26 +152,13 @@ export function WatchPartyCreatePage() {
 
           <label className="flex items-center justify-between gap-3 text-sm text-white">
             <div>
-              <p>Cho phép người xem điều khiển (play/pause, tốc độ)</p>
-              <p className="text-xs text-slate-400">Tắt để chỉ host được quyền bấm.</p>
+              <p>Bật chế độ Live</p>
+              <p className="text-xs text-slate-400">Bật: tất cả theo host. Tắt: ai nấy xem riêng.</p>
             </div>
             <input
               type="checkbox"
-              checked={allowViewerControl}
-              onChange={(e) => setAllowViewerControl(e.target.checked)}
-              className="h-5 w-5 accent-primary"
-            />
-          </label>
-
-          <label className="flex items-center justify-between gap-3 text-sm text-white">
-            <div>
-              <p>Cho phép tải video</p>
-              <p className="text-xs text-slate-400">Tắt nếu muốn tránh lạm dụng.</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={allowDownload}
-              onChange={(e) => setAllowDownload(e.target.checked)}
+              checked={isLive}
+              onChange={(e) => setIsLive(e.target.checked)}
               className="h-5 w-5 accent-primary"
             />
           </label>
@@ -196,7 +180,7 @@ export function WatchPartyCreatePage() {
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            disabled={!movieId || creating}
+            disabled={!movieId || creating || !isLoggedIn}
             onClick={handleCreate}
             className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-dark shadow-[0_15px_40px_rgba(255,107,107,0.35)] transition hover:bg-primary/90 disabled:opacity-60"
           >
@@ -215,6 +199,12 @@ export function WatchPartyCreatePage() {
             Quay lại xem phim
           </Link>
         </div>
+
+        {!isLoggedIn && (
+          <p className="text-xs text-red-400">
+            Bạn cần đăng nhập để tạo phòng xem chung. Vui lòng đăng nhập trước khi tiếp tục.
+          </p>
+        )}
       </div>
     </div>
   );

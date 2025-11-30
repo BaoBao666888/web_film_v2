@@ -29,8 +29,9 @@ const WatchPartySchema = new mongoose.Schema(
     poster: { type: String },
     hostId: { type: String, required: true },
     hostName: { type: String, required: true },
-    allowViewerControl: { type: Boolean, default: false },
-    allowDownload: { type: Boolean, default: false },
+    allowViewerControl: { type: Boolean, default: false }, // legacy, replaced by isLive
+    allowDownload: { type: Boolean, default: false }, // legacy, hidden in UI
+    isLive: { type: Boolean, default: false },
     isPrivate: { type: Boolean, default: false },
     autoStart: { type: Boolean, default: true },
     currentPosition: { type: Number, default: 0 },

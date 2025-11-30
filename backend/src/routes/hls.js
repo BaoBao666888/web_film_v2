@@ -15,6 +15,11 @@ const CACHE_MAX_BYTES = 80 * 1024 * 1024; // 80 MB
 const segmentCache = new Map(); // key -> { buffer, contentType, storedAt, size }
 let cacheSize = 0;
 
+export const clearHlsCache = () => {
+  segmentCache.clear();
+  cacheSize = 0;
+};
+
 function safeOrigin(url) {
   try {
     const parsed = new URL(url);

@@ -22,14 +22,7 @@ const pruneParticipants = (rooms: WatchPartyRoom[]): WatchPartyRoom[] => {
   const now = Date.now();
   return rooms.map((room) => {
     const alive = room.participants.filter((p) => now - p.lastSeen < 15000);
-    let hostId = room.hostId;
-    let hostName = room.hostName;
-    if (!alive.find((p) => p.id === hostId) && alive.length) {
-      const nextHost = [...alive].sort((a, b) => a.joinedAt - b.joinedAt)[0];
-      hostId = nextHost.id;
-      hostName = nextHost.name;
-    }
-    return { ...room, participants: alive, hostId, hostName };
+    return { ...room, participants: alive };
   });
 };
 
@@ -123,18 +116,9 @@ export const watchPartyStorage = {
     const index = rooms.findIndex((r) => r.id === id);
     if (index === -1) return undefined;
     const updatedParticipants = rooms[index].participants.filter((p) => p.id !== participantId);
-    let hostId = rooms[index].hostId;
-    let hostName = rooms[index].hostName;
-    if (participantId === hostId && updatedParticipants.length) {
-      const nextHost = [...updatedParticipants].sort((a, b) => a.joinedAt - b.joinedAt)[0];
-      hostId = nextHost.id;
-      hostName = nextHost.name;
-    }
     rooms[index] = {
       ...rooms[index],
       participants: updatedParticipants,
-      hostId,
-      hostName,
       lastActive: Date.now(),
     };
     saveRooms(rooms);

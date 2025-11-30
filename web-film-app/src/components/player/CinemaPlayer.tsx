@@ -9,6 +9,13 @@ type StreamSource = {
   headers?: Record<string, string>;
 };
 
+type ExternalState = {
+  position: number;
+  isPlaying: boolean;
+  playbackRate: number;
+  updatedAt: number;
+};
+
 type QualityOption = {
   id: string;
   label: string;
@@ -23,6 +30,9 @@ interface CinemaPlayerProps {
   className?: string;
   controlsEnabled?: boolean;
   lockMessage?: string;
+  externalState?: ExternalState | null;
+  onStatePush?: (state: ExternalState) => void;
+  chatSlot?: ReactNode;
 }
 
 const formatQualityLabel = (resolution?: string) => {
@@ -40,6 +50,9 @@ export function CinemaPlayer({
   className,
   controlsEnabled = true,
   lockMessage,
+  externalState = null,
+  onStatePush,
+  chatSlot,
 }: CinemaPlayerProps) {
   const resolvedStream = stream?.url ? stream : null;
   const [status, setStatus] = useState<string>("Đang khởi tạo player...");
@@ -52,6 +65,7 @@ export function CinemaPlayer({
   const [pipSupported, setPipSupported] = useState(false);
   const [pipActive, setPipActive] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [needsStart, setNeedsStart] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [buffered, setBuffered] = useState(0);
@@ -60,12 +74,53 @@ export function CinemaPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastEmitRef = useRef(0);
+  const syncRateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const externalStateRef = useRef<ExternalState | null>(null);
+  const userInteractedRef = useRef(false);
+  const autoMutedRef = useRef(false);
   const speedPresets = [0.75, 1, 1.25, 1.5];
   const controlsDisabled = controlsEnabled === false;
+
+  const tryPlay = async (forcePlay = false) => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!userInteractedRef.current && !autoMutedRef.current) {
+      video.muted = true;
+      setIsMuted(true);
+      autoMutedRef.current = true;
+    }
+    if (!forcePlay && video.paused === false) return;
+    try {
+      await video.play();
+      setNeedsStart(false);
+    } catch {
+      setNeedsStart(true);
+    }
+  };
+
+  const emitState = (force = false) => {
+    if (!onStatePush) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const now = Date.now();
+    if (!force && now - lastEmitRef.current < 500) return;
+    lastEmitRef.current = now;
+    onStatePush({
+      position: video.currentTime || 0,
+      isPlaying: !video.paused,
+      playbackRate: video.playbackRate || 1,
+      updatedAt: now,
+    });
+  };
 
   useEffect(() => {
     setQualityOptions([]);
     setActiveQuality(null);
+    externalStateRef.current =
+      externalState && externalState.updatedAt
+        ? externalState
+        : { position: 0, isPlaying: false, playbackRate: 1, updatedAt: Date.now() };
     if (!resolvedStream?.url) {
       setStatus("Chưa có URL nguồn để phát.");
       return;
@@ -245,12 +300,92 @@ export function CinemaPlayer({
     }
   }, [isMuted]);
 
+  const applyExternalState = (state: ExternalState | null, forcePlay = false) => {
+    if (!state) return;
+    externalStateRef.current = state;
+    const video = videoRef.current;
+    if (!video) return;
+    const { position, isPlaying, playbackRate, updatedAt } = state;
+    const elapsed = isPlaying ? (Date.now() - (updatedAt || Date.now())) / 1000 : 0;
+    const hostTime = (Number(position) || 0) + elapsed * (playbackRate || 1);
+    if (!Number.isFinite(hostTime)) return;
+
+    // Đồng bộ kiểu note_yt-dlp: dùng tốc độ trước, chỉ nhảy khi lệch lớn
+    const TOLERANCE = 2.5;
+    const BIG_JUMP = 5;
+    const CATCH_UP = 1.1;
+    const SLOW_DOWN = 0.95;
+
+    const clientTime = video.currentTime;
+    const diff = hostTime - clientTime; // >0: client chậm
+
+    const setRate = (rate: number) => {
+      if (video.playbackRate !== rate) {
+        video.playbackRate = rate;
+        setPlaybackSpeed(rate);
+      }
+    };
+
+    if (Math.abs(diff) > BIG_JUMP) {
+      video.currentTime = hostTime;
+      setRate(1);
+    } else if (diff > TOLERANCE) {
+      setRate(CATCH_UP);
+    } else if (diff < -TOLERANCE) {
+      setRate(SLOW_DOWN);
+    } else {
+      setRate(1);
+    }
+    syncRateTimerRef.current = null;
+
+    if (isPlaying || forcePlay) {
+      void tryPlay(forcePlay);
+    } else {
+      video.pause();
+    }
+  };
+
+  useEffect(() => {
+    applyExternalState(externalState || externalStateRef.current || null);
+    return () => {
+      if (syncRateTimerRef.current) {
+        clearTimeout(syncRateTimerRef.current);
+        syncRateTimerRef.current = null;
+      }
+    };
+  }, [externalState?.updatedAt, externalState?.position, externalState?.isPlaying, externalState?.playbackRate]);
+
   const handleSeek = (delta: number) => {
     if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video) return;
     const next = Math.max(0, Math.min(video.currentTime + delta, video.duration || Infinity));
     video.currentTime = next;
+    emitState(true);
+  };
+
+  const handleUserStart = () => {
+    userInteractedRef.current = true;
+    setNeedsStart(false);
+    if (autoMutedRef.current) {
+      autoMutedRef.current = false;
+      const video = videoRef.current;
+      if (video) {
+        video.muted = false;
+      }
+      setIsMuted(false);
+    }
+    const wantsPlay = Boolean(externalStateRef.current?.isPlaying || externalState?.isPlaying);
+    applyExternalState(externalStateRef.current || externalState || null, wantsPlay);
+  };
+
+  const handleVideoClick = () => {
+    if (needsStart) {
+      handleUserStart();
+      return;
+    }
+    if (controlsDisabled) return;
+    togglePlayPause();
   };
 
   const handleSpeedChange = (speed: number) => {
@@ -260,10 +395,12 @@ export function CinemaPlayer({
     if (video) {
       video.playbackRate = speed;
     }
+    emitState(true);
   };
 
   const toggleMute = () => {
-    if (controlsDisabled) return;
+    userInteractedRef.current = true;
+    autoMutedRef.current = false;
     const video = videoRef.current;
     const next = !isMuted;
     if (video) {
@@ -288,7 +425,9 @@ export function CinemaPlayer({
   };
 
   const toggleFullscreen = async () => {
-    if (controlsDisabled) return;
+    if (controlsDisabled) {
+      // cho khách phóng to/thu nhỏ dù bị khóa điều khiển
+    }
     const wrapper = playerRef.current;
     if (!wrapper) return;
     try {
@@ -328,6 +467,7 @@ export function CinemaPlayer({
     video.currentTime = clamped;
     setCurrentTime(clamped);
     showControls();
+    emitState(true);
   };
 
   const formatTime = (time: number) => {
@@ -355,6 +495,26 @@ export function CinemaPlayer({
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !onStatePush) return;
+    const soft = () => emitState(false);
+    const hard = () => emitState(true);
+    video.addEventListener("timeupdate", soft);
+    video.addEventListener("seeked", hard);
+    video.addEventListener("ratechange", hard);
+    video.addEventListener("play", hard);
+    video.addEventListener("pause", hard);
+    return () => {
+      video.removeEventListener("timeupdate", soft);
+      video.removeEventListener("seeked", hard);
+      video.removeEventListener("ratechange", hard);
+      video.removeEventListener("play", hard);
+      video.removeEventListener("pause", hard);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onStatePush]);
 
   const safeDuration = duration > 0 ? duration : 0;
   const playedPercent = safeDuration ? Math.min((currentTime / safeDuration) * 100, 100) : 0;
@@ -391,7 +551,11 @@ export function CinemaPlayer({
       hlsInstance.attachMedia(video);
       hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
         setStatus("Đang phát...");
-        void video.play().catch(() => undefined);
+        if (externalStateRef.current?.isPlaying) {
+          void tryPlay(true);
+        } else {
+          video.pause();
+        }
       });
       hlsInstance.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
@@ -401,7 +565,13 @@ export function CinemaPlayer({
     } else {
       video.src = source.url;
       video.load();
-      const autoPlay = () => void video.play().catch(() => undefined);
+      const autoPlay = () => {
+        if (externalStateRef.current?.isPlaying) {
+          void tryPlay(true);
+        } else {
+          video.pause();
+        }
+      };
       video.addEventListener("loadedmetadata", autoPlay, { once: true });
     }
 
@@ -428,6 +598,17 @@ export function CinemaPlayer({
       >
         <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-white/5" />
+        {needsStart && (
+          <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/50">
+            <button
+              type="button"
+              onClick={handleUserStart}
+              className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-dark shadow-lg shadow-black/40"
+            >
+              Bấm để bắt đầu xem
+            </button>
+          </div>
+        )}
         <video
           ref={videoRef}
           poster={poster}
@@ -437,13 +618,18 @@ export function CinemaPlayer({
           controlsList="nodownload noremoteplayback noplaybackrate"
           disableRemotePlayback
           onDoubleClick={toggleFullscreen}
-          onClick={togglePlayPause}
+          onClick={handleVideoClick}
           aria-label={`Trình phát ${title}`}
           title={title}
           className={`aspect-video w-full bg-black object-contain ${
             isFullscreen ? "min-h-screen" : "min-h-[360px] md:min-h-[440px] lg:min-h-[520px] rounded-[20px]"
           }`}
         />
+        {chatSlot && (
+          <div className="pointer-events-auto absolute right-3 top-3 z-30 max-w-[320px]">
+            {chatSlot}
+          </div>
+        )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
 
         <div
@@ -467,10 +653,10 @@ export function CinemaPlayer({
           </div>
 
           <div
-            className={`pointer-events-auto flex flex-col gap-3 text-white ${
-              controlsDisabled ? "pointer-events-none opacity-70" : ""
-            }`}
-          >
+          className={`pointer-events-auto flex flex-col gap-3 text-white ${
+            controlsDisabled ? "opacity-70" : ""
+          }`}
+        >
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-white/70">{formatTime(currentTime)}</span>
               <div className="relative flex-1 py-1">

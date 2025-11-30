@@ -21,8 +21,11 @@ import type {
   Comment,
 } from "../types/api";
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const envApi = import.meta.env.VITE_API_BASE_URL;
+const originApi =
+  typeof window !== "undefined" ? `${window.location.origin.replace(/\/$/, "")}/api` : "http://localhost:4000/api";
+
+export const API_BASE_URL = envApi && String(envApi).trim().length ? envApi : originApi;
 
 const API_ROOT_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
