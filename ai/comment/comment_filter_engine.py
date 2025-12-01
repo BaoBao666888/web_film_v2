@@ -68,8 +68,8 @@ class CommentFilterEngine:
         #    - hoặc trúng từ khóa blacklist
         is_toxic = (
             label_name != "clean"
-            or toxic_prob >= 0.30
-            or spam_prob >= 0.30
+            or toxic_prob >= 0.8
+            or spam_prob >= 0.40
             or rule_hit
         )
 

@@ -12,7 +12,8 @@ BASE_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 def load_data():
     # Dùng đường dẫn tuyệt đối tới thư mục comment/
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, "data", "comments_train.csv")
+    #csv_path = os.path.join(base_dir, "data", "comments_train.csv")
+    csv_path = os.path.join(base_dir, "data", "comments_train_merged_v2.csv")
 
     print(f"🔹 Load data bình luận từ {csv_path} ...")
 
