@@ -1,16 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
-import type { AdminMoviesResponse, Movie } from "../../types/api";
+import type { AdminMoviesResponse, Episode, Movie } from "../../types/api";
 import { api } from "../../lib/api";
 
+type EpisodeInput = Episode & {
+  videoUrl: string;
+  videoType: Movie["videoType"];
+};
+
+type FormState = {
+  title: string;
+  synopsis: string;
+  year: string;
+  duration: string;
+  rating: string;
+  tags: string;
+  moods: string;
+  cast: string;
+  director: string;
+  trailerUrl: string;
+  videoUrl: string;
+  videoType: Movie["videoType"];
+  videoHeaders: string;
+  thumbnail: string;
+  poster: string;
+  type: "single" | "series";
+  episodes: EpisodeInput[];
+  country: string;
+  seriesStatus: "" | "Còn tiếp" | "Hoàn thành" | "Tạm ngưng";
+};
+
 export function AdminManagePage() {
-  const { data, loading, error, refetch } =
-    useFetch<AdminMoviesResponse>("/admin/movies");
+  const [page, setPage] = useState(1);
+  const limit = 12;
+  const { data, loading, error, refetch } = useFetch<AdminMoviesResponse>(
+    `/admin/movies?page=${page}&limit=${limit}`,
+    [page]
+  );
   const movies = data?.movies ?? [];
+  const meta = data?.meta;
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormState>({
     title: "",
     synopsis: "",
     year: "",
@@ -26,14 +58,87 @@ export function AdminManagePage() {
     videoHeaders: "",
     thumbnail: "",
     poster: "",
+    type: "single",
+    episodes: [],
+    country: "",
+    seriesStatus: "",
   });
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    let didLoad = false;
+    fetch("/countries.json")
+      .then((res) => res.json())
+      .then((list: Array<{ name?: string } | string>) => {
+        if (didLoad) return;
+        const names = (list || [])
+          .map((item) =>
+            typeof item === "string"
+              ? item.trim()
+              : (item?.name || "").trim()
+          )
+          .filter((name) => Boolean(name));
+        setCountryOptions(Array.from(new Set(names)));
+        didLoad = true;
+      })
+      .catch(() => setCountryOptions([]));
+    return () => {
+      didLoad = true;
+    };
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Bạn chắc chắn muốn xoá phim này?")) return;
     await api.movies.delete(id);
     refetch();
+  };
+
+  const addEpisodeRow = () => {
+    setFormData((prev) => {
+      const nextNumber = (prev.episodes?.length || 0) + 1;
+      return {
+        ...prev,
+        episodes: [
+          ...(prev.episodes || []),
+          {
+            number: nextNumber,
+            title: `Tập ${nextNumber}`,
+            videoUrl: "",
+            videoType: prev.videoType as Movie["videoType"],
+            duration: "",
+          },
+        ],
+      };
+    });
+  };
+
+  const updateEpisodeField = (
+    index: number,
+    key: "title" | "videoUrl" | "videoType" | "duration",
+    value: string | undefined
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      episodes: prev.episodes.map((ep, idx) => {
+        if (idx !== index) return ep;
+        if (key === "videoType") {
+          return {
+            ...ep,
+            videoType: (value || "hls") as Movie["videoType"],
+          };
+        }
+        return { ...ep, [key]: value ?? "" };
+      }),
+    }));
+  };
+
+  const removeEpisode = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      episodes: prev.episodes.filter((_, idx) => idx !== index),
+    }));
   };
 
   return (
@@ -52,11 +157,39 @@ export function AdminManagePage() {
       />
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-black/30">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 text-sm text-slate-300">
+          <span>
+            Trang {meta?.page ?? page} / {meta?.totalPages ?? "?"} •{" "}
+            {meta?.totalItems ?? movies.length} phim
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded-full border border-white/20 px-3 py-1 text-xs text-white transition hover:border-primary disabled:opacity-50"
+            >
+              ← Trang trước
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setPage((p) =>
+                  meta?.totalPages ? Math.min(meta.totalPages, p + 1) : p + 1
+                )
+              }
+              disabled={meta?.totalPages ? page >= meta.totalPages : false}
+              className="rounded-full border border-white/20 px-3 py-1 text-xs text-white transition hover:border-primary disabled:opacity-50"
+            >
+              Trang sau →
+            </button>
+          </div>
+        </div>
         <table className="w-full border-collapse text-left text-sm text-slate-200">
           <thead className="bg-white/5 text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-6 py-4">Phim</th>
-              <th className="px-6 py-4">Thể loại</th>
+              <th className="px-6 py-4">Loại / Tags</th>
               <th className="px-6 py-4">Năm</th>
               <th className="px-6 py-4">Rating</th>
               <th className="px-6 py-4 text-right">Hành động</th>
@@ -101,7 +234,14 @@ export function AdminManagePage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
-                  {movie.tags?.join(", ")}
+                  <div className="space-y-1">
+                    <p className="font-semibold text-white">
+                      {movie.type === "series" ? "Phim bộ" : "Phim lẻ"}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {movie.tags?.join(", ")}
+                    </p>
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
                   {movie.year}
@@ -126,12 +266,32 @@ export function AdminManagePage() {
                         director: movie.director ?? "",
                         trailerUrl: movie.trailerUrl ?? "",
                         videoUrl: movie.videoUrl ?? "",
-                        videoType: movie.videoType ?? "mp4",
-                        videoHeaders: movie.videoHeaders
-                          ? JSON.stringify(movie.videoHeaders, null, 2)
-                          : "",
-                        thumbnail: movie.thumbnail ?? "",
-                        poster: movie.poster ?? "",
+                    videoType:
+                      (movie.videoType as Movie["videoType"]) ?? "hls",
+                    videoHeaders: movie.videoHeaders
+                      ? JSON.stringify(movie.videoHeaders, null, 2)
+                      : "",
+                    thumbnail: movie.thumbnail ?? "",
+                    poster: movie.poster ?? "",
+                    type: movie.type ?? "single",
+                    country: movie.country ?? "",
+                    seriesStatus:
+                      (movie.seriesStatus as FormState["seriesStatus"]) ??
+                      ((movie.tags ?? []).find((t) =>
+                        ["Còn tiếp", "Hoàn thành", "Tạm ngưng"].includes(t)
+                      ) as FormState["seriesStatus"]) ??
+                      "",
+                    episodes:
+                      movie.episodes?.map((ep, idx) => ({
+                        number: ep.number ?? idx + 1,
+                        title: ep.title ?? `Tập ${idx + 1}`,
+                            videoUrl: ep.videoUrl ?? "",
+                            videoType:
+                              (ep.videoType as Movie["videoType"]) ??
+                              ((movie.videoType as Movie["videoType"]) ??
+                                "hls"),
+                            duration: ep.duration ?? "",
+                          })) ?? [],
                       });
                     }}
                     className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary"
@@ -198,16 +358,43 @@ export function AdminManagePage() {
                 }
 
                 try {
+                  const episodes =
+                    formData.type === "series"
+                      ? formData.episodes
+                          .map((ep, idx) => ({
+                            number: ep.number || idx + 1,
+                            title: ep.title || `Tập ${idx + 1}`,
+                            videoUrl: ep.videoUrl,
+                            videoType:
+                              (ep.videoType as Movie["videoType"]) ??
+                              (formData.videoType as Movie["videoType"]) ??
+                              "hls",
+                            duration: ep.duration,
+                          }))
+                          .filter((ep) => ep.videoUrl)
+                      : [];
+
+                  if (formData.type === "series" && episodes.length === 0) {
+                    setSubmitStatus("Phim bộ cần ít nhất 1 tập với link video.");
+                    setSubmitting(false);
+                    return;
+                  }
+
+                  const tagList = formData.tags
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean);
+                  if (formData.type === "series" && formData.seriesStatus) {
+                    tagList.push(formData.seriesStatus);
+                  }
+
                   await api.movies.update(editingMovie.id, {
                     title: formData.title,
                     synopsis: formData.synopsis,
                     year: Number(formData.year) || editingMovie.year,
                     duration: formData.duration,
                     rating: Number(formData.rating) || editingMovie.rating,
-                    tags: formData.tags
-                      .split(",")
-                      .map((tag) => tag.trim())
-                      .filter(Boolean),
+                    tags: tagList,
                     moods: formData.moods
                       .split(",")
                       .map((mood) => mood.trim())
@@ -223,6 +410,13 @@ export function AdminManagePage() {
                     videoHeaders: parsedHeaders,
                     thumbnail: formData.thumbnail,
                     poster: formData.poster,
+                    type: formData.type,
+                    country: formData.country,
+                    seriesStatus:
+                      formData.type === "series"
+                        ? formData.seriesStatus
+                        : "",
+                    episodes,
                   });
                   setSubmitStatus("✔ Đã cập nhật phim thành công.");
                   setEditingMovie(null);
@@ -340,6 +534,25 @@ export function AdminManagePage() {
                 </div>
               </div>
 
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Loại phim
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      type: event.target.value as "single" | "series",
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                >
+                  <option value="single">Phim lẻ</option>
+                  <option value="series">Phim bộ</option>
+                </select>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
@@ -423,11 +636,11 @@ export function AdminManagePage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-400">
-                    Trailer URL
-                  </label>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Trailer URL
+              </label>
                   <input
                     value={formData.trailerUrl}
                     onChange={(event) =>
@@ -439,21 +652,27 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-400">
-                    Video URL
-                  </label>
-                  <input
-                    value={formData.videoUrl}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        videoUrl: event.target.value,
-                      }))
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                  />
-                </div>
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Video URL
+              </label>
+              <input
+                value={formData.videoUrl}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    videoUrl: event.target.value,
+                  }))
+                }
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                disabled={formData.type === "series"}
+                placeholder={
+                  formData.type === "series"
+                    ? "Phim bộ: điền link ở từng tập"
+                    : ""
+                }
+              />
+            </div>
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Định dạng nguồn
@@ -463,7 +682,7 @@ export function AdminManagePage() {
                     onChange={(event) =>
                       setFormData((prev) => ({
                         ...prev,
-                        videoType: event.target.value,
+                        videoType: event.target.value as Movie["videoType"],
                       }))
                     }
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
@@ -472,6 +691,160 @@ export function AdminManagePage() {
                     <option value="mp4">MP4 trực tiếp</option>
                   </select>
                 </div>
+              </div>
+
+              {formData.type === "series" && (
+                <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Trạng thái phim bộ
+                    </label>
+                    <select
+                      value={formData.seriesStatus}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          seriesStatus:
+                            event.target.value as FormState["seriesStatus"],
+                        }))
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                    >
+                      <option value="">-- Chọn trạng thái --</option>
+                      <option value="Còn tiếp">Còn tiếp</option>
+                      <option value="Hoàn thành">Hoàn Thành</option>
+                      <option value="Tạm ngưng">Tạm Ngưng</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Trạng thái sẽ tự thêm vào tag của phim bộ.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        Danh sách tập ({formData.episodes.length})
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Thêm/xoá tập, mặc định tiêu đề sẽ là Tập + số thứ tự.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addEpisodeRow}
+                      className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-primary hover:text-primary"
+                    >
+                      + Thêm tập
+                    </button>
+                  </div>
+
+                  {formData.episodes.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      Chưa có tập nào. Bấm &quot;+ Thêm tập&quot; để bắt đầu.
+                    </p>
+                  )}
+
+                  <div className="space-y-3">
+                    {formData.episodes.map((ep, index) => (
+                      <div
+                        key={`edit-ep-${ep.number}-${index}`}
+                        className="grid gap-3 rounded-xl border border-white/10 bg-dark/60 p-3 md:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_auto]"
+                      >
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Tiêu đề tập
+                          </label>
+                          <input
+                            value={ep.title}
+                            onChange={(event) =>
+                              updateEpisodeField(index, "title", event.target.value)
+                            }
+                            placeholder={`Tập ${ep.number || index + 1}`}
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Link video
+                          </label>
+                          <input
+                            value={ep.videoUrl}
+                            onChange={(event) =>
+                              updateEpisodeField(index, "videoUrl", event.target.value)
+                            }
+                            placeholder="https://..."
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Thời lượng
+                          </label>
+                          <input
+                            value={ep.duration ?? ""}
+                            onChange={(event) =>
+                              updateEpisodeField(index, "duration", event.target.value)
+                            }
+                            placeholder="45m"
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                            Định dạng
+                          </label>
+                    <select
+                      value={ep.videoType || formData.videoType || "hls"}
+                            onChange={(event) =>
+                              updateEpisodeField(
+                                index,
+                                "videoType",
+                                event.target.value as Movie["videoType"]
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          >
+                            <option value="hls">HLS</option>
+                            <option value="mp4">MP4</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeEpisode(index)}
+                            className="rounded-full border border-red-400/50 px-3 py-2 text-xs text-red-300 transition hover:bg-red-500/10"
+                          >
+                            Xoá
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Quốc gia (không bắt buộc)
+                </label>
+                <input
+                  type="text"
+                  list="country-options"
+                  value={formData.country}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      country: event.target.value,
+                    }))
+                  }
+                  placeholder="Nhập hoặc chọn nhanh..."
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                />
+                <datalist id="country-options">
+                  {countryOptions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
 
               <div>

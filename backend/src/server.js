@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import http from "http";
+import { Server } from "socket.io";
 
 import moviesRouter from "./routes/movies.js";
 import authRouter from "./routes/auth.js";
@@ -12,10 +14,18 @@ import feedbackRouter from "./routes/feedback.js";
 import { connectDB } from "./config/mongo.js";
 import historyRouter from "./routes/history.js";
 import hlsRouter from "./routes/hls.js";
+import watchPartyRouter from "./routes/watchParty.js";
+import { registerWatchPartySocket } from "./socket/watchParty.js";
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
 
 app.use(
   cors({
@@ -37,13 +47,15 @@ app.use("/api/admin", adminRouter);
 app.use("/api", feedbackRouter);
 app.use("/api/history", historyRouter);
 app.use("/api/hls", hlsRouter);
+app.use("/api/watch-party", watchPartyRouter);
 app.use((req, res) => {
   res.status(404).json({ message: `Không tìm thấy route ${req.path}` });
 });
 
 const start = async () => {
   await connectDB();
-  app.listen(PORT, () => {
+  registerWatchPartySocket(io);
+  server.listen(PORT, () => {
     console.log(`Lumi AI backend đang chạy tại http://localhost:${PORT}`);
   });
 };

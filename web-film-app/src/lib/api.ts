@@ -21,8 +21,11 @@ import type {
   Comment,
 } from "../types/api";
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const envApi = import.meta.env.VITE_API_BASE_URL;
+const originApi =
+  typeof window !== "undefined" ? `${window.location.origin.replace(/\/$/, "")}/api` : "http://localhost:4000/api";
+
+export const API_BASE_URL = envApi && String(envApi).trim().length ? envApi : originApi;
 
 const API_ROOT_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
@@ -91,7 +94,10 @@ export const api = {
       return apiFetch<MovieListResponse>(`/movies${qs ? `?${qs}` : ""}`);
     },
     detail: (id: string) => apiFetch<MovieDetailResponse>(`/movies/${id}`),
-    watch: (id: string) => apiFetch<WatchResponse>(`/movies/${id}/watch`),
+    watch: (id: string, episode?: number) =>
+      apiFetch<WatchResponse>(
+        `/movies/${id}/watch${episode ? `?ep=${encodeURIComponent(String(episode))}` : ""}`
+      ),
     create: (payload: Partial<Movie> & { title: string }) =>
       apiFetch<{ movie: Movie }>(`/movies`, {
         method: "POST",
@@ -153,6 +159,11 @@ export const api = {
       ),
     addComment: (movieId: string, payload: { content: string }) =>
       apiFetch<{ comment: Comment }>(`/movies/${movieId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    addView: (movieId: string, payload: { viewerId?: string; episode?: number }) =>
+      apiFetch<{ success: boolean }>(`/movies/${movieId}/view`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),

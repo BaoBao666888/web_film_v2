@@ -18,6 +18,9 @@ import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminStatsPage } from "./pages/admin/AdminStatsPage";
 import { useAuth } from "./hooks/useAuth";
 import { TrendingPage } from "./pages/TrendingPage";
+import { WatchPartyCreatePage } from "./pages/WatchPartyCreatePage";
+import { WatchPartyListPage } from "./pages/WatchPartyListPage";
+import { WatchPartyRoomPage } from "./pages/WatchPartyRoomPage";
 
 function AdminGuard() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -52,6 +55,11 @@ function App() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="logout" element={<LogoutPage />} />
         <Route path="watch/:id" element={<WatchPage />} />
+        <Route path="watch-party">
+          <Route index element={<WatchPartyListPage />} />
+          <Route path="create" element={<WatchPartyCreatePage />} />
+          <Route path="room/:roomId" element={<WatchPartyRoomPage />} />
+        </Route>
 
         <Route path="admin" element={<AdminGuard />}>
           <Route index element={<AdminDashboardPage />} />

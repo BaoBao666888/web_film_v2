@@ -43,6 +43,14 @@ npm run preview
 - Admin Dashboard và Admin Manage gọi các endpoint `/api/admin/*` (yêu cầu token admin).
 - Trang “Quản lý phim” có thể thêm, xóa và **sửa phim qua modal** (gọi `PUT /api/movies/:id`).
 
+### Xem chung (watch-party)
+- Tab “Xem chung” trên navbar: danh sách phòng public từ `/api/watch-party/public` + modal hướng dẫn tạo phòng.
+- Nút “Xem chung” dưới player trang xem phim: mở form tạo phòng (public/private, cho phép điều khiển, cho phép tải, auto-start).
+- Phòng private chỉ hiện ở mục “Phòng riêng của bạn” (theo viewerId) và truy cập bằng link, không lộ trên danh sách public.
+- Người không đăng nhập vẫn xem được; chat chỉ cho người đã đăng nhập.
+- Backend lưu participants, host, chat, trạng thái play (API `/api/watch-party/*`). Front đang join/heartbeat/chat qua API; đồng bộ play/pause/seek/tốc độ cần gắn thêm `watchPartyApi.updateState` + polling state cho viewer.
+- HLS proxy backend đã bật cache segment 5 phút để giảm tải nguồn phim cho phòng xem chung.
+
 ## Hướng phát triển thêm
 
 - Tách context auth/global store để tránh reload sau khi đăng nhập.

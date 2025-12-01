@@ -8,6 +8,7 @@ export interface MovieSummary {
 
 export interface Movie extends MovieSummary {
   slug: string;
+  type?: "single" | "series";
   synopsis: string;
   year: number;
   rating: number;
@@ -19,6 +20,17 @@ export interface Movie extends MovieSummary {
   moods: string[];
   cast: string[];
   director: string;
+  episodes?: Episode[];
+  country?: string;
+  seriesStatus?: "Còn tiếp" | "Hoàn thành" | "Tạm ngưng" | "";
+}
+
+export interface Episode {
+  number: number;
+  title: string;
+  duration?: string;
+  videoUrl?: string;
+  videoType?: "mp4" | "hls";
 }
 
 export interface MovieListResponse {
@@ -88,8 +100,14 @@ export interface WatchResponse {
   poster: string;
   trailerUrl?: string;
   tags: string[];
+  type?: "single" | "series";
+  episodes?: Episode[];
+  currentEpisode?: Episode | null;
+  views?: number;
   nextUp: Array<{
     id: string;
+    movieId?: string;
+    episodeNumber?: number;
     title: string;
     duration: string;
     thumbnail: string;
@@ -201,6 +219,7 @@ export interface AdminUsersResponse {
 
 export interface AdminMoviesResponse {
   movies: Movie[];
+  meta?: PaginatedMeta;
 }
 
 export interface RatingResponse {

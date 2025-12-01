@@ -4,6 +4,8 @@ const WatchHistorySchema = new mongoose.Schema(
   {
     id: { type: String, unique: true, index: true },
     user_id: String,
+    viewer_id: String,
+    episode: Number,
     movie_id: String,
     last_watched_at: { type: Date, default: Date.now },
   },

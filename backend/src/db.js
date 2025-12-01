@@ -37,7 +37,7 @@ const hydrateMovies = async (stats) => {
 
 // Movies
 
-export const listMovies = async ({ q, mood, tag, limit = 12 } = {}) => {
+export const listMovies = async ({ q, mood, tag, limit = 12, page = 1 } = {}) => {
   const query = {};
 
   if (q) {
@@ -55,7 +55,14 @@ export const listMovies = async ({ q, mood, tag, limit = 12 } = {}) => {
     query.tags = tag;
   }
 
-  return Movie.find(query).limit(Math.min(limit, 50)).lean();
+  const sanitizedLimit = Math.min(limit, 50);
+  const sanitizedPage = Math.max(Number(page) || 1, 1);
+  const skip = (sanitizedPage - 1) * sanitizedLimit;
+
+  return Movie.find(query)
+    .skip(skip)
+    .limit(sanitizedLimit)
+    .lean();
 };
 
 export const getMovie = async (idOrSlug) => {
@@ -90,10 +97,37 @@ export const updateMovie = async (idOrSlug, updates) => {
   return movie ? movie.toObject() : null;
 };
 
+// export const deleteMovie = async (idOrSlug) => {
+//   const res = await Movie.deleteOne({
+//     $or: [{ id: idOrSlug }, { slug: idOrSlug }],
+//   });
+//   return res.deletedCount > 0;
+// };
 export const deleteMovie = async (idOrSlug) => {
-  const res = await Movie.deleteOne({
+  // Tìm movie trước (lấy đúng movie.id)
+  const movie = await Movie.findOne({
     $or: [{ id: idOrSlug }, { slug: idOrSlug }],
   });
+
+  if (!movie) return false;
+
+  const movieId = movie.id;
+
+  // 1) XÓA YÊU THÍCH
+  await Favorite.deleteMany({ movie_id: movieId });
+
+  // 2) XÓA LỊCH SỬ XEM
+  await WatchHistory.deleteMany({ movie_id: movieId });
+
+  // 3) XÓA REVIEW
+  await Review.deleteMany({ movie_id: movieId });
+
+  // 4) XÓA COMMENT
+  await Comment.deleteMany({ movie_id: movieId });
+
+  // 5) CUỐI CÙNG XOÁ PHIM
+  const res = await Movie.deleteOne({ id: movieId });
+
   return res.deletedCount > 0;
 };
 
@@ -251,22 +285,35 @@ export const listWatchHistory = async (userId) => {
   }));
 };
 
-export const addWatchHistory = async ({ userId, movieId }) => {
+export const addWatchHistory = async ({
+  userId,
+  movieId,
+  viewerId,
+  episode,
+}) => {
   const doc = new WatchHistory({
     id: generateId("history"),
     user_id: userId,
+    viewer_id: viewerId,
     movie_id: movieId,
+    episode,
     last_watched_at: new Date(),
   });
   await doc.save();
 };
 
 export const removeWatchHistory = async ({ userId, historyId }) => {
-  await WatchHistory.deleteOne({ id: historyId, user_id: userId });
+  await WatchHistory.updateOne(
+    { id: historyId, user_id: userId },
+    { $set: { user_id: null } }
+  );
 };
 
 export const clearWatchHistory = async (userId) => {
-  await WatchHistory.deleteMany({ user_id: userId });
+  await WatchHistory.updateMany(
+    { user_id: userId },
+    { $set: { user_id: null } }
+  );
 };
 
 // Favorites
@@ -323,6 +370,10 @@ const buildWatchAggregation = ({ since }) => {
     { $sort: { views: -1, lastWatchedAt: -1 } }
   );
   return pipeline;
+};
+
+export const countMovieViews = async (movieId) => {
+  return WatchHistory.countDocuments({ movie_id: movieId });
 };
 
 export const getTrendingMovies = async ({
