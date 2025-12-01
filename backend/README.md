@@ -53,4 +53,3 @@ npm run dev    # nodemon, cổng 4000
 - File seed nằm tại `src/seeds/*`. Khi cần reset dữ liệu, xóa các collection tương ứng hoặc chạy lại `npm run seed` sau khi drop DB.
 - Middleware `verifyToken` và `requireAdmin` đang dùng JWT đơn giản. Khi triển khai production cần bổ sung refresh token, expiry, revoke list...
 - Một số tính năng AI/chatbot chỉ mock dữ liệu. Thay bằng service thật bằng cách sửa `src/routes/ai.js`.
-- README phụ: file `readme.md` (chữ thường) trong thư mục này trỏ nhanh sang README chính và frontend.

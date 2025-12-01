@@ -36,8 +36,14 @@ const formatFavorites = (value?: number) =>
     ? `${numberFormatter.format(value)} lượt yêu thích`
     : "Chưa có dữ liệu";
 
+const uniqueStrings = (items?: (string | null | undefined)[]) =>
+  (items ?? [])
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item))
+    .filter((item, index, arr) => arr.indexOf(item) === index);
+
 const resolveTags = (movie: { tags?: string[]; moods?: string[] }) =>
-  movie.tags?.length ? movie.tags : movie.moods ?? [];
+  uniqueStrings(movie.tags?.length ? movie.tags : movie.moods ?? []);
 
 type PreviewMovie = {
   id: string;
@@ -172,6 +178,14 @@ export function HomePage() {
     movie: PreviewMovie,
     event: MouseEvent<HTMLAnchorElement>
   ) => {
+    if (
+      typeof window === "undefined" ||
+      (window.matchMedia &&
+        window.matchMedia("(pointer: coarse)").matches) ||
+      window.innerWidth < 1024
+    ) {
+      return;
+    }
     clearShowPreviewTimeout();
     cancelPreviewHide();
     const target = event.currentTarget;
@@ -213,12 +227,12 @@ export function HomePage() {
   }, []);
 
   return (
-    <div className="space-y-12">
-      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-secondary/60 to-dark p-10 shadow-xl shadow-black/30">
-        <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-[1.2fr_1fr]">
+    <div className="space-y-8 md:space-y-12">
+      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-secondary/60 to-dark p-6 shadow-xl shadow-black/30 sm:p-8 md:p-10">
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-[1.2fr_1fr] md:gap-8">
           <div>
             <StatusBadge label="Bản thử nghiệm có AI" tone="info" />
-            <h2 className="mt-4 text-4xl font-bold text-white md:text-5xl">
+            <h2 className="mt-4 text-3xl font-bold text-white sm:text-4xl md:text-5xl">
               Phim hot, playlist mới và gợi ý AI trong một trang
             </h2>
             <p className="mt-3 text-base text-slate-200">
@@ -256,7 +270,7 @@ export function HomePage() {
                   <img
                     src={movie.poster}
                     alt={movie.title}
-                    className="h-28 w-20 flex-none rounded-xl object-cover"
+                    className="h-24 w-16 flex-none rounded-xl object-cover sm:h-28 sm:w-20"
                   />
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-white">
@@ -283,7 +297,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-primary">
@@ -309,13 +323,13 @@ export function HomePage() {
           <div className="relative mt-6">
             <div
               ref={trendingScrollRef}
-              className="flex gap-6 overflow-x-auto pb-4 trending-scroll scroll-smooth"
+              className="flex gap-4 overflow-x-auto pb-4 trending-scroll scroll-smooth snap-x snap-mandatory sm:gap-6"
             >
               {trendingItems.map((item, index) => (
                 <Link
                   to={`/movie/${item.movie.id}`}
                   key={item.movie.id}
-                  className="group min-w-[260px] max-w-sm flex-1 overflow-hidden rounded-3xl bg-gradient-to-b from-white/10 to-dark/60 shadow-lg shadow-black/30"
+                  className="group min-w-[220px] max-w-sm flex-1 snap-start overflow-hidden rounded-3xl bg-gradient-to-b from-white/10 to-dark/60 shadow-lg shadow-black/30 sm:min-w-[260px]"
                   onMouseEnter={(event) => handlePreviewEnter(item.movie, event)}
                   onMouseLeave={handlePreviewLeave}
                 >
@@ -391,7 +405,7 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-violet-300">
@@ -411,13 +425,13 @@ export function HomePage() {
         <div className="relative mt-6">
           <div
             ref={newMoviesScrollRef}
-            className="flex gap-6 overflow-x-auto pb-4 trending-scroll scroll-smooth"
+            className="flex gap-4 overflow-x-auto pb-4 trending-scroll scroll-smooth snap-x snap-mandatory sm:gap-6"
           >
             {latestMovies.map((movie) => (
               <Link
                 to={`/movie/${movie.id}`}
                 key={movie.id}
-                className="flex min-w-[240px] max-w-[280px] flex-none flex-col overflow-hidden rounded-3xl border border-white/10 bg-dark/60 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-primary/70"
+                className="flex min-w-[210px] max-w-[260px] flex-none snap-start flex-col overflow-hidden rounded-3xl border border-white/10 bg-dark/60 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-primary/70 sm:min-w-[240px] sm:max-w-[280px]"
                 onMouseEnter={(event) => handlePreviewEnter(movie, event)}
                 onMouseLeave={handlePreviewLeave}
               >
@@ -486,7 +500,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
+      <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-dark/80 p-6">
           <div className="flex items-center justify-between">
             <h4 className="text-xl font-semibold text-white">🔥 Sôi nổi nhất</h4>
@@ -614,7 +628,7 @@ export function HomePage() {
             Xem thêm
           </Link>
         </div>
-        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {recommendationList.map((movie) => (
             <div
               key={`rec-${movie.id}`}

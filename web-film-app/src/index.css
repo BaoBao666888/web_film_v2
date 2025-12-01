@@ -42,3 +42,12 @@ body {
 .trending-scroll::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(90deg, rgba(255, 107, 107, 0.9), rgba(79, 70, 229, 0.9));
 }
+
+/* Hide scrollbars for navbar overflow */
+.nav-scroll {
+  scrollbar-width: none;
+}
+
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}

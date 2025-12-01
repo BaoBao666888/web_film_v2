@@ -51,9 +51,6 @@ npm run preview
 - Backend lưu participants, host, chat, trạng thái play (API `/api/watch-party/*`). Front đang join/heartbeat/chat qua API; đồng bộ play/pause/seek/tốc độ cần gắn thêm `watchPartyApi.updateState` + polling state cho viewer.
 - HLS proxy backend đã bật cache segment 5 phút để giảm tải nguồn phim cho phòng xem chung.
 
-### README bổ sung
-- File `readme.md` (chữ thường) nằm cùng thư mục để trỏ qua các README khác.
-
 ## Hướng phát triển thêm
 
 - Tách context auth/global store để tránh reload sau khi đăng nhập.

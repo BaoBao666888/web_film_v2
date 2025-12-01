@@ -5,6 +5,3 @@ Repo gồm 2 phần:
 - `backend/`: Backend Express + MongoDB. Chi tiết xem `backend/README.md` (API phim, auth/admin, watch-party, HLS proxy cache).
 
 Tập tin `lumi_ai.movies.json` chứa dữ liệu phim mẫu.
-
-Mẹo chuyển nhanh:
-- Tại frontend/back end đều có thêm file `readme.md` (chữ thường) trỏ về các README liên quan.

@@ -100,10 +100,10 @@ export function TrendingPage() {
         title="Khám phá xu hướng và phim mới"
         description="Bảng dữ liệu nền tối ưu để bạn xem thêm nhiều phim hơn. Lượt xem của tuần này được phân trang mượt mà, kéo đến đâu tải dữ liệu đến đó."
         actions={
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3 sm:justify-end">
             <button
               onClick={() => handleTabChange("trending")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              className={`w-full rounded-full px-4 py-2 text-sm font-medium transition sm:w-auto ${
                 isTrendingView
                   ? "bg-primary text-dark shadow-glow"
                   : "border border-white/20 text-white hover:border-primary hover:text-primary"
@@ -113,7 +113,7 @@ export function TrendingPage() {
             </button>
             <button
               onClick={() => handleTabChange("new")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              className={`w-full rounded-full px-4 py-2 text-sm font-medium transition sm:w-auto ${
                 !isTrendingView
                   ? "bg-primary text-dark shadow-glow"
                   : "border border-white/20 text-white hover:border-primary hover:text-primary"

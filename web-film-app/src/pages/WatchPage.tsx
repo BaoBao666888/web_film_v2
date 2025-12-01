@@ -199,6 +199,8 @@ export function WatchPage() {
     watchData.currentEpisode?.title ?? `Tập ${currentEpisodeNumber}`;
 
   const backgroundPoster = detail?.poster ?? watchData.poster;
+  // Placeholder for future resume-from-history integration
+  const resumePosition = 0;
 
   const stats = [
     { label: "Năm", value: detail?.year ?? "—" },
@@ -310,6 +312,8 @@ export function WatchPage() {
                     stream={streamSource}
                     title={detail?.title ?? watchData.title}
                     poster={backgroundPoster}
+                    autoPlay
+                    startPosition={resumePosition}
                   />
                 </div>
               </div>

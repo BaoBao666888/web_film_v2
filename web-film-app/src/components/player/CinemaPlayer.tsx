@@ -33,6 +33,8 @@ interface CinemaPlayerProps {
   externalState?: ExternalState | null;
   onStatePush?: (state: ExternalState) => void;
   chatSlot?: ReactNode;
+  autoPlay?: boolean;
+  startPosition?: number | null;
 }
 
 const formatQualityLabel = (resolution?: string) => {
@@ -53,6 +55,8 @@ export function CinemaPlayer({
   externalState = null,
   onStatePush,
   chatSlot,
+  autoPlay = false,
+  startPosition = null,
 }: CinemaPlayerProps) {
   const resolvedStream = stream?.url ? stream : null;
   const [status, setStatus] = useState<string>("Đang khởi tạo player...");
@@ -281,6 +285,17 @@ export function CinemaPlayer({
     video.addEventListener("progress", syncBuffered);
     video.addEventListener("loadeddata", syncBuffered);
 
+    const handleLoadedMetadata = () => {
+      if (typeof startPosition === "number" && startPosition > 0) {
+        video.currentTime = startPosition;
+      }
+      if (autoPlay) {
+        void tryPlay(true);
+      }
+    };
+
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+
     return () => {
       video.removeEventListener("play", syncPlayState);
       video.removeEventListener("pause", syncPlayState);
@@ -290,8 +305,9 @@ export function CinemaPlayer({
       video.removeEventListener("timeupdate", syncTime);
       video.removeEventListener("progress", syncBuffered);
       video.removeEventListener("loadeddata", syncBuffered);
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
     };
-  }, []);
+  }, [autoPlay, startPosition]);
 
   useEffect(() => {
     const video = videoRef.current;

@@ -40,7 +40,7 @@ export function Footer() {
 
   return (
     <footer className="border-t border-white/10 bg-dark/80 py-12">
-      <div className="mx-auto flex max-w-7xl flex-wrap gap-10 px-4 text-sm text-slate-300">
+      <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 text-sm text-slate-300 md:flex-row md:flex-wrap">
         <div className="max-w-sm">
           <p className="text-base font-semibold text-white">
             Lumi AI Cinema
@@ -51,7 +51,7 @@ export function Footer() {
           </p>
         </div>
         {visibleLinks.map((column) => (
-          <div key={column.heading} className="min-w-[140px] flex-1">
+          <div key={column.heading} className="min-w-[140px] flex-1 sm:w-auto">
             <p className="text-sm font-semibold text-slate-200 uppercase tracking-wide">
               {column.heading}
             </p>
@@ -69,9 +69,9 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <div className="mx-auto mt-10 flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 text-xs text-slate-500">
+      <div className="mx-auto mt-10 flex max-w-7xl flex-col items-start gap-3 px-4 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} Lumi Studio. All rights reserved.</p>
-        <p className="text-slate-400">
+        <p className="text-slate-400 sm:text-right">
           Ghi chú: Một số tính năng AI đang được hoàn thiện — phần này dùng để
           mô tả luồng giao diện.
         </p>
