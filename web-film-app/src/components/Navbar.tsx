@@ -18,6 +18,17 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
 
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const navItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [
       { label: "Trang chủ", to: "/" },
@@ -64,7 +75,7 @@ export function Navbar() {
       <nav className="relative mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:py-4">
         <NavLink
           to="/"
-          className="flex items-center gap-2 text-lg font-semibold text-white"
+          className="flex shrink-0 items-center gap-2 text-base font-semibold text-white whitespace-nowrap sm:text-lg"
         >
           <span className="rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide">
             Lumi
@@ -72,48 +83,60 @@ export function Navbar() {
           <span>AI Cinema</span>
         </NavLink>
 
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden nav-scroll">
-          {navItems.map((item) => renderNavLink(item))}
-        </div>
+        {/* Container for desktop nav and auth */}
+        <div
+          className={`flex-grow items-center ${
+            isDesktop ? "flex" : "hidden"
+          }`}
+        >
+          {/* Nav Links */}
+          <div className="flex items-center gap-1">
+            {navItems.map((item) => renderNavLink(item))}
+          </div>
 
-        <div className="hidden items-center gap-3 sm:flex">
-          {isAuthenticated ? (
-            <>
-              <NavLink
-                to="/profile"
-                className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
-              >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-dark">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </div>
-                <span className="hidden md:inline">{user?.name}</span>
-              </NavLink>
-              <button
-                onClick={() => {
-                  logout();
-                  window.location.reload();
-                }}
-                className="rounded-full border border-red-500/30 bg-red-500/20 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/30"
-              >
-                Đăng xuất
-              </button>
-            </>
-          ) : (
-            <>
-              <NavLink
-                to="/login"
-                className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
-              >
-                Đăng nhập
-              </NavLink>
-              <NavLink
-                to="/register"
-                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
-              >
-                Đăng ký
-              </NavLink>
-            </>
-          )}
+          {/* Spacer */}
+          <div className="flex-grow" />
+
+          {/* Auth Buttons */}
+          <div className="flex flex-none items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <NavLink
+                  to="/profile"
+                  className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
+                >
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-dark">
+                    {user?.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="truncate">{user?.name}</span>
+                </NavLink>
+                <button
+                  onClick={() => {
+                    logout();
+                    window.location.reload();
+                  }}
+                  className="rounded-full border border-red-500/30 bg-red-500/20 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/30"
+                >
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <>
+                <NavLink
+                  to="/login"
+                  className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
+                >
+                  Đăng nhập
+                </NavLink>
+                <NavLink
+                  to="/register"
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
+                >
+                  Đăng ký
+                </NavLink>
+              </>
+            )}
+          </div>
         </div>
 
         <button
@@ -121,7 +144,9 @@ export function Navbar() {
           aria-expanded={menuOpen}
           aria-label="Mở menu"
           onClick={() => setMenuOpen((open) => !open)}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary sm:hidden"
+          className={`h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
+            isDesktop ? "hidden" : "flex"
+          }`}
         >
           <div className="space-y-1.5">
             <span
@@ -144,7 +169,9 @@ export function Navbar() {
       </nav>
 
       <div
-        className={`min-[520px]:hidden absolute left-0 right-0 top-full z-30 transition-all duration-200 ${
+        className={`${
+          isDesktop ? "hidden" : ""
+        } absolute left-0 right-0 top-full z-30 transition-all duration-200 ${
           menuOpen
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0"
