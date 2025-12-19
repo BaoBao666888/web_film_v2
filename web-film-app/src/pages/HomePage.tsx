@@ -107,8 +107,7 @@ export function HomePage() {
       setTrendingNav({
         canPrev: element.scrollLeft > 8,
         canNext:
-          element.scrollLeft + element.clientWidth <
-          element.scrollWidth - 8,
+          element.scrollLeft + element.clientWidth < element.scrollWidth - 8,
       });
     };
     updateButtons();
@@ -127,8 +126,7 @@ export function HomePage() {
       setNewNav({
         canPrev: element.scrollLeft > 8,
         canNext:
-          element.scrollLeft + element.clientWidth <
-          element.scrollWidth - 8,
+          element.scrollLeft + element.clientWidth < element.scrollWidth - 8,
       });
     };
     updateButtons();
@@ -180,8 +178,7 @@ export function HomePage() {
   ) => {
     if (
       typeof window === "undefined" ||
-      (window.matchMedia &&
-        window.matchMedia("(pointer: coarse)").matches) ||
+      (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
       window.innerWidth < 1024
     ) {
       return;
@@ -223,7 +220,6 @@ export function HomePage() {
       clearShowPreviewTimeout();
       cancelPreviewHide();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -236,9 +232,9 @@ export function HomePage() {
               Phim hot, playlist mới và gợi ý AI trong một trang
             </h2>
             <p className="mt-3 text-base text-slate-200">
-              Theo dõi xu hướng thực tế dựa trên lượt xem tuần này, phim vừa
-              cập bến và bảng xếp hạng sôi nổi nhất. AI vẫn túc trực để gợi ý
-              đúng mood bạn cần.
+              Theo dõi xu hướng thực tế dựa trên lượt xem tuần này, phim vừa cập
+              bến và bảng xếp hạng sôi nổi nhất. AI vẫn túc trực để gợi ý đúng
+              mood bạn cần.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <Link
@@ -255,8 +251,9 @@ export function HomePage() {
               </Link>
             </div>
             <p className="mt-6 text-xs text-slate-400">
-              Dữ liệu lấy trực tiếp từ backend Express (cổng 4000). Khi API
-              gián đoạn, giao diện tự động dùng dữ liệu demo để bạn không bị gián quãng.
+              Dữ liệu lấy trực tiếp từ backend Express (cổng 4000). Khi API gián
+              đoạn, giao diện tự động dùng dữ liệu demo để bạn không bị gián
+              quãng.
             </p>
           </div>
           <div className="relative">
@@ -307,7 +304,8 @@ export function HomePage() {
               Top phim được xem nhiều nhất trong 7 ngày
             </h3>
             <p className="text-sm text-slate-400">
-              Danh sách dựa trên Watch History thực tế, sắp xếp theo lượt xem cao nhất.
+              Danh sách dựa trên Watch History thực tế, sắp xếp theo lượt xem
+              cao nhất.
             </p>
           </div>
           <Link
@@ -330,7 +328,9 @@ export function HomePage() {
                   to={`/movie/${item.movie.id}`}
                   key={item.movie.id}
                   className="group min-w-[220px] max-w-sm flex-1 snap-start overflow-hidden rounded-3xl bg-gradient-to-b from-white/10 to-dark/60 shadow-lg shadow-black/30 sm:min-w-[260px]"
-                  onMouseEnter={(event) => handlePreviewEnter(item.movie, event)}
+                  onMouseEnter={(event) =>
+                    handlePreviewEnter(item.movie, event)
+                  }
                   onMouseLeave={handlePreviewLeave}
                 >
                   <div className="relative">
@@ -365,7 +365,9 @@ export function HomePage() {
               <button
                 type="button"
                 aria-label="Xem phim trước"
-                onClick={() => scrollCarousel(trendingScrollRef.current, "prev")}
+                onClick={() =>
+                  scrollCarousel(trendingScrollRef.current, "prev")
+                }
                 className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-dark shadow-2xl shadow-black/40 transition hover:bg-white"
               >
                 <svg
@@ -385,7 +387,9 @@ export function HomePage() {
               <button
                 type="button"
                 aria-label="Xem phim tiếp theo"
-                onClick={() => scrollCarousel(trendingScrollRef.current, "next")}
+                onClick={() =>
+                  scrollCarousel(trendingScrollRef.current, "next")
+                }
                 className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-dark shadow-2xl shadow-black/40 transition hover:bg-white"
               >
                 <svg
@@ -503,7 +507,9 @@ export function HomePage() {
       <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-dark/80 p-6">
           <div className="flex items-center justify-between">
-            <h4 className="text-xl font-semibold text-white">🔥 Sôi nổi nhất</h4>
+            <h4 className="text-xl font-semibold text-white">
+              🔥 Sôi nổi nhất
+            </h4>
           </div>
           <ol className="mt-5 space-y-4">
             {community.mostActive.length ? (
@@ -540,7 +546,9 @@ export function HomePage() {
 
         <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-dark/80 p-6">
           <div className="flex items-center justify-between">
-            <h4 className="text-xl font-semibold text-white">💛 Yêu thích nhất</h4>
+            <h4 className="text-xl font-semibold text-white">
+              💛 Yêu thích nhất
+            </h4>
           </div>
           <ol className="mt-5 space-y-4">
             {community.mostFavorited.length ? (
@@ -575,14 +583,18 @@ export function HomePage() {
 
         <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-dark/80 p-6">
           <div className="flex items-center justify-between">
-            <h4 className="text-xl font-semibold text-white">⚡ Bình luận mới</h4>
+            <h4 className="text-xl font-semibold text-white">
+              ⚡ Bình luận mới
+            </h4>
           </div>
           <div className="mt-5 space-y-4">
             {community.recentComments.length ? (
               community.recentComments.slice(0, 5).map((comment) => (
                 <Link
                   key={comment.id}
-                  to={comment.movie?.id ? `/movie/${comment.movie.id}` : "/search"}
+                  to={
+                    comment.movie?.id ? `/movie/${comment.movie.id}` : "/search"
+                  }
                   className="flex gap-3 rounded-2xl border border-white/10 bg-black/20 p-3 transition hover:border-primary/70"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">

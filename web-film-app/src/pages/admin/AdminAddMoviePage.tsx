@@ -67,9 +67,7 @@ export function AdminAddMoviePage() {
         if (didLoad) return;
         const names = (list || [])
           .map((item) =>
-            typeof item === "string"
-              ? item.trim()
-              : (item?.name || "").trim()
+            typeof item === "string" ? item.trim() : (item?.name || "").trim()
           )
           .filter((name) => Boolean(name));
         setCountryOptions(Array.from(new Set(names)));
@@ -142,7 +140,11 @@ export function AdminAddMoviePage() {
         ? (JSON.parse(form.videoHeaders) as Record<string, string>)
         : {};
     } catch (err) {
-      setStatus("Headers JSON không hợp lệ. Kiểm tra lại cú pháp.");
+      setStatus(
+        `Headers JSON không hợp lệ: ${
+          err instanceof Error ? err.message : "Kiểm tra lại cú pháp."
+        }`
+      );
       setLoading(false);
       return;
     }
@@ -376,7 +378,7 @@ export function AdminAddMoviePage() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
               Link poster <span className="text-red-400">*</span>
@@ -403,6 +405,21 @@ export function AdminAddMoviePage() {
             />
           </div>
 
+          <div>
+            <label className="text-xs uppercase tracking-wide text-slate-400">
+              Link thumbnail
+            </label>
+            <input
+              type="url"
+              value={form.thumbnail}
+              onChange={(event) => updateField("thumbnail", event.target.value)}
+              placeholder="https://..."
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Link trailer
@@ -469,9 +486,12 @@ export function AdminAddMoviePage() {
           <div className="space-y-3 rounded-2xl border border-white/10 bg-dark/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-white">Danh sách tập</p>
+                <p className="text-sm font-semibold text-white">
+                  Danh sách tập
+                </p>
                 <p className="text-xs text-slate-400">
-                  Điền link và tiêu đề, mặc định tiêu đề sẽ là “Tập + số thứ tự”.
+                  Điền link và tiêu đề, mặc định tiêu đề sẽ là “Tập + số thứ
+                  tự”.
                 </p>
               </div>
               <button
@@ -485,7 +505,8 @@ export function AdminAddMoviePage() {
 
             {form.episodes.length === 0 && (
               <p className="text-xs text-slate-400">
-                Chưa có tập nào. Bấm &quot;+ Thêm tập&quot; để bắt đầu với Tập 1.
+                Chưa có tập nào. Bấm &quot;+ Thêm tập&quot; để bắt đầu với Tập
+                1.
               </p>
             )}
 
@@ -515,7 +536,11 @@ export function AdminAddMoviePage() {
                     <input
                       value={ep.videoUrl}
                       onChange={(event) =>
-                        updateEpisodeField(index, "videoUrl", event.target.value)
+                        updateEpisodeField(
+                          index,
+                          "videoUrl",
+                          event.target.value
+                        )
                       }
                       placeholder="https://..."
                       className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
@@ -528,7 +553,11 @@ export function AdminAddMoviePage() {
                     <input
                       value={ep.duration ?? ""}
                       onChange={(event) =>
-                        updateEpisodeField(index, "duration", event.target.value)
+                        updateEpisodeField(
+                          index,
+                          "duration",
+                          event.target.value
+                        )
                       }
                       placeholder="45m"
                       className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
@@ -575,14 +604,16 @@ export function AdminAddMoviePage() {
           <textarea
             rows={3}
             value={form.videoHeaders}
-            onChange={(event) => updateField("videoHeaders", event.target.value)}
+            onChange={(event) =>
+              updateField("videoHeaders", event.target.value)
+            }
             placeholder='{"Referer":"https://example.com/"} (bỏ trống để dùng header mặc định)'
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
           />
           <p className="mt-2 text-xs text-slate-400">
             Nếu để trống, hệ thống sẽ tự áp dụng bộ headers mặc định (Referer
-            https://goatembed.com/ + user-agent chuẩn). Điền JSON khi cần override
-            riêng cho phim.
+            https://goatembed.com/ + user-agent chuẩn). Điền JSON khi cần
+            override riêng cho phim.
           </p>
         </div>
 

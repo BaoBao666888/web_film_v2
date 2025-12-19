@@ -124,7 +124,12 @@ export function CinemaPlayer({
     externalStateRef.current =
       externalState && externalState.updatedAt
         ? externalState
-        : { position: 0, isPlaying: false, playbackRate: 1, updatedAt: Date.now() };
+        : {
+            position: 0,
+            isPlaying: false,
+            playbackRate: 1,
+            updatedAt: Date.now(),
+          };
     if (!resolvedStream?.url) {
       setStatus("Chưa có URL nguồn để phát.");
       return;
@@ -145,10 +150,7 @@ export function CinemaPlayer({
     }
   }, [resolvedStream]);
 
-  const analyzeHls = async (
-    url: string,
-    headers: Record<string, string>
-  ) => {
+  const analyzeHls = async (url: string, headers: Record<string, string>) => {
     setAnalyzing(true);
     setStatus("Đang phân tích playlist HLS và tạo proxy an toàn...");
     try {
@@ -234,7 +236,8 @@ export function CinemaPlayer({
       setIsFullscreen(document.fullscreenElement === playerRef.current);
     };
     document.addEventListener("fullscreenchange", handleFullscreen);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreen);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreen);
   }, []);
 
   useEffect(() => {
@@ -316,13 +319,18 @@ export function CinemaPlayer({
     }
   }, [isMuted]);
 
-  const applyExternalState = (state: ExternalState | null, forcePlay = false) => {
+  const applyExternalState = (
+    state: ExternalState | null,
+    forcePlay = false
+  ) => {
     if (!state) return;
     externalStateRef.current = state;
     const video = videoRef.current;
     if (!video) return;
     const { position, isPlaying, playbackRate, updatedAt } = state;
-    const elapsed = isPlaying ? (Date.now() - (updatedAt || Date.now())) / 1000 : 0;
+    const elapsed = isPlaying
+      ? (Date.now() - (updatedAt || Date.now())) / 1000
+      : 0;
     const hostTime = (Number(position) || 0) + elapsed * (playbackRate || 1);
     if (!Number.isFinite(hostTime)) return;
 
@@ -369,13 +377,21 @@ export function CinemaPlayer({
         syncRateTimerRef.current = null;
       }
     };
-  }, [externalState?.updatedAt, externalState?.position, externalState?.isPlaying, externalState?.playbackRate]);
+  }, [
+    externalState?.updatedAt,
+    externalState?.position,
+    externalState?.isPlaying,
+    externalState?.playbackRate,
+  ]);
 
   const handleSeek = (delta: number) => {
     if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video) return;
-    const next = Math.max(0, Math.min(video.currentTime + delta, video.duration || Infinity));
+    const next = Math.max(
+      0,
+      Math.min(video.currentTime + delta, video.duration || Infinity)
+    );
     video.currentTime = next;
     emitState(true);
   };
@@ -391,8 +407,13 @@ export function CinemaPlayer({
       }
       setIsMuted(false);
     }
-    const wantsPlay = Boolean(externalStateRef.current?.isPlaying || externalState?.isPlaying);
-    applyExternalState(externalStateRef.current || externalState || null, wantsPlay);
+    const wantsPlay = Boolean(
+      externalStateRef.current?.isPlaying || externalState?.isPlaying
+    );
+    applyExternalState(
+      externalStateRef.current || externalState || null,
+      wantsPlay
+    );
   };
 
   const handleVideoClick = () => {
@@ -533,9 +554,13 @@ export function CinemaPlayer({
   }, [onStatePush]);
 
   const safeDuration = duration > 0 ? duration : 0;
-  const playedPercent = safeDuration ? Math.min((currentTime / safeDuration) * 100, 100) : 0;
+  const playedPercent = safeDuration
+    ? Math.min((currentTime / safeDuration) * 100, 100)
+    : 0;
   const bufferedAhead = Math.max(buffered - currentTime, 0);
-  const bufferedAheadPercent = safeDuration ? Math.min((bufferedAhead / safeDuration) * 100, 100 - playedPercent) : 0;
+  const bufferedAheadPercent = safeDuration
+    ? Math.min((bufferedAhead / safeDuration) * 100, 100 - playedPercent)
+    : 0;
   const bufferEndPercent = Math.min(playedPercent + bufferedAheadPercent, 100);
   const showKnob = safeDuration > 0 && currentTime > 0.05;
 
@@ -638,7 +663,9 @@ export function CinemaPlayer({
           aria-label={`Trình phát ${title}`}
           title={title}
           className={`aspect-video w-full bg-black object-contain ${
-            isFullscreen ? "min-h-screen" : "min-h-[360px] md:min-h-[440px] lg:min-h-[520px] rounded-[20px]"
+            isFullscreen
+              ? "min-h-screen"
+              : "min-h-[360px] md:min-h-[440px] lg:min-h-[520px] rounded-[20px]"
           }`}
         />
         {chatSlot && (
@@ -656,7 +683,9 @@ export function CinemaPlayer({
           <div className="flex flex-wrap items-center gap-2 text-slate-200">
             <span className="flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 font-semibold text-emerald-300">
               <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
-              {resolvedStream?.type === "hls" ? "HLS secure proxy" : "Direct MP4"}
+              {resolvedStream?.type === "hls"
+                ? "HLS secure proxy"
+                : "Direct MP4"}
             </span>
             {analyzing && (
               <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-amber-200">
@@ -669,12 +698,14 @@ export function CinemaPlayer({
           </div>
 
           <div
-          className={`pointer-events-auto flex flex-col gap-3 text-white ${
-            controlsDisabled ? "opacity-70" : ""
-          }`}
-        >
+            className={`pointer-events-auto flex flex-col gap-3 text-white ${
+              controlsDisabled ? "opacity-70" : ""
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <span className="text-[11px] text-white/70">{formatTime(currentTime)}</span>
+              <span className="text-[11px] text-white/70">
+                {formatTime(currentTime)}
+              </span>
               <div className="relative flex-1 py-1">
                 <div className="relative h-[6px] overflow-hidden rounded-full bg-white/15">
                   <div
@@ -685,7 +716,10 @@ export function CinemaPlayer({
                     className="absolute inset-y-0 bg-white/30 z-10"
                     style={{
                       left: `${playedPercent}%`,
-                      width: `${Math.max(bufferEndPercent - playedPercent, 0)}%`,
+                      width: `${Math.max(
+                        bufferEndPercent - playedPercent,
+                        0
+                      )}%`,
                       opacity: bufferedAheadPercent > 0 ? 1 : 0,
                     }}
                   />
@@ -709,7 +743,9 @@ export function CinemaPlayer({
                   className="absolute inset-0 h-6 w-full cursor-pointer appearance-none bg-transparent opacity-0"
                 />
               </div>
-              <span className="text-[11px] text-white/70">{formatTime(duration)}</span>
+              <span className="text-[11px] text-white/70">
+                {formatTime(duration)}
+              </span>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -721,27 +757,47 @@ export function CinemaPlayer({
                 >
                   {isPlaying ? <IconPause /> : <IconPlay />}
                 </ControlButton>
-                <ControlButton label="Tua lùi 10 giây" onClick={() => handleSeek(-10)}>
+                <ControlButton
+                  label="Tua lùi 10 giây"
+                  onClick={() => handleSeek(-10)}
+                >
                   <IconBack10 />
                 </ControlButton>
-                <ControlButton label="Tua nhanh 10 giây" onClick={() => handleSeek(10)}>
+                <ControlButton
+                  label="Tua nhanh 10 giây"
+                  onClick={() => handleSeek(10)}
+                >
                   <IconForward10 />
                 </ControlButton>
-                <ControlButton label={isMuted ? "Bật tiếng" : "Tắt tiếng"} onClick={toggleMute} active={isMuted}>
+                <ControlButton
+                  label={isMuted ? "Bật tiếng" : "Tắt tiếng"}
+                  onClick={toggleMute}
+                  active={isMuted}
+                >
                   {isMuted ? <IconMute /> : <IconVolume />}
                 </ControlButton>
                 <ControlButton label="Chuyển tốc độ" onClick={cycleSpeed}>
-                  <span className="text-[11px] font-semibold">{playbackSpeed.toFixed(2).replace(/\.00$/, "")}x</span>
+                  <span className="text-[11px] font-semibold">
+                    {playbackSpeed.toFixed(2).replace(/\.00$/, "")}x
+                  </span>
                 </ControlButton>
               </div>
 
               <div className="flex items-center gap-2">
                 {pipSupported && (
-                  <ControlButton label="Hình trong hình" onClick={togglePictureInPicture} active={pipActive}>
+                  <ControlButton
+                    label="Hình trong hình"
+                    onClick={togglePictureInPicture}
+                    active={pipActive}
+                  >
                     <IconPiP />
                   </ControlButton>
                 )}
-                <ControlButton label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"} onClick={toggleFullscreen} active={isFullscreen}>
+                <ControlButton
+                  label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+                  onClick={toggleFullscreen}
+                  active={isFullscreen}
+                >
                   {isFullscreen ? <IconCompress /> : <IconExpand />}
                 </ControlButton>
               </div>
@@ -812,7 +868,9 @@ function ControlButton({
       title={label}
       onClick={onClick}
       className={`flex h-10 w-10 items-center justify-center rounded-full border text-white transition hover:-translate-y-[1px] hover:border-primary/60 hover:bg-white/10 ${
-        active ? "border-primary bg-primary/20 text-primary shadow-[0_10px_30px_rgba(255,107,107,0.25)]" : "border-white/15 bg-black/40"
+        active
+          ? "border-primary bg-primary/20 text-primary shadow-[0_10px_30px_rgba(255,107,107,0.25)]"
+          : "border-white/15 bg-black/40"
       }`}
     >
       {children}
@@ -825,7 +883,12 @@ const iconProps = "h-4 w-4 stroke-current";
 function IconPlay() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="M8 5.5v13l9-6.5-9-6.5z" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M8 5.5v13l9-6.5-9-6.5z"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -841,9 +904,24 @@ function IconPause() {
 function IconBack10() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="M11 6 7 4v4" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M7 12.5A6 6 0 1 0 13 7" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 14h-2v2" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M11 6 7 4v4"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 12.5A6 6 0 1 0 13 7"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 14h-2v2"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -851,9 +929,24 @@ function IconBack10() {
 function IconForward10() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="m13 6 4-2v4" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M17 12.5A6 6 0 1 1 11 7" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10 14h2v2" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="m13 6 4-2v4"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M17 12.5A6 6 0 1 1 11 7"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 14h2v2"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -861,8 +954,17 @@ function IconForward10() {
 function IconVolume() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="M5 10v4h3l5 4V6l-5 4H5z" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 9.5c1 .6 1.5 1.6 1.5 2.5 0 .9-.5 1.9-1.5 2.5" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M5 10v4h3l5 4V6l-5 4H5z"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 9.5c1 .6 1.5 1.6 1.5 2.5 0 .9-.5 1.9-1.5 2.5"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -870,8 +972,17 @@ function IconVolume() {
 function IconMute() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="M5 10v4h3l5 4V6l-5 4H5z" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m17.5 9-3 3m0 0-3 3m3-3 3 3m-3-3 3-3" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M5 10v4h3l5 4V6l-5 4H5z"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m17.5 9-3 3m0 0-3 3m3-3 3 3m-3-3 3-3"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -880,7 +991,14 @@ function IconPiP() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
       <rect x="4" y="6" width="16" height="12" rx="2" strokeWidth="1.6" />
-      <rect x="12.5" y="10.5" width="5.5" height="4.5" rx="1" strokeWidth="1.6" />
+      <rect
+        x="12.5"
+        y="10.5"
+        width="5.5"
+        height="4.5"
+        rx="1"
+        strokeWidth="1.6"
+      />
     </svg>
   );
 }
@@ -888,7 +1006,12 @@ function IconPiP() {
 function IconExpand() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="M9 5H5v4M15 5h4v4M9 19H5v-4M15 19h4v-4" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M9 5H5v4M15 5h4v4M9 19H5v-4M15 19h4v-4"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -896,7 +1019,12 @@ function IconExpand() {
 function IconCompress() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path d="M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

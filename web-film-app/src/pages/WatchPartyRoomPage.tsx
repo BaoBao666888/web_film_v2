@@ -13,12 +13,7 @@ import type { WatchPartyMessage, WatchPartyRoom } from "../types/watchParty";
 type WatchPartySeed = Partial<
   Pick<
     WatchPartyRoom,
-    | "episodeNumber"
-    | "title"
-    | "poster"
-    | "autoStart"
-    | "isLive"
-    | "isPrivate"
+    "episodeNumber" | "title" | "poster" | "autoStart" | "isLive" | "isPrivate"
   >
 > & { movieId: string };
 
@@ -30,7 +25,9 @@ type SyncedState = {
 };
 
 const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, "");
-const normalizeState = (state?: Partial<SyncedState> | null): SyncedState | null => {
+const normalizeState = (
+  state?: Partial<SyncedState> | null
+): SyncedState | null => {
   if (!state) return null;
   return {
     position: Number(state.position) || 0,
@@ -48,7 +45,9 @@ export function WatchPartyRoomPage() {
   const [room, setRoom] = useState<WatchPartyRoom | undefined>(undefined);
   const [message, setMessage] = useState("");
   const [appliedState, setAppliedState] = useState<SyncedState | null>(null);
-  const [hostInitialState, setHostInitialState] = useState<SyncedState | null>(null);
+  const [hostInitialState, setHostInitialState] = useState<SyncedState | null>(
+    null
+  );
   const [miniChatOpen, setMiniChatOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const latestHostStateRef = useRef<SyncedState | null>(null);
@@ -91,7 +90,11 @@ export function WatchPartyRoomPage() {
   }, [roomId, location.search, user?.id, user?.name]);
 
   const { data: watchData } = useFetch<WatchResponse>(
-    room?.movieId ? `/movies/${room.movieId}/watch${room.episodeNumber ? `?ep=${room.episodeNumber}` : ""}` : null,
+    room?.movieId
+      ? `/movies/${room.movieId}/watch${
+          room.episodeNumber ? `?ep=${room.episodeNumber}` : ""
+        }`
+      : null,
     [room?.movieId, room?.episodeNumber]
   );
   const viewerIdRef = useRef<string | null>(null);
@@ -103,7 +106,9 @@ export function WatchPartyRoomPage() {
     }
     const stored = localStorage.getItem("viewerId") || "";
     if (!stored || stored.startsWith("user")) {
-      const fresh = `viewer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const fresh = `viewer-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
       localStorage.setItem("viewerId", fresh);
       return fresh;
     }
@@ -112,7 +117,8 @@ export function WatchPartyRoomPage() {
 
   const playMentionSound = () => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
@@ -157,7 +163,11 @@ export function WatchPartyRoomPage() {
     const socket = io(SOCKET_URL, { transports: ["websocket"] });
     socketRef.current = socket;
 
-    const joinPayload = { roomId, viewerId: viewerIdRef.current, name: user?.name ?? "Khách" };
+    const joinPayload = {
+      roomId,
+      viewerId: viewerIdRef.current,
+      name: user?.name ?? "Khách",
+    };
 
     socket.on("connect", () => {
       socket.emit("watch-party:join", joinPayload);
@@ -187,7 +197,8 @@ export function WatchPartyRoomPage() {
       if (!normalized) return;
       latestHostStateRef.current = normalized;
       const currentRoom = roomRef.current;
-      const shouldFollow = currentRoom?.isLive && viewerIdRef.current !== currentRoom?.hostId;
+      const shouldFollow =
+        currentRoom?.isLive && viewerIdRef.current !== currentRoom?.hostId;
       if (shouldFollow) {
         setAppliedState(normalized);
       }
@@ -200,10 +211,17 @@ export function WatchPartyRoomPage() {
     socket.on("watch-party:messages", (messages) => {
       setRoom((prev) => (prev ? { ...prev, messages } : prev));
       const latest = messages[messages.length - 1];
-      if (latest && latest.createdAt !== lastMsgIdRef.current && latest.userId !== viewerIdRef.current) {
+      if (
+        latest &&
+        latest.createdAt !== lastMsgIdRef.current &&
+        latest.userId !== viewerIdRef.current
+      ) {
         const mentionTarget = user?.name?.trim()?.toLowerCase();
         const content = (latest.content || "").toLowerCase();
-        if ((mentionTarget && content.includes(`@${mentionTarget}`)) || content.includes("@all")) {
+        if (
+          (mentionTarget && content.includes(`@${mentionTarget}`)) ||
+          content.includes("@all")
+        ) {
           playMentionSound();
         }
         lastMsgIdRef.current = latest.createdAt;
@@ -216,7 +234,10 @@ export function WatchPartyRoomPage() {
 
     const hb = setInterval(() => {
       if (!roomId || !viewerIdRef.current) return;
-      socket.emit("watch-party:heartbeat", { roomId, viewerId: viewerIdRef.current });
+      socket.emit("watch-party:heartbeat", {
+        roomId,
+        viewerId: viewerIdRef.current,
+      });
     }, 8000);
 
     return () => {
@@ -264,7 +285,9 @@ export function WatchPartyRoomPage() {
 
   const handleSyncNow = () => {
     if (!roomId || !room) return;
-    const state = normalizeState(latestHostStateRef.current || (room.state as SyncedState | undefined));
+    const state = normalizeState(
+      latestHostStateRef.current || (room.state as SyncedState | undefined)
+    );
     if (state) {
       setAppliedState(state);
     }
@@ -299,18 +322,35 @@ export function WatchPartyRoomPage() {
   }, [isHost, hostInitialState]);
 
   const liveBadge = room?.isLive ? "LIVE" : "FREE";
-  const externalState = room ? (isHost ? hostInitialState : appliedState) : null;
+  const externalState = room
+    ? isHost
+      ? hostInitialState
+      : appliedState
+    : null;
 
   const chatMessages = room?.messages || [];
   const chatOverlay = (
     <div className="text-sm text-white">
-      <button
-        type="button"
-        onClick={() => setMiniChatOpen((v) => !v)}
-        className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white shadow-sm shadow-black/40 hover:bg-black/80"
-      >
-        {miniChatOpen ? "Ẩn chat" : "Chat"}
-      </button>
+      <div className="flex justify-between items-center">
+        {!miniChatOpen && (
+          <button
+            type="button"
+            onClick={() => setMiniChatOpen((v) => !v)}
+            className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white shadow-sm shadow-black/40 hover:bg-black/80"
+          >
+            Chat
+          </button>
+        )}
+        {miniChatOpen && (
+          <button
+            type="button"
+            onClick={() => setMiniChatOpen((v) => !v)}
+            className="ml-auto rounded-full bg-black/60 px-2 py-1 text-xs font-semibold text-white shadow-sm shadow-black/40 hover:bg-black/80"
+          >
+            ×
+          </button>
+        )}
+      </div>
       {miniChatOpen && (
         <div className="mt-2 w-80 max-w-[80vw] rounded-2xl border border-white/15 bg-black/70 p-3 shadow-2xl shadow-black/60 backdrop-blur">
           <div className="mb-2 flex items-center justify-between text-[11px] text-white/70">
@@ -318,7 +358,9 @@ export function WatchPartyRoomPage() {
             <span>{chatMessages.length} tin</span>
           </div>
           <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-            {chatMessages.length === 0 && <p className="text-xs text-slate-400">Chưa có tin nhắn.</p>}
+            {chatMessages.length === 0 && (
+              <p className="text-xs text-slate-400">Chưa có tin nhắn.</p>
+            )}
             {chatMessages.slice(-30).map((msg) => (
               <div
                 key={`${msg.userId}-${msg.createdAt}-overlay`}
@@ -357,7 +399,9 @@ export function WatchPartyRoomPage() {
               </button>
             </div>
           ) : (
-            <p className="mt-2 text-[11px] text-slate-400">Đăng nhập để chat.</p>
+            <p className="mt-2 text-[11px] text-slate-400">
+              Đăng nhập để chat.
+            </p>
           )}
         </div>
       )}
@@ -380,8 +424,12 @@ export function WatchPartyRoomPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-primary/80">Live room</p>
-            <h1 className="text-xl font-semibold text-white line-clamp-2">{room.title}</h1>
+            <p className="text-xs uppercase tracking-[0.3em] text-primary/80">
+              Live room
+            </p>
+            <h1 className="text-xl font-semibold text-white line-clamp-2">
+              {room.title}
+            </h1>
             <p className="text-xs text-slate-400">
               Chủ phòng: {room.hostName} • Người xem: {room.participants.length}
             </p>
@@ -434,7 +482,8 @@ export function WatchPartyRoomPage() {
               Tự động bắt đầu: {room.autoStart ? "Có" : "Không"}
             </span>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-              Chế độ Live: {room.isLive ? "On (đồng bộ theo host)" : "Off (tự do)"}
+              Chế độ Live:{" "}
+              {room.isLive ? "On (đồng bộ theo host)" : "Off (tự do)"}
             </span>
           </div>
         </div>
@@ -452,7 +501,8 @@ export function WatchPartyRoomPage() {
             <div>
               <p>Chế độ Live</p>
               <p className="text-xs text-slate-400">
-                Bật: mọi người theo host. Tắt: ai nấy xem riêng, không ảnh hưởng nhau.
+                Bật: mọi người theo host. Tắt: ai nấy xem riêng, không ảnh hưởng
+                nhau.
               </p>
             </div>
             <input
