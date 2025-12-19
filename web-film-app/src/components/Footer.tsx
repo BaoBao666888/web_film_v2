@@ -42,9 +42,7 @@ export function Footer() {
     <footer className="border-t border-white/10 bg-dark/80 py-12">
       <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 text-sm text-slate-300 md:flex-row md:flex-wrap">
         <div className="max-w-sm">
-          <p className="text-base font-semibold text-white">
-            Lumi AI Cinema
-          </p>
+          <p className="text-base font-semibold text-white">Lumi AI Cinema</p>
           <p className="mt-3 text-slate-400">
             Xem phim theo mood, nhận gợi ý cá nhân hóa và tương tác với chatbot
             thông minh – tất cả trong một nền tảng.
@@ -71,10 +69,6 @@ export function Footer() {
       </div>
       <div className="mx-auto mt-10 flex max-w-7xl flex-col items-start gap-3 px-4 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} Lumi Studio. All rights reserved.</p>
-        <p className="text-slate-400 sm:text-right">
-          Ghi chú: Một số tính năng AI đang được hoàn thiện — phần này dùng để
-          mô tả luồng giao diện.
-        </p>
       </div>
     </footer>
   );
