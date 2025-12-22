@@ -21,6 +21,12 @@ export function AdminDashboardPage() {
               + Thêm phim
             </Link>
             <Link
+              to="/admin/manage"
+              className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
+            >
+              Quản lý phim
+            </Link>
+            <Link
               to="/admin/stats"
               className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
             >
@@ -47,7 +53,7 @@ export function AdminDashboardPage() {
         ))}
       </section>
 
-      <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+      {/* <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
           <p className="text-sm font-semibold text-white">Luồng công việc</p>
           <div className="mt-4 space-y-4 text-xs text-slate-300">
@@ -73,7 +79,7 @@ export function AdminDashboardPage() {
             hiển thị placeholder để kiểm thử UI.
           </p>
         </div>
-      </section>
+      </section> */}
 
       {data?.topMoods?.length ? (
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">

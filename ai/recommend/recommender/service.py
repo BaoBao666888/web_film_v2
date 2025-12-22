@@ -8,31 +8,6 @@ import numpy as np
 class RecommendationService:
     """
     Service gom toàn bộ logic gợi ý phim cho user.
-
-    Hai cách khởi tạo:
-
-    1) Cách hiện tại trong api_main:
-        service = RecommendationService("path/to/recommender.joblib")
-
-       -> __init__ sẽ tự joblib.load(...) và set:
-          - self.movies_meta
-          - self.movie2idx
-          - self.idx2movie
-          - self.similarity (numpy array hoặc None)
-          - self.user_items
-          - self.user_favorites
-
-       (giả định train_recommender đã lưu các key đó trong file joblib)
-
-    2) Nếu sau này muốn inject cứng:
-        RecommendationService(
-            movies_meta=...,
-            movie2idx=...,
-            idx2movie=...,
-            similarity=...,
-            user_items=...,
-            user_favorites=...,
-        )
     """
 
     def __init__(
@@ -78,6 +53,28 @@ class RecommendationService:
             self.user_items = user_items or {}
             self.user_favorites = user_favorites or {}
 
+    # -------------------- CHECK PHIM CÒN TỒN TẠI / ACTIVE --------------------
+    def _is_movie_available(self, movie_id: str) -> bool:
+        """
+        Trả về True nếu phim còn tồn tại để gợi ý.
+
+        Hiện tại:
+        - Nếu không có trong movies_meta -> coi như không tồn tại.
+        - Nếu sau này bạn có field 'is_deleted' hoặc 'status' thì check thêm ở đây.
+        """
+        meta = self.movies_meta.get(movie_id)
+        if not meta:
+            return False
+
+        # Nếu sau này bạn thêm cờ xóa mềm trong DB/model thì bật logic này:
+        if meta.get("is_deleted") is True:
+            return False
+
+        if meta.get("status") in {"deleted", "inactive"}:
+            return False
+
+        return True
+
     # -------------------- HÀM TÍNH ĐIỂM POPULARITY --------------------
     def _score_by_rating_and_views(self, mid: str) -> float:
         """
@@ -116,7 +113,10 @@ class RecommendationService:
 
     # -------------------- HÀM BUILD MỘT PHẦN TỬ KẾT QUẢ --------------------
     def _build_result_item(self, movie_id: str) -> Dict[str, Any]:
-        meta = self.movies_meta.get(movie_id, {})
+        meta = self.movies_meta.get(movie_id)
+        if not meta:
+            # Không có meta -> không nên gọi, raise để dễ debug
+            raise KeyError(f"Movie id {movie_id} không có trong movies_meta")
 
         poster = (
             meta.get("poster")
@@ -202,7 +202,12 @@ class RecommendationService:
         if not seed_indices:
             print(f"👀 User {user_id} là user mới (không history, không favorites) → gợi ý theo rating + lượt xem")
 
-            all_movie_ids = list(self.movies_meta.keys())
+            # chỉ lấy phim còn tồn tại
+            all_movie_ids = [
+                mid for mid in self.movies_meta.keys()
+                if self._is_movie_available(mid)
+            ]
+
             # sort toàn bộ theo độ hot
             all_movie_ids.sort(key=self._score_by_rating_and_views, reverse=True)
             final_movie_ids = all_movie_ids[:top_k]
@@ -250,6 +255,10 @@ class RecommendationService:
                 if not mid:
                     continue
 
+                # skip phim đã bị xóa / không còn tồn tại
+                if not self._is_movie_available(mid):
+                    continue
+
                 if mid in seed_movie_ids:
                     # đã nằm trong history hoặc favorites
                     continue
@@ -285,7 +294,10 @@ class RecommendationService:
             block_set = set(final_movie_ids) | set(seed_movie_ids)
 
             all_movie_ids = list(self.movies_meta.keys())
-            cold_candidates = [mid for mid in all_movie_ids if mid not in block_set]
+            cold_candidates = [
+                mid for mid in all_movie_ids
+                if mid not in block_set and self._is_movie_available(mid)
+            ]
 
             # sort theo độ hot
             cold_candidates.sort(key=self._score_by_rating_and_views, reverse=True)
@@ -296,6 +308,8 @@ class RecommendationService:
                     break
 
         # -------------------- XÂY KẾT QUẢ --------------------
+
+
         results: List[Dict[str, Any]] = [self._build_result_item(mid) for mid in final_movie_ids]
 
         print(f"✨ Gợi ý cho {user_id}: {final_movie_ids}")
