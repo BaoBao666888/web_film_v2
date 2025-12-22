@@ -49,7 +49,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
     } catch {
       // ignore
     }
-    throw new Error(message);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
   if (response.status === 204) {
     return undefined as unknown as T;
@@ -169,7 +171,11 @@ export const api = {
       }),
   },
   hls: {
-    analyze: (payload: { url: string; headers?: Record<string, string> }) =>
+    analyze: (payload: {
+      url: string;
+      headers?: Record<string, string>;
+      roomId?: string;
+    }) =>
       apiFetch<HlsAnalyzeResponse>(`/hls/analyze`, {
         method: "POST",
         body: JSON.stringify(payload),

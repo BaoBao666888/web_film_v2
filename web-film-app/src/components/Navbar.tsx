@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
@@ -16,6 +16,8 @@ interface NavItem {
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const location = useLocation();
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
@@ -39,14 +41,63 @@ export function Navbar() {
       { label: "Chatbot", to: "/chat" },
     ];
     if (user?.role === "admin") {
-      items.push({ label: "Dashboard", to: "/admin" });
+      // admin entry moved into user menu
     }
     return items;
   }, [user?.role]);
 
   useEffect(() => {
     setMenuOpen(false);
+    setUserMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    return () => {
+      if (userMenuTimerRef.current) {
+        clearTimeout(userMenuTimerRef.current);
+      }
+    };
+  }, []);
+
+  const openUserMenu = () => {
+    if (userMenuTimerRef.current) {
+      clearTimeout(userMenuTimerRef.current);
+      userMenuTimerRef.current = null;
+    }
+    setUserMenuOpen(true);
+  };
+
+  const closeUserMenu = (delay = 120) => {
+    if (userMenuTimerRef.current) {
+      clearTimeout(userMenuTimerRef.current);
+    }
+    userMenuTimerRef.current = setTimeout(() => {
+      setUserMenuOpen(false);
+      userMenuTimerRef.current = null;
+    }, delay);
+  };
+
+  const handleLogout = () => {
+    logout();
+    window.location.reload();
+  };
+
+  const avatarFallback = user?.name?.charAt(0).toUpperCase() || "?";
+  const renderAvatar = (sizeClasses: string) => (
+    user?.avatar ? (
+      <img
+        src={user.avatar}
+        alt={user?.name ? `Avatar của ${user.name}` : "Avatar"}
+        className={`${sizeClasses} rounded-full object-cover`}
+      />
+    ) : (
+      <div
+        className={`${sizeClasses} flex items-center justify-center rounded-full bg-primary text-xs font-bold text-dark`}
+      >
+        {avatarFallback}
+      </div>
+    )
+  );
 
   const renderNavLink = (item: NavItem, isMobile?: boolean) => (
     <NavLink
@@ -73,15 +124,44 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-dark/80 backdrop-blur-md">
       <nav className="relative mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:py-4">
-        <NavLink
-          to="/"
-          className="flex shrink-0 items-center gap-2 text-base font-semibold text-white whitespace-nowrap sm:text-lg"
-        >
-          <span className="rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide">
-            Lumi
-          </span>
-          <span>AI Cinema</span>
-        </NavLink>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-expanded={menuOpen}
+            aria-label="Mở menu"
+            onClick={() => setMenuOpen((open) => !open)}
+            className={`h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
+              isDesktop ? "hidden" : "flex"
+            }`}
+          >
+            <div className="space-y-1.5">
+              <span
+                className={`block h-0.5 w-6 rounded-full bg-current transition ${
+                  menuOpen ? "translate-y-[7px] rotate-45" : ""
+                }`}
+              />
+              <span
+                className={`block h-0.5 w-6 rounded-full bg-current transition ${
+                  menuOpen ? "opacity-0" : ""
+                }`}
+              />
+              <span
+                className={`block h-0.5 w-6 rounded-full bg-current transition ${
+                  menuOpen ? "-translate-y-[7px] -rotate-45" : ""
+                }`}
+              />
+            </div>
+          </button>
+          <NavLink
+            to="/"
+            className="flex shrink-0 items-center gap-2 text-base font-semibold text-white whitespace-nowrap sm:text-lg"
+          >
+            <span className="rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide">
+              Lumi
+            </span>
+            <span>AI Cinema</span>
+          </NavLink>
+        </div>
 
         {/* Container for desktop nav and auth */}
         <div
@@ -98,28 +178,61 @@ export function Navbar() {
           <div className="flex-grow" />
 
           {/* Auth Buttons */}
-          <div className="flex flex-none items-center gap-3">
-            {isAuthenticated ? (
-              <>
-                <NavLink
-                  to="/profile"
-                  className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:border-primary hover:text-primary"
-                >
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-dark">
-                    {user?.name?.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="truncate">{user?.name}</span>
-                </NavLink>
+        <div className="flex flex-none items-center gap-3">
+          {isAuthenticated ? (
+              <div
+                className="relative"
+                onMouseEnter={() => isDesktop && openUserMenu()}
+                onMouseLeave={() => isDesktop && closeUserMenu()}
+              >
                 <button
-                  onClick={() => {
-                    logout();
-                    window.location.reload();
-                  }}
-                  className="rounded-full border border-red-500/30 bg-red-500/20 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/30"
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={userMenuOpen}
+                  onClick={() => setUserMenuOpen((open) => !open)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-primary hover:text-primary"
                 >
-                  Đăng xuất
+                  {renderAvatar("h-8 w-8")}
                 </button>
-              </>
+                <div
+                  onMouseEnter={() => isDesktop && openUserMenu()}
+                  onMouseLeave={() => isDesktop && closeUserMenu()}
+                  className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border border-white/10 bg-black/90 p-2 text-sm text-white shadow-2xl shadow-black/50 backdrop-blur transition ${
+                    userMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                  }`}
+                >
+                  <NavLink
+                    to="/chat"
+                    className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
+                  >
+                    Hộp thư
+                    <span className="text-xs text-slate-400">→</span>
+                  </NavLink>
+                  <NavLink
+                    to="/profile"
+                    className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
+                  >
+                    Hồ sơ
+                    <span className="text-xs text-slate-400">→</span>
+                  </NavLink>
+                  {user?.role === "admin" && (
+                    <NavLink
+                      to="/admin"
+                      className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
+                    >
+                      Quản trị
+                      <span className="text-xs text-slate-400">→</span>
+                    </NavLink>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="mt-1 w-full rounded-xl border border-red-500/30 bg-red-500/15 px-3 py-2 text-left font-semibold text-red-400 transition hover:bg-red-500/25"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 <NavLink
@@ -139,33 +252,19 @@ export function Navbar() {
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-expanded={menuOpen}
-          aria-label="Mở menu"
-          onClick={() => setMenuOpen((open) => !open)}
-          className={`h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
-            isDesktop ? "hidden" : "flex"
-          }`}
-        >
-          <div className="space-y-1.5">
-            <span
-              className={`block h-0.5 w-6 rounded-full bg-current transition ${
-                menuOpen ? "translate-y-[7px] rotate-45" : ""
-              }`}
-            />
-            <span
-              className={`block h-0.5 w-6 rounded-full bg-current transition ${
-                menuOpen ? "opacity-0" : ""
-              }`}
-            />
-            <span
-              className={`block h-0.5 w-6 rounded-full bg-current transition ${
-                menuOpen ? "-translate-y-[7px] -rotate-45" : ""
-              }`}
-            />
-          </div>
-        </button>
+        {isAuthenticated && (
+          <button
+            type="button"
+            aria-expanded={userMenuOpen}
+            aria-label="Mở menu tài khoản"
+            onClick={() => setUserMenuOpen((open) => !open)}
+            className={`h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
+              isDesktop ? "hidden" : "flex"
+            }`}
+          >
+            {renderAvatar("h-8 w-8")}
+          </button>
+        )}
       </nav>
 
       <div
@@ -182,51 +281,71 @@ export function Navbar() {
             <div className="grid gap-2">
               {navItems.map((item) => renderNavLink(item, true))}
             </div>
-            <div className="grid gap-2 pt-2 text-sm">
-              {isAuthenticated ? (
-                <>
-                  <NavLink
-                    to="/profile"
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-dark">
-                        {user?.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <span>{user?.name}</span>
-                    </div>
-                    <span className="text-xs text-slate-400">Hồ sơ</span>
-                  </NavLink>
-                  <button
-                    onClick={() => {
-                      logout();
-                      window.location.reload();
-                    }}
-                    className="w-full rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-left font-semibold text-red-400 transition hover:bg-red-500/25"
-                  >
-                    Đăng xuất
-                  </button>
-                </>
-              ) : (
-                <>
-                  <NavLink
-                    to="/login"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center font-semibold text-white transition hover:border-primary hover:text-primary"
-                  >
-                    Đăng nhập
-                  </NavLink>
-                  <NavLink
-                    to="/register"
-                    className="w-full rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
-                  >
-                    Đăng ký tài khoản
-                  </NavLink>
-                </>
-              )}
-            </div>
+            {!isAuthenticated && (
+              <div className="grid gap-2 pt-2 text-sm">
+                <NavLink
+                  to="/login"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center font-semibold text-white transition hover:border-primary hover:text-primary"
+                >
+                  Đăng nhập
+                </NavLink>
+                <NavLink
+                  to="/register"
+                  className="w-full rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
+                >
+                  Đăng ký tài khoản
+                </NavLink>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {isAuthenticated && (
+        <div
+          className={`${
+            isDesktop ? "hidden" : ""
+          } absolute left-0 right-0 top-full z-30 transition-all duration-200 ${
+            userMenuOpen
+              ? "pointer-events-auto translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-2 opacity-0"
+          }`}
+        >
+          <div className="mx-auto max-w-7xl px-4 pb-4">
+            <div className="space-y-2 rounded-2xl border border-white/10 bg-black/80 p-4 shadow-2xl shadow-black/40 backdrop-blur">
+              <NavLink
+                to="/chat"
+                className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
+              >
+                <span>Hộp thư</span>
+                <span className="text-xs text-slate-400">→</span>
+              </NavLink>
+              <NavLink
+                to="/profile"
+                className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
+              >
+                <span>Hồ sơ</span>
+                <span className="text-xs text-slate-400">→</span>
+              </NavLink>
+              {user?.role === "admin" && (
+                <NavLink
+                  to="/admin"
+                  className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
+                >
+                  <span>Quản trị</span>
+                  <span className="text-xs text-slate-400">→</span>
+                </NavLink>
+              )}
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-left font-semibold text-red-400 transition hover:bg-red-500/25"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

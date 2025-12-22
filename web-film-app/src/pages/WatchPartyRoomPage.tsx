@@ -105,7 +105,7 @@ export function WatchPartyRoomPage() {
       return userId;
     }
     const stored = localStorage.getItem("viewerId") || "";
-    if (!stored || stored.startsWith("user")) {
+    if (!stored || !stored.startsWith("viewer-")) {
       const fresh = `viewer-${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 8)}`;
@@ -197,8 +197,7 @@ export function WatchPartyRoomPage() {
       if (!normalized) return;
       latestHostStateRef.current = normalized;
       const currentRoom = roomRef.current;
-      const shouldFollow =
-        currentRoom?.isLive && viewerIdRef.current !== currentRoom?.hostId;
+      const shouldFollow = currentRoom?.isLive && !isHost;
       if (shouldFollow) {
         setAppliedState(normalized);
       }
@@ -247,7 +246,7 @@ export function WatchPartyRoomPage() {
     };
   }, [roomId, user?.name, user?.id]);
 
-  const isHost = room ? viewerIdRef.current === room.hostId : false;
+  const isHost = room ? user?.id === room.hostId : false;
   const controlsEnabled = !room?.isLive || isHost;
 
   const sendMessage = () => {
@@ -261,17 +260,6 @@ export function WatchPartyRoomPage() {
       content: trimmed,
     });
     setMessage("");
-  };
-
-  const handleToggleLive = () => {
-    if (!isHost || !roomId || !room) return;
-    const next = !room.isLive;
-    setRoom((prev) => (prev ? { ...prev, isLive: next } : prev));
-    socketRef.current?.emit("watch-party:live-toggle", {
-      roomId,
-      viewerId: viewerIdRef.current,
-      isLive: next,
-    });
   };
 
   const handleDeleteRoom = () => {
@@ -474,6 +462,7 @@ export function WatchPartyRoomPage() {
               externalState={externalState}
               onStatePush={pushState}
               chatSlot={chatOverlay}
+              hlsRoomId={room.roomId}
               lockMessage="Chủ phòng đang khóa điều khiển."
             />
           </div>
@@ -501,15 +490,13 @@ export function WatchPartyRoomPage() {
             <div>
               <p>Chế độ Live</p>
               <p className="text-xs text-slate-400">
-                Bật: mọi người theo host. Tắt: ai nấy xem riêng, không ảnh hưởng
-                nhau.
+                Bật mặc định khi tạo phòng và khóa trong lúc xem.
               </p>
             </div>
             <input
               type="checkbox"
-              disabled={!isHost}
+              disabled
               checked={room.isLive}
-              onChange={handleToggleLive}
               className="h-5 w-5 accent-primary disabled:opacity-50"
             />
           </label>

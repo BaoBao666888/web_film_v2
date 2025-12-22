@@ -249,7 +249,7 @@ export function WatchPage() {
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
                 <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
                   {isSeries
-                    ? `Tập ${currentEpisodeNumber}: ${currentEpisodeTitle}`
+                    ? `${currentEpisodeTitle}`
                     : detail?.duration ?? "Phim lẻ"}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">

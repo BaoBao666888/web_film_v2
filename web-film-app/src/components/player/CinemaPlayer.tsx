@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Hls from "hls.js";
 import { api, buildApiUrl } from "../../lib/api";
 import type { HlsAnalyzeResponse } from "../../types/api";
+import forward5sIcon from "../../assets/forward_5s.svg";
+import replay5sIcon from "../../assets/replay_5s.svg";
 
 type StreamSource = {
   type?: "mp4" | "hls";
@@ -35,6 +37,7 @@ interface CinemaPlayerProps {
   chatSlot?: ReactNode;
   autoPlay?: boolean;
   startPosition?: number | null;
+  hlsRoomId?: string;
 }
 
 const formatQualityLabel = (resolution?: string) => {
@@ -57,6 +60,7 @@ export function CinemaPlayer({
   chatSlot,
   autoPlay = false,
   startPosition = null,
+  hlsRoomId,
 }: CinemaPlayerProps) {
   const resolvedStream = stream?.url ? stream : null;
   const [status, setStatus] = useState<string>("Đang khởi tạo player...");
@@ -85,20 +89,29 @@ export function CinemaPlayer({
   const autoMutedRef = useRef(false);
   const speedPresets = [0.75, 1, 1.25, 1.5];
   const controlsDisabled = controlsEnabled === false;
+  const [autoMuted, setAutoMuted] = useState(false);
 
   const tryPlay = async (forcePlay = false) => {
     const video = videoRef.current;
     if (!video) return;
-    if (!userInteractedRef.current && !autoMutedRef.current) {
-      video.muted = true;
-      setIsMuted(true);
-      autoMutedRef.current = true;
-    }
     if (!forcePlay && video.paused === false) return;
     try {
       await video.play();
       setNeedsStart(false);
     } catch {
+      if (!video.muted) {
+        video.muted = true;
+        setIsMuted(true);
+        autoMutedRef.current = true;
+        setAutoMuted(true);
+        try {
+          await video.play();
+          setNeedsStart(false);
+          return;
+        } catch {
+          // ignore and fall through
+        }
+      }
       setNeedsStart(true);
     }
   };
@@ -157,6 +170,7 @@ export function CinemaPlayer({
       const result = (await api.hls.analyze({
         url,
         headers,
+        roomId: hlsRoomId,
       })) as HlsAnalyzeResponse;
       const options: QualityOption[] = [];
       if (result.type === "master" && result.qualities?.length) {
@@ -336,7 +350,7 @@ export function CinemaPlayer({
 
     // Đồng bộ kiểu note_yt-dlp: dùng tốc độ trước, chỉ nhảy khi lệch lớn
     const TOLERANCE = 2.5;
-    const BIG_JUMP = 5;
+    const BIG_JUMP = 3.5;
     const CATCH_UP = 1.1;
     const SLOW_DOWN = 0.95;
 
@@ -401,6 +415,7 @@ export function CinemaPlayer({
     setNeedsStart(false);
     if (autoMutedRef.current) {
       autoMutedRef.current = false;
+      setAutoMuted(false);
       const video = videoRef.current;
       if (video) {
         video.muted = false;
@@ -438,6 +453,7 @@ export function CinemaPlayer({
   const toggleMute = () => {
     userInteractedRef.current = true;
     autoMutedRef.current = false;
+    setAutoMuted(false);
     const video = videoRef.current;
     const next = !isMuted;
     if (video) {
@@ -692,6 +708,11 @@ export function CinemaPlayer({
                 Đang đồng bộ chất lượng...
               </span>
             )}
+            {autoMuted && (
+              <span className="rounded-full border border-rose-400/40 bg-rose-500/10 px-3 py-1 text-rose-200">
+                Trình duyệt đang tắt tiếng, bấm để bật âm.
+              </span>
+            )}
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
               {status}
             </span>
@@ -758,16 +779,16 @@ export function CinemaPlayer({
                   {isPlaying ? <IconPause /> : <IconPlay />}
                 </ControlButton>
                 <ControlButton
-                  label="Tua lùi 10 giây"
-                  onClick={() => handleSeek(-10)}
+                  label="Tua lùi 5 giây"
+                  onClick={() => handleSeek(-5)}
                 >
-                  <IconBack10 />
+                  <IconReplay5 />
                 </ControlButton>
                 <ControlButton
-                  label="Tua nhanh 10 giây"
-                  onClick={() => handleSeek(10)}
+                  label="Tua nhanh 5 giây"
+                  onClick={() => handleSeek(5)}
                 >
-                  <IconForward10 />
+                  <IconForward5 />
                 </ControlButton>
                 <ControlButton
                   label={isMuted ? "Bật tiếng" : "Tắt tiếng"}
@@ -901,53 +922,25 @@ function IconPause() {
   );
 }
 
-function IconBack10() {
+function IconReplay5() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path
-        d="M11 6 7 4v4"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M7 12.5A6 6 0 1 0 13 7"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 14h-2v2"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <img
+      src={replay5sIcon}
+      alt=""
+      aria-hidden="true"
+      className="h-5 w-5"
+    />
   );
 }
 
-function IconForward10() {
+function IconForward5() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
-      <path
-        d="m13 6 4-2v4"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M17 12.5A6 6 0 1 1 11 7"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 14h2v2"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <img
+      src={forward5sIcon}
+      alt=""
+      aria-hidden="true"
+      className="h-5 w-5"
+    />
   );
 }
 

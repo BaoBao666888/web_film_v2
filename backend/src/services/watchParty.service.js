@@ -278,7 +278,7 @@ class WatchPartyService {
     // Clear HLS cache if available
     try {
       const { clearHlsCache } = await import("../routes/hls.js");
-      clearHlsCache?.();
+      await clearHlsCache?.(roomId);
     } catch (err) {
       console.warn(
         "Không thể xóa cache HLS khi xóa phòng:",

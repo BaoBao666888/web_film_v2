@@ -1,6 +1,11 @@
 import { Router } from "express";
 import fetch from "node-fetch";
-import { pipeline } from "node:stream/promises";
+import { PassThrough } from "node:stream";
+import { pipeline, finished } from "node:stream/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
 import { getDefaultHlsHeaders } from "../config/hlsDefaults.js";
 
 const router = Router();
@@ -8,16 +13,114 @@ const router = Router();
 const DEFAULT_HEADERS = getDefaultHlsHeaders();
 const DEFAULT_REFERER = DEFAULT_HEADERS.Referer;
 
-// ==== Cache đoạn HLS để giảm tải nguồn phim ====
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 phút
-const CACHE_MAX_ITEMS = 500;
-const CACHE_MAX_BYTES = 80 * 1024 * 1024; // 80 MB
-const segmentCache = new Map(); // key -> { buffer, contentType, storedAt, size }
-let cacheSize = 0;
+// ==== Cache đoạn HLS lên đĩa để giảm tải nguồn phim ====
+const CACHE_ROOT = path.resolve(process.cwd(), "hls-cache");
+const SHARED_ROOM = "shared";
 
-export const clearHlsCache = () => {
-  segmentCache.clear();
-  cacheSize = 0;
+const getRoomDir = (roomId) =>
+  path.join(CACHE_ROOT, roomId ? `room-${roomId}` : SHARED_ROOM);
+
+const hashKey = (key) =>
+  crypto.createHash("sha1").update(String(key)).digest("hex");
+
+const ensureDir = async (dir) => {
+  await fs.mkdir(dir, { recursive: true });
+};
+
+const getCachePaths = (roomId, key) => {
+  const dir = getRoomDir(roomId);
+  const hash = hashKey(key);
+  return {
+    dir,
+    dataPath: path.join(dir, hash),
+    metaPath: path.join(dir, `${hash}.json`),
+  };
+};
+
+const getDiskCache = async (roomId, key) => {
+  const { dataPath, metaPath } = getCachePaths(roomId, key);
+  try {
+    const [metaRaw, stat] = await Promise.all([
+      fs.readFile(metaPath, "utf-8"),
+      fs.stat(dataPath),
+    ]);
+    const meta = JSON.parse(metaRaw || "{}");
+    return {
+      dataPath,
+      contentType: meta.contentType,
+      size: stat.size,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const setDiskCache = async (roomId, key, buffer, contentType) => {
+  const { dir, dataPath, metaPath } = getCachePaths(roomId, key);
+  await ensureDir(dir);
+  await fs.writeFile(dataPath, buffer);
+  await fs.writeFile(
+    metaPath,
+    JSON.stringify({ contentType, storedAt: Date.now() })
+  );
+};
+
+export const clearHlsCache = async (roomId) => {
+  const dir = roomId ? getRoomDir(roomId) : CACHE_ROOT;
+  try {
+    await fs.rm(dir, { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+};
+
+const streamSegmentToCache = async ({
+  roomId,
+  cacheKey,
+  upstream,
+  res,
+  contentType,
+}) => {
+  const { dir, dataPath, metaPath } = getCachePaths(roomId, cacheKey);
+  await ensureDir(dir);
+  const tempPath = `${dataPath}.part-${Date.now()}`;
+  const fileStream = createWriteStream(tempPath);
+  const tee = new PassThrough();
+
+  upstream.body.on("error", (err) => {
+    tee.destroy(err);
+  });
+
+  tee.on("error", (err) => {
+    fileStream.destroy(err);
+    res.destroy(err);
+  });
+
+  res.on("close", () => {
+    if (!res.writableEnded) {
+      fileStream.destroy();
+    }
+  });
+
+  upstream.body.pipe(tee);
+  tee.pipe(res);
+  tee.pipe(fileStream);
+
+  try {
+    await Promise.all([finished(res), finished(fileStream)]);
+    await fs.rename(tempPath, dataPath);
+    await fs.writeFile(
+      metaPath,
+      JSON.stringify({ contentType, storedAt: Date.now() })
+    );
+  } catch (err) {
+    try {
+      await fs.rm(tempPath, { force: true });
+    } catch {
+      // ignore
+    }
+    throw err;
+  }
 };
 
 function safeOrigin(url) {
@@ -42,46 +145,6 @@ const isSegment = (url, contentType) => {
   );
 };
 
-const evictCacheIfNeeded = () => {
-  const now = Date.now();
-  for (const [key, value] of segmentCache) {
-    if (now - value.storedAt > CACHE_TTL_MS) {
-      cacheSize -= value.size;
-      segmentCache.delete(key);
-    }
-  }
-  while (segmentCache.size > CACHE_MAX_ITEMS || cacheSize > CACHE_MAX_BYTES) {
-    const oldestKey = segmentCache.keys().next().value;
-    if (!oldestKey) break;
-    cacheSize -= segmentCache.get(oldestKey).size;
-    segmentCache.delete(oldestKey);
-  }
-};
-
-const getCache = (key) => {
-  const item = segmentCache.get(key);
-  if (!item) return null;
-  if (Date.now() - item.storedAt > CACHE_TTL_MS) {
-    cacheSize -= item.size;
-    segmentCache.delete(key);
-    return null;
-  }
-  segmentCache.delete(key);
-  segmentCache.set(key, item);
-  return item;
-};
-
-const setCache = (key, buffer, contentType) => {
-  const size = buffer?.byteLength ?? 0;
-  segmentCache.set(key, {
-    buffer,
-    contentType,
-    storedAt: Date.now(),
-    size,
-  });
-  cacheSize += size;
-  evictCacheIfNeeded();
-};
 
 const parseHeaders = (value) => {
   if (!value && value !== "") return {};
@@ -174,8 +237,9 @@ const isPlaylistContent = (contentType, url) => {
   );
 };
 
-const rewritePlaylist = (playlist, baseUrl, headersPayload) => {
+const rewritePlaylist = (playlist, baseUrl, headersPayload, roomId) => {
   const encodedHeaders = encodeURIComponent(JSON.stringify(headersPayload));
+  const encodedRoom = roomId ? encodeURIComponent(String(roomId)) : "";
   return playlist
     .split(/\r?\n/)
     .map((line) => {
@@ -183,7 +247,8 @@ const rewritePlaylist = (playlist, baseUrl, headersPayload) => {
       if (trimmed && !trimmed.startsWith("#")) {
         const segmentUrl = ensureAbsolute(trimmed, baseUrl);
         const encodedSegment = encodeURIComponent(segmentUrl);
-        return `/api/hls/proxy?url=${encodedSegment}&headers=${encodedHeaders}`;
+        const roomQuery = encodedRoom ? `&roomId=${encodedRoom}` : "";
+        return `/api/hls/proxy?url=${encodedSegment}&headers=${encodedHeaders}${roomQuery}`;
       }
       return line;
     })
@@ -191,7 +256,7 @@ const rewritePlaylist = (playlist, baseUrl, headersPayload) => {
 };
 
 router.post("/analyze", async (req, res) => {
-  const { url, headers } = req.body || {};
+  const { url, headers, roomId } = req.body || {};
   if (!url || typeof url !== "string") {
     return res.status(400).json({ message: "Thiếu URL nguồn phát." });
   }
@@ -210,9 +275,9 @@ router.post("/analyze", async (req, res) => {
     const playlistText = await upstream.text();
     const finalUrl = upstream.url || url;
     const qualities = parseMasterPlaylist(playlistText, finalUrl);
-    const encodedHeaders = encodeURIComponent(
-      JSON.stringify(headerPayload || {})
-    );
+    const encodedHeaders = encodeURIComponent(JSON.stringify(headerPayload || {}));
+    const encodedRoom = roomId ? encodeURIComponent(String(roomId)) : "";
+    const roomQuery = encodedRoom ? `&roomId=${encodedRoom}` : "";
 
     if (qualities.length > 0) {
       return res.json({
@@ -223,7 +288,7 @@ router.post("/analyze", async (req, res) => {
           bitrate: quality.bitrate,
           proxiedUrl: `/api/hls/proxy?url=${encodeURIComponent(
             quality.url
-          )}&headers=${encodedHeaders}`,
+          )}&headers=${encodedHeaders}${roomQuery}`,
           url: quality.url,
         })),
       });
@@ -233,7 +298,7 @@ router.post("/analyze", async (req, res) => {
       type: "direct",
       proxiedUrl: `/api/hls/proxy?url=${encodeURIComponent(
         finalUrl
-      )}&headers=${encodedHeaders}`,
+      )}&headers=${encodedHeaders}${roomQuery}`,
       url: finalUrl,
     });
   } catch (error) {
@@ -250,12 +315,18 @@ router.get("/proxy", async (req, res) => {
     return res.status(400).send("Thiếu hoặc sai URL.");
   }
 
+  const roomId = req.query.roomId ? String(req.query.roomId) : "";
   const headerPayload = parseHeaders(normalizeUrl(req.query.headers) ?? "{}");
   const cacheKey = `${target}::${req.query.headers || ""}`;
-  const cached = getCache(cacheKey);
+  const cached = await getDiskCache(roomId, cacheKey);
   if (cached) {
     res.setHeader("Content-Type", cached.contentType || "application/octet-stream");
-    return res.send(Buffer.from(cached.buffer));
+    if (cached.size) {
+      res.setHeader("Content-Length", cached.size);
+    }
+    const stream = createReadStream(cached.dataPath);
+    stream.on("error", () => res.status(500).end());
+    return stream.pipe(res);
   }
 
   try {
@@ -278,7 +349,7 @@ router.get("/proxy", async (req, res) => {
 
     if (isPlaylistContent(contentType, finalUrl)) {
       const playlistText = await upstream.text();
-      const rewritten = rewritePlaylist(playlistText, finalUrl, headerPayload);
+      const rewritten = rewritePlaylist(playlistText, finalUrl, headerPayload, roomId);
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       return res.send(rewritten);
     }
@@ -292,9 +363,19 @@ router.get("/proxy", async (req, res) => {
     res.setHeader("Content-Type", contentType);
     // cache segment/binary, stream playlists
     if (isSegment(finalUrl, contentType)) {
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      setCache(cacheKey, buffer, contentType);
-      return res.send(buffer);
+      if (!upstream.body) {
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        await setDiskCache(roomId, cacheKey, buffer, contentType);
+        return res.send(buffer);
+      }
+      await streamSegmentToCache({
+        roomId,
+        cacheKey,
+        upstream,
+        res,
+        contentType,
+      });
+      return;
     }
     try {
       await pipeline(upstream.body, res);

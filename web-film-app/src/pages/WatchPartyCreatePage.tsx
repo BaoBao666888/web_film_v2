@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import type { MovieDetailResponse } from "../types/api";
@@ -10,7 +10,8 @@ export function WatchPartyCreatePage() {
   const movieId = searchParams.get("movieId");
   const ep = searchParams.get("ep");
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, logout } = useAuth();
   const isLoggedIn = Boolean(user?.id);
 
   const { data: detailData } = useFetch<MovieDetailResponse>(
@@ -24,7 +25,7 @@ export function WatchPartyCreatePage() {
     () => searchParams.get("title") || movie?.title || "Cùng xem phim này nhé"
   );
   const [autoStart, setAutoStart] = useState(true);
-  const [isLive, setIsLive] = useState(false);
+  const [isLive, setIsLive] = useState(true);
   const [isPrivate, setIsPrivate] = useState(false);
 
   const posterOptions = useMemo(() => {
@@ -41,6 +42,7 @@ export function WatchPartyCreatePage() {
 
   const [selectedPoster, setSelectedPoster] = useState<string | undefined>(posterOptions[0]);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (posterOptions.length && !selectedPoster) {
@@ -51,6 +53,7 @@ export function WatchPartyCreatePage() {
   const handleCreate = async () => {
     if (!movieId || !movie || !user?.id) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const room = await watchPartyApi.create({
         movieId,
@@ -68,6 +71,22 @@ export function WatchPartyCreatePage() {
       navigate(`/watch-party/room/${room.roomId}`);
     } catch (error) {
       console.error(error);
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 401) {
+        setCreateError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        setCreating(false);
+        logout();
+        navigate(`/login`, {
+          replace: true,
+          state: { from: `${location.pathname}${location.search}` },
+        });
+        return;
+      }
+      setCreateError(
+        error instanceof Error
+          ? error.message
+          : "Tạo phòng không thành công. Vui lòng thử lại."
+      );
       setCreating(false);
     }
   };
@@ -199,6 +218,12 @@ export function WatchPartyCreatePage() {
             Quay lại xem phim
           </Link>
         </div>
+
+        {createError && (
+          <p className="text-xs text-red-400">
+            {createError}
+          </p>
+        )}
 
         {!isLoggedIn && (
           <p className="text-xs text-red-400">
