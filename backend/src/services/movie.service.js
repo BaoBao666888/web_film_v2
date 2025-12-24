@@ -22,6 +22,7 @@ import {
 import {
   slugify,
   orDefault,
+  sanitizeTags,
   detectVideoType,
   resolveVideoHeaders,
   sanitizeEpisodes,
@@ -369,13 +370,14 @@ class MovieService {
               computedHeaders
             )
           : [],
-      tags: orDefault(payload.tags, []),
+      tags: sanitizeTags(orDefault(payload.tags, [])),
       moods: orDefault(payload.moods, []),
       cast: orDefault(payload.cast, []),
       director: orDefault(payload.director, ""),
       country: orDefault(payload.country, ""),
       seriesStatus:
         type === "series" ? orDefault(payload.seriesStatus, "") : "",
+      embedding_synced: false,
     };
 
     return await insertMovie(newMovie);
@@ -405,6 +407,7 @@ class MovieService {
         ? payload.videoHeaders
         : movie.videoHeaders
     );
+    merged.tags = sanitizeTags(merged.tags ?? []);
     merged.episodes =
       type === "series"
         ? sanitizeEpisodes(
@@ -417,6 +420,7 @@ class MovieService {
       type === "series"
         ? orDefault(payload.seriesStatus, movie.seriesStatus ?? "")
         : "";
+    merged.embedding_synced = false;
 
     return await updateMovie(movieId, merged);
   }

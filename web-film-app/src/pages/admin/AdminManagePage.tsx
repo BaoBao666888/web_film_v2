@@ -32,6 +32,8 @@ type FormState = {
   seriesStatus: "" | "Còn tiếp" | "Hoàn thành" | "Tạm ngưng";
 };
 
+const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
+
 export function AdminManagePage() {
   const [page, setPage] = useState(1);
   const limit = 12;
@@ -260,7 +262,12 @@ export function AdminManagePage() {
                         year: String(movie.year ?? ""),
                         duration: movie.duration ?? "",
                         rating: movie.rating ? String(movie.rating) : "",
-                        tags: movie.tags?.join(", ") ?? "",
+                        tags:
+                          movie.tags
+                            ?.filter(
+                              (tag) => !SERIES_STATUS_TAGS.includes(tag)
+                            )
+                            .join(", ") ?? "",
                         moods: movie.moods?.join(", ") ?? "",
                         cast: movie.cast?.join(", ") ?? "",
                         director: movie.director ?? "",
@@ -278,7 +285,7 @@ export function AdminManagePage() {
                     seriesStatus:
                       (movie.seriesStatus as FormState["seriesStatus"]) ??
                       ((movie.tags ?? []).find((t) =>
-                        ["Còn tiếp", "Hoàn thành", "Tạm ngưng"].includes(t)
+                        SERIES_STATUS_TAGS.includes(t)
                       ) as FormState["seriesStatus"]) ??
                       "",
                     episodes:
@@ -383,10 +390,8 @@ export function AdminManagePage() {
                   const tagList = formData.tags
                     .split(",")
                     .map((tag) => tag.trim())
-                    .filter(Boolean);
-                  if (formData.type === "series" && formData.seriesStatus) {
-                    tagList.push(formData.seriesStatus);
-                  }
+                    .filter(Boolean)
+                    .filter((tag) => !SERIES_STATUS_TAGS.includes(tag));
 
                   await api.movies.update(editingMovie.id, {
                     title: formData.title,

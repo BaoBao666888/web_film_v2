@@ -1,6 +1,6 @@
 [
   {
-    "_id": "6929b6992936bf5ac72551bb",
+    "_id": "694bdf4c5c13778445904a67",
     "id": "v-n-may",
     "slug": "v-n-may",
     "title": "Vận May ",
@@ -14,23 +14,6 @@
     "trailerUrl": "",
     "videoUrl": "https://mistcloud50.pro/hls/4GlI04oK6NYYOA5hT0kgrnNefqJWX8DxAggLGBlTN4C71KwQHlLCLJPBrLfxHNjzJKW69Hj+q96yV4QFnZd4-g==/bWFzdGVyLm0zdTg=.m3u8",
     "videoType": "hls",
-    "tags": [
-      "Hành động",
-      "Hài"
-    ],
-    "moods": [
-      "Hành động",
-      "Khoa học viễn tưởng"
-    ],
-    "cast": [
-      "Keanu Reeves",
-      "Aziz Ansari"
-    ],
-    "director": "Aziz Ansari",
-    "episodes": [],
-    "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.286Z",
-    "updatedAt": "2025-11-28T14:57:52.058Z",
     "videoHeaders": {
       "accept": "*/*",
       "accept-language": "vi-VN,vi;q=0.9,zh-CN;q=0.8,zh;q=0.7,fr-FR;q=0.6,fr;q=0.5,en-US;q=0.4,en;q=0.3",
@@ -45,10 +28,28 @@
       "sec-fetch-site": "cross-site",
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
-    }
+    },
+    "episodes": [],
+    "tags": [
+      "Hành động",
+      "Hài"
+    ],
+    "moods": [
+      "Hành động",
+      "Khoa học viễn tưởng"
+    ],
+    "cast": [
+      "Keanu Reeves",
+      "Aziz Ansari"
+    ],
+    "director": "Aziz Ansari",
+    "embedding_synced": false,
+    "__v": 0,
+    "createdAt": "2025-12-24T12:40:44.908000",
+    "updatedAt": "2025-12-24T12:40:44.908000"
   },
   {
-    "_id": "6929b6992936bf5ac72551bc",
+    "_id": "694bdf4c5c13778445904a68",
     "id": "th-tr-n-baramulla",
     "slug": "th-tr-n-baramulla",
     "title": "Thị Trấn Baramulla",
@@ -77,6 +78,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Hành động",
       "Sci-fi"
@@ -90,13 +92,13 @@
       "Neelofar Hamid"
     ],
     "director": "Aditya Suhas Jambhale",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.299Z",
-    "updatedAt": "2025-11-28T14:50:01.299Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551bd",
+    "_id": "694bdf4c5c13778445904a69",
     "id": "r-c-r-i-s-m-panh",
     "slug": "r-c-r-i-s-m-panh",
     "title": "Rắc Rối Sâm Panh",
@@ -125,6 +127,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Tình cảm",
       "hài"
@@ -138,13 +141,13 @@
       "Ryan Garner"
     ],
     "director": "",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.299Z",
-    "updatedAt": "2025-11-28T14:50:01.299Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551be",
+    "_id": "694bdf4c5c13778445904a6a",
     "id": "cu-c-phi-u-l-u-trong-gi-c-m-ng",
     "slug": "cu-c-phi-u-l-u-trong-gi-c-m-ng",
     "title": "Cuộc Phiêu Lưu Trong Giấc Mộng",
@@ -173,6 +176,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Gia đình",
       "hài",
@@ -187,13 +191,13 @@
       "Jolie Hoang-Rappaport"
     ],
     "director": "Erik Benson, Alex Woo",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.299Z",
-    "updatedAt": "2025-11-28T14:50:01.299Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551bf",
+    "_id": "694bdf4c5c13778445904a6b",
     "id": "k-x-u",
     "slug": "k-x-u",
     "title": "Kẻ Xấu",
@@ -222,6 +226,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Hành động",
       "Hài"
@@ -235,13 +240,13 @@
       "Johnny Simmons"
     ],
     "director": "Michael Diliberti",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c0",
+    "_id": "694bdf4c5c13778445904a6c",
     "id": "hoa-h-ng-c-gai",
     "slug": "hoa-h-ng-c-gai",
     "title": "Hoa Hồng Có Gai",
@@ -270,6 +275,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Tình Cảm",
       "Gia Đình",
@@ -286,13 +292,13 @@
       "Andy Samberg"
     ],
     "director": "James Excell, Joe Payne, Sophie Graham, Sophy Taylor, Alana Marmion-Warr, Jay Roach, Jessica Laws",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c1",
+    "_id": "694bdf4c5c13778445904a6d",
     "id": "frankenstein",
     "slug": "frankenstein",
     "title": "Frankenstein",
@@ -321,6 +327,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Kinh Dị",
       "Cổ Điển",
@@ -337,13 +344,13 @@
       "Mia Goth"
     ],
     "director": "Guillermo del Toro, Dug Rotstein",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c2",
+    "_id": "694bdf4c5c13778445904a6e",
     "id": "phi-v-b-n",
     "slug": "phi-v-b-n",
     "title": "Phi Vụ Bẩn",
@@ -372,6 +379,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Hành Động",
@@ -388,13 +396,13 @@
       "Rosa Salazar"
     ],
     "director": "Phi Vụ Bẩn",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c3",
+    "_id": "694bdf4c5c13778445904a6f",
     "id": "c-m-y-nghi-n",
     "slug": "c-m-y-nghi-n",
     "title": "Cỗ Máy Nghiền",
@@ -423,6 +431,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Hành Động",
@@ -442,13 +451,13 @@
       "Ryan Bader"
     ],
     "director": "Hannah Christine Kess, Misha Bukowski, Benny Safdie, David Tierney Lerner, Joel Cyr, Peter McGrew, Silver Butler, Hannah Broad",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.930000",
+    "updatedAt": "2025-12-24T12:40:44.930000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c4",
+    "_id": "694bdf4c5c13778445904a70",
     "id": "g-qu-n-tr",
     "slug": "g-qu-n-tr",
     "title": "Gã Quản Trò",
@@ -477,6 +486,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Gay Cấn",
       "Kinh Dị",
@@ -491,13 +501,13 @@
       "Jamie Flatters"
     ],
     "director": "D.W. Medoff",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c5",
+    "_id": "694bdf4c5c13778445904a71",
     "id": "tay-m-th-p",
     "slug": "tay-m-th-p",
     "title": "Tay Đấm Thép",
@@ -526,6 +536,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Hành Động",
@@ -537,13 +548,13 @@
     ],
     "cast": [],
     "director": "Shawn Levy, Josh McLaglen, Diane Durant",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c6",
+    "_id": "694bdf4c5c13778445904a72",
     "id": "b-c-ng-c-ng",
     "slug": "b-c-ng-c-ng",
     "title": "Bước Đường Cùng",
@@ -572,6 +583,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Gay Cấn",
       "Hình Sự",
@@ -586,13 +598,13 @@
       "Son Ye-jin"
     ],
     "director": "Park Chan-wook",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c7",
+    "_id": "694bdf4c5c13778445904a73",
     "id": "chi-n-binh-b-o-en",
     "slug": "chi-n-binh-b-o-en",
     "title": "Chiến Binh Báo Đen",
@@ -621,6 +633,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Hành Động",
       "Chiếu Rạp",
@@ -638,13 +651,13 @@
       "Michael B. Jordan"
     ],
     "director": " Andy Gill, Lisa C. Satriano, Ryan Coogler",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c8",
+    "_id": "694bdf4c5c13778445904a74",
     "id": "x-men-logan",
     "slug": "x-men-logan",
     "title": "X-Men: Logan",
@@ -673,6 +686,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Hành Động",
@@ -690,13 +704,13 @@
       "Hugh Jackman"
     ],
     "director": "Michael Musteric, Sheila Waldron",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551c9",
+    "_id": "694bdf4c5c13778445904a75",
     "id": "avengers-ch-ultron",
     "slug": "avengers-ch-ultron",
     "title": "Avengers: Đế Chế Ultron",
@@ -725,6 +739,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Hành Động",
       "Chiếu Rạp",
@@ -743,13 +758,13 @@
       "Mark Ruffalo"
     ],
     "director": "Luca Lachin, Xenia Taylor, Stewart Hamilton",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551ca",
+    "_id": "694bdf4c5c13778445904a76",
     "id": "doraemon-movie-44-nobita-v-cu-c-phi-u-l-u-v-o-th-gi-i-trong-tranh",
     "slug": "doraemon-movie-44-nobita-v-cu-c-phi-u-l-u-v-o-th-gi-i-trong-tranh",
     "title": "Doraemon Movie 44: Nobita Và Cuộc Phiêu Lưu Vào Thế Giới Trong Tranh",
@@ -761,7 +776,7 @@
     "thumbnail": "https://static.nutscdn.com/vimg/300-0/d0f979ab72160593e538fcc702b7e749.jpg",
     "poster": "https://static.nutscdn.com/vimg/300-0/d0f979ab72160593e538fcc702b7e749.jpg",
     "trailerUrl": "",
-    "videoUrl": "https://hitmefirstcdn.store/hls/E7U0MrAC6Z+TI83oM0gIamESdRvfvk65u1ZfEZVYwH065rd9kd8q+lIgOjKDcIb2E3VMAIShPA5B+rmoUf--BA==/bWFzdGVyLm0zdTg=.m3u8",
+    "videoUrl": "https://hitmefirstcdn.store/hls/gLVlPl1ovKpXJq+hsPb4MexKiVHc5Q4uRCT2V8rMs9psKj3KxlTi7uz8nXYAkc8G31Xr54WFIlVL04tkwaWm8g==/bWFzdGVyLm0zdTg=.m3u8",
     "videoType": "hls",
     "videoHeaders": {
       "accept": "*/*",
@@ -778,6 +793,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Gia Đình",
       "Anime",
@@ -794,13 +810,15 @@
       "Wasabi Mizuta-voice"
     ],
     "director": " Takuya Fujikura, Shigeo Koshi, Yukiyo Teramoto, Takuya Ogasawara",
-    "episodes": [],
+    "country": "",
+    "seriesStatus": "",
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551cb",
+    "_id": "694bdf4c5c13778445904a77",
     "id": "ng-h-m-t-i-m-a-h-l-i-tho-t-c-a-bi-t-ly",
     "slug": "ng-h-m-t-i-m-a-h-l-i-tho-t-c-a-bi-t-ly",
     "title": "Đường Hầm Tới Mùa Hạ, Lối Thoát Của Biệt Ly",
@@ -812,7 +830,7 @@
     "thumbnail": "https://static.nutscdn.com/vimg/300-0/b84db135b884516abc859948324023c0.jpg",
     "poster": "https://static.nutscdn.com/vimg/300-0/b84db135b884516abc859948324023c0.jpg",
     "trailerUrl": "",
-    "videoUrl": "https://quetinuk271.site/hls/vJqlOwe-T82wbplw9nBvz+F3asfY76ztzp5NO0fLFBuhliTR1ngDoQtIIK8omK1NuBGj3vyjApDje3PurnrFKQ==/aW5kZXgtZjMtdjEtYTEubTN1OA==.m3u8",
+    "videoUrl": "https://snowbreeze49.live/hls/tBapYLcBxt5WOHpXsWKZ1cPUeL-hjcjzBGMEXB5ITZwTHMpRfPPaRRQv45ekXDNwAfF1yXtWzsFLWornbUVe2g==/bWFzdGVyLm0zdTg=.m3u8",
     "videoType": "hls",
     "videoHeaders": {
       "accept": "*/*",
@@ -829,6 +847,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Chiếu Rạp",
@@ -847,13 +866,15 @@
       "Ouji Suzuka"
     ],
     "director": "Kanji Miyake, Tomohisa Taguchi",
-    "episodes": [],
+    "country": "",
+    "seriesStatus": "",
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551cc",
+    "_id": "694bdf4c5c13778445904a78",
     "id": "b-p-b-k-c-h-i-t-ng",
     "slug": "b-p-b-k-c-h-i-t-ng",
     "title": "Búp Bê Ký Ức: Hồi Tưởng",
@@ -882,6 +903,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Khoa Học",
@@ -898,13 +920,13 @@
       "Yui Ishikawa"
     ],
     "director": " Taichi Ishidate, Haruka Fujita",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929b6992936bf5ac72551cd",
+    "_id": "694bdf4c5c13778445904a79",
     "id": "th-m-t-l-ng-danh-conan-movie-26-t-u-ng-m-s-t-m-u-en",
     "slug": "th-m-t-l-ng-danh-conan-movie-26-t-u-ng-m-s-t-m-u-en",
     "title": "Thám Tử Lừng Danh Conan Movie 26: Tàu Ngầm Sắt Màu Đen",
@@ -916,7 +938,7 @@
     "thumbnail": "https://static.nutscdn.com/vimg/300-0/2409b6edfbd590d8f4d018ed6d82b427.jpg",
     "poster": "https://static.nutscdn.com/vimg/300-0/2409b6edfbd590d8f4d018ed6d82b427.jpg",
     "trailerUrl": "",
-    "videoUrl": "https://sunfog88.live/hls/qe6WCHr-ca3kuCWa-IEZ45NvxHhnKpdu-urqt+Zk+Pc9ZCcFq8+90Weqwp8RGEXJAOUhP8efe9k3l+yKOFk6lw==/bWFzdGVyLm0zdTg=.m3u8",
+    "videoUrl": "https://quetinuk271.site/hls/zj8DJ03CgJKsjhCu-PltcWwUpi+IF8F66LBBAGynSIpNlBlHTZpM2-Og460Uwfw6TBBGoWzdi--TxK-87UVDmw==/bWFzdGVyLm0zdTg=.m3u8",
     "videoType": "hls",
     "videoHeaders": {
       "accept": "*/*",
@@ -933,6 +955,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Hành Động",
       "Hình Sự",
@@ -948,13 +971,15 @@
       "Minami Takayama"
     ],
     "director": "Yuzuru Tachikawa",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.300Z",
-    "updatedAt": "2025-11-28T14:50:01.300Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T13:12:47.401000",
+    "country": "",
+    "seriesStatus": ""
   },
   {
-    "_id": "6929b6992936bf5ac72551ce",
+    "_id": "694bdf4c5c13778445904a7a",
     "id": "josee-khi-n-ng-th-y-u",
     "slug": "josee-khi-n-ng-th-y-u",
     "title": "Josee, Khi Nàng Thơ Yêu",
@@ -983,6 +1008,7 @@
       "Referer": "https://goatembed.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     },
+    "episodes": [],
     "tags": [
       "Chính Kịch",
       "Anime",
@@ -997,13 +1023,13 @@
       "Taishi Nakagawa"
     ],
     "director": "Tetsuya Miyanishi, Kenjirou Okada",
-    "episodes": [],
+    "embedding_synced": false,
     "__v": 0,
-    "createdAt": "2025-11-28T14:50:01.301Z",
-    "updatedAt": "2025-11-28T14:50:01.301Z"
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   },
   {
-    "_id": "6929c8e6925eb27bd5fef561",
+    "_id": "694bdf4c5c13778445904a7b",
     "id": "gia-nh-l-s-m-t",
     "slug": "gia-nh-l-s-m-t",
     "title": "Gia Đình Là Số Một",
@@ -1013,7 +1039,7 @@
     "duration": "30m",
     "rating": 8.4,
     "thumbnail": "https://static.nutscdn.com/vimg/300-0/6f52af47c5f8dea8416d0512f6aa31f4.jpg",
-    "poster": "https://static.nutscdn.com/vimg/300-0/6f52af47c5f8dea8416d0512f6aa31f4.jpg",
+    "poster": "https://static.nutscdn.com/vimg/1920-0/5ac97d2123da41e82fd5f1d3be5136c2.jpg",
     "trailerUrl": "",
     "videoUrl": "",
     "videoType": "hls",
@@ -1054,7 +1080,7 @@
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
         },
         "duration": "26m 13s",
-        "_id": "6929c95f925eb27bd5fef60a"
+        "_id": "694bcc6246da1398fb2f9a02"
       },
       {
         "number": 2,
@@ -1077,7 +1103,30 @@
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
         },
         "duration": "28m 49s",
-        "_id": "6929c95f925eb27bd5fef60b"
+        "_id": "694bcc6246da1398fb2f9a03"
+      },
+      {
+        "number": 3,
+        "title": "Tập 3",
+        "videoUrl": "https://snowbreeze49.live/hls/WZdbh1A2CePH-Z8lkyIVQMq8NNHPs6YWXmEjBoakcRRQCazEwRpKI336W0HFXIdb6kb0JxDlqPazMHXIbtrNfA==/bWFzdGVyLm0zdTg=.m3u8",
+        "videoType": "hls",
+        "videoHeaders": {
+          "accept": "*/*",
+          "accept-language": "vi-VN,vi;q=0.9,zh-CN;q=0.8,zh;q=0.7,fr-FR;q=0.6,fr;q=0.5,en-US;q=0.4,en;q=0.3",
+          "cache-control": "no-cache",
+          "pragma": "no-cache",
+          "priority": "u=1, i",
+          "sec-ch-ua": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"Windows\"",
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "cross-site",
+          "Referer": "https://goatembed.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+        },
+        "duration": "24m 43s",
+        "_id": "694bcc6246da1398fb2f9a04"
       }
     ],
     "tags": [
@@ -1085,7 +1134,6 @@
       "Gia Đình",
       "Đời Thường",
       "Hài",
-      "Hoàn thành",
       "Hoàn thành"
     ],
     "moods": [
@@ -1105,8 +1153,9 @@
     "director": "Kim Young-ki, Kim Byeong-wook, Kim Chang-dong",
     "country": "Hàn Quốc",
     "seriesStatus": "Hoàn thành",
-    "createdAt": "2025-11-28T16:08:06.669Z",
-    "updatedAt": "2025-11-28T16:10:07.814Z",
-    "__v": 0
+    "embedding_synced": false,
+    "__v": 0,
+    "createdAt": "2025-12-24T12:40:44.931000",
+    "updatedAt": "2025-12-24T12:40:44.931000"
   }
 ]

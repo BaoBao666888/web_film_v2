@@ -50,6 +50,10 @@ const MovieSchema = new mongoose.Schema(
     director: String,
     country: String,
     seriesStatus: String,
+    embedding_synced: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

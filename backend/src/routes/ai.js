@@ -1,7 +1,10 @@
 import { Router } from "express";
+import fetch from "node-fetch";
 import { listMovies, getStats } from "../db.js";
 
 const router = Router();
+const getChatbotUrl = () =>
+  process.env.AI_CHATBOT_URL || "http://127.0.0.1:5005/api/chatbot";
 
 const moodPlaylists = [
   {
@@ -68,6 +71,50 @@ router.post("/chat", async (req, res) => {
     reply: `Mình nghĩ bạn sẽ thích nhóm phim mang mood "${mood}". Dưới đây là vài gợi ý nè!`,
     suggestions,
   });
+});
+
+router.post("/chatbot", async (req, res) => {
+  const {
+    message = "",
+    slug,
+    episode,
+    userId = "demo-user",
+    sessionId,
+  } = req.body || {};
+  const trimmed = String(message || "").trim();
+  if (!trimmed) {
+    return res.status(400).json({ message: "Thiếu message" });
+  }
+
+  try {
+    const response = await fetch(getChatbotUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: trimmed,
+        slug,
+        episode,
+        session_id: sessionId || userId,
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        message: payload?.message || "Chatbot lỗi",
+      });
+    }
+
+    res.json({
+      userId,
+      reply: payload?.reply || "",
+      suggestions: payload?.suggestions || [],
+    });
+  } catch (error) {
+    console.error("Error calling chatbot:", error);
+    res.status(500).json({ message: "Không thể kết nối chatbot" });
+  }
 });
 
 router.get("/dashboard", async (req, res) => {

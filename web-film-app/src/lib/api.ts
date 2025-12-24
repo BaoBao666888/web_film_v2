@@ -195,6 +195,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    chatbot: (payload: unknown) =>
+      apiFetch<ChatResponse>(`/ai/chatbot`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     dashboard: () => apiFetch<AiDashboardResponse>(`/ai/dashboard`),
   },
   ratings: {

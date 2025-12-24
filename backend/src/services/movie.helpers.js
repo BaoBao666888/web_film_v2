@@ -14,6 +14,26 @@ export const slugify = (text) =>
 export const orDefault = (value, fallback) =>
   value === undefined || value === null ? fallback : value;
 
+export const SERIES_STATUS_VALUES = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
+
+export const sanitizeTags = (tags = []) => {
+  if (!Array.isArray(tags)) return [];
+  const seen = new Set();
+  const cleaned = [];
+
+  for (const raw of tags) {
+    const value = String(raw ?? "").trim();
+    if (!value) continue;
+    if (SERIES_STATUS_VALUES.includes(value)) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(value);
+  }
+
+  return cleaned;
+};
+
 export const parseHeadersPayload = (value, fallback = {}) => {
   if (value === undefined || value === null || value === "") {
     return fallback;

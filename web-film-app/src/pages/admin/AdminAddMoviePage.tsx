@@ -31,6 +31,8 @@ type FormState = {
   country: string;
 };
 
+const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
+
 export function AdminAddMoviePage() {
   const [form, setForm] = useState<FormState>({
     title: "",
@@ -175,10 +177,8 @@ export function AdminAddMoviePage() {
       const tagList = form.tags
         .split(",")
         .map((item) => item.trim())
-        .filter(Boolean);
-      if (form.type === "series" && form.seriesStatus) {
-        tagList.push(form.seriesStatus);
-      }
+        .filter(Boolean)
+        .filter((tag) => !SERIES_STATUS_TAGS.includes(tag));
 
       await api.movies.create({
         ...form,
