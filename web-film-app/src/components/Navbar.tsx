@@ -174,7 +174,6 @@ export function Navbar() {
       }}
     >
       {item.label}
-      {isMobile && <span className="text-xs text-slate-400">→</span>}
     </NavLink>
   );
 
@@ -271,21 +270,18 @@ export function Navbar() {
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-slate-400">→</span>
                   </NavLink>
                   <NavLink
                     to="/history"
                     className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
                   >
                     Lịch sử xem
-                    <span className="text-xs text-slate-400">→</span>
                   </NavLink>
                   <NavLink
                     to="/profile"
                     className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
                   >
                     Hồ sơ
-                    <span className="text-xs text-slate-400">→</span>
                   </NavLink>
                   {user?.role === "admin" && (
                     <NavLink
@@ -293,7 +289,6 @@ export function Navbar() {
                       className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
                     >
                       Quản trị
-                      <span className="text-xs text-slate-400">→</span>
                     </NavLink>
                   )}
                   <button
@@ -398,21 +393,18 @@ export function Navbar() {
                     </span>
                   )}
                 </span>
-                <span className="text-xs text-slate-400">→</span>
               </NavLink>
               <NavLink
                 to="/history"
                 className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
               >
                 <span>Lịch sử xem</span>
-                <span className="text-xs text-slate-400">→</span>
               </NavLink>
               <NavLink
                 to="/profile"
                 className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
               >
                 <span>Hồ sơ</span>
-                <span className="text-xs text-slate-400">→</span>
               </NavLink>
               {user?.role === "admin" && (
                 <NavLink
@@ -420,7 +412,6 @@ export function Navbar() {
                   className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
                 >
                   <span>Quản trị</span>
-                  <span className="text-xs text-slate-400">→</span>
                 </NavLink>
               )}
               <button

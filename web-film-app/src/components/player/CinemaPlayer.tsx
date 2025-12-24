@@ -843,7 +843,7 @@ export function CinemaPlayer({
       </div>
 
       {qualityOptions.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="player-quality rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80">
               Chất lượng

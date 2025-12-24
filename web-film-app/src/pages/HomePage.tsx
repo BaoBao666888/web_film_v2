@@ -99,6 +99,7 @@ export function HomePage() {
   } | null>(null);
   const showPreviewTimeoutRef = useRef<number | null>(null);
   const hidePreviewTimeoutRef = useRef<number | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const element = trendingScrollRef.current;
@@ -187,14 +188,15 @@ export function HomePage() {
     cancelPreviewHide();
     const target = event.currentTarget;
     const rect = target.getBoundingClientRect();
-    const width = 360;
     const padding = 16;
+    const width = Math.min(360, window.innerWidth - padding * 2);
     let left = rect.right + padding;
-    if (left + width > window.innerWidth) {
+    if (left + width > window.innerWidth - padding) {
       left = rect.left - width - padding;
     }
-    left = Math.max(padding, left);
-    const estimatedHeight = 260;
+    const maxLeft = window.innerWidth - width - padding;
+    left = Math.min(Math.max(padding, left), Math.max(padding, maxLeft));
+    const estimatedHeight = 360;
     let top = rect.top - padding;
     const maxTop = window.innerHeight - estimatedHeight - padding;
     if (top < padding) top = padding;
@@ -221,6 +223,34 @@ export function HomePage() {
       cancelPreviewHide();
     };
   }, []);
+
+  useEffect(() => {
+    if (!hoverPreview || !previewRef.current) return;
+    const padding = 16;
+    const rect = previewRef.current.getBoundingClientRect();
+    const maxLeft = window.innerWidth - rect.width - padding;
+    const maxTop = window.innerHeight - rect.height - padding;
+    const nextLeft = Math.min(
+      Math.max(padding, hoverPreview.position.left),
+      Math.max(padding, maxLeft)
+    );
+    const nextTop = Math.min(
+      Math.max(padding, hoverPreview.position.top),
+      Math.max(padding, maxTop)
+    );
+    if (
+      nextLeft !== hoverPreview.position.left ||
+      nextTop !== hoverPreview.position.top
+    ) {
+      setHoverPreview((prev) =>
+        prev ? { ...prev, position: { top: nextTop, left: nextLeft } } : prev
+      );
+    }
+  }, [
+    hoverPreview?.movie?.id,
+    hoverPreview?.position.left,
+    hoverPreview?.position.top,
+  ]);
 
   return (
     <div className="space-y-8 md:space-y-12">
@@ -665,7 +695,8 @@ export function HomePage() {
       </section>
       {hoverPreview && (
         <div
-          className="fixed z-40 w-[360px] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-800/95 to-slate-900/95 text-white shadow-2xl shadow-black/60 backdrop-blur"
+          ref={previewRef}
+          className="home-preview-card fixed z-40 w-[360px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-x-hidden overflow-y-auto rounded-3xl border border-white/10 bg-gradient-to-b from-slate-800/95 to-slate-900/95 text-white shadow-2xl shadow-black/60 backdrop-blur"
           style={{
             top: hoverPreview.position.top,
             left: hoverPreview.position.left,
