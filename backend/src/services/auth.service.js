@@ -101,12 +101,14 @@ class AuthService {
     }
 
     const favorites = await listFavorites(userId, 6);
-    const historyRaw = await listWatchHistory(userId);
-    const history = historyRaw.slice(0, 6).map((item) => ({
+    const { items: historyRaw } = await listWatchHistory(userId, { limit: 3 });
+    const history = historyRaw.map((item) => ({
       id: item.id,
-      movieId: item.movie_id,
+      movieId: item.movie?.id || item.movie_id,
       title: item.movie?.title || "",
       thumbnail: item.movie?.thumbnail || "",
+      episode: item.episode,
+      position: item.last_position ?? 0,
       lastWatchedAt: item.last_watched_at,
     }));
 
@@ -121,7 +123,13 @@ class AuthService {
    * Update user profile
    */
   async updateProfile(userId, requesterId, requesterRole, updates) {
-    const { avatar, currentPassword, newPassword, favoriteMoods } = updates;
+    const {
+      avatar,
+      currentPassword,
+      newPassword,
+      favoriteMoods,
+      themePreference,
+    } = updates;
 
     // Check authorization
     if (requesterId !== userId && requesterRole !== "admin") {
@@ -141,6 +149,14 @@ class AuthService {
 
     if (Array.isArray(favoriteMoods)) {
       userUpdates.favorite_moods = favoriteMoods.filter(Boolean);
+    }
+
+    if (themePreference) {
+      const normalized = String(themePreference).toLowerCase();
+      if (!["system", "light", "dark"].includes(normalized)) {
+        throw new Error("INVALID_THEME");
+      }
+      userUpdates.theme_preference = normalized;
     }
 
     if (newPassword) {
@@ -177,6 +193,7 @@ class AuthService {
       role: user.role,
       created_at: user.created_at,
       favorite_moods: user.favorite_moods || [],
+      theme_preference: user.theme_preference || "system",
     };
   }
 

@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import type {
   CommentListResponse,
@@ -18,7 +18,9 @@ const COMMENT_FILTER_URL = "http://127.0.0.1:5002/api/moderate";
 export function WatchPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const episodeParam = Number(searchParams.get("ep") ?? "1");
+  const hasEpisodeParam = searchParams.has("ep");
   const episodeNumber =
     Number.isFinite(episodeParam) && episodeParam > 0 ? episodeParam : 1;
   const { isAuthenticated } = useAuth();
@@ -51,6 +53,19 @@ export function WatchPage() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [theaterMode, setTheaterMode] = useState(true);
   const viewerIdRef = useRef<string | null>(null);
+  const lastHistorySyncRef = useRef(0);
+  const lastPositionRef = useRef(0);
+  const historyMovieId = watchData?.movieId ?? id;
+
+  const { data: resumeData } = useFetch<{
+    item: { movieId: string; episode?: number; position?: number } | null;
+  }>(
+    isAuthenticated && historyMovieId
+      ? `/history/resume?movieId=${encodeURIComponent(historyMovieId)}`
+      : null,
+    [isAuthenticated, historyMovieId]
+  );
+  const resumeItem = resumeData?.item ?? null;
 
   useEffect(() => {
     let viewerId = localStorage.getItem("viewerId");
@@ -72,6 +87,22 @@ export function WatchPage() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [id, episodeNumber]);
+
+  useEffect(() => {
+    if (!id || !resumeItem?.episode || hasEpisodeParam) return;
+    navigate(`/watch/${id}?ep=${resumeItem.episode}`, { replace: true });
+  }, [id, resumeItem?.episode, hasEpisodeParam, navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (!isAuthenticated || !historyMovieId) return;
+      const position = lastPositionRef.current;
+      if (!Number.isFinite(position) || position <= 1) return;
+      api.history
+        .update({ movieId: historyMovieId, episode: episodeNumber, position })
+        .catch((err) => console.error("Không thể lưu tiến độ:", err));
+    };
+  }, [episodeNumber, historyMovieId, isAuthenticated]);
 
 
   const streamSource = useMemo(() => {
@@ -199,8 +230,35 @@ export function WatchPage() {
     watchData.currentEpisode?.title ?? `Tập ${currentEpisodeNumber}`;
 
   const backgroundPoster = detail?.poster ?? watchData.poster;
-  // Placeholder for future resume-from-history integration
-  const resumePosition = 0;
+  const resumePosition = (() => {
+    if (!resumeItem || !resumeItem.position) return 0;
+    if (watchData.type === "series" && resumeItem.episode) {
+      return resumeItem.episode === currentEpisodeNumber
+        ? resumeItem.position
+        : 0;
+    }
+    return resumeItem.position;
+  })();
+
+  const handleHistorySync = (state: {
+    position: number;
+    isPlaying: boolean;
+    playbackRate: number;
+    updatedAt: number;
+  }) => {
+    if (!isAuthenticated || !historyMovieId) return;
+    const position = Number(state.position) || 0;
+    lastPositionRef.current = position;
+    if (position <= 1) return;
+
+    const now = Date.now();
+    const shouldSync = !state.isPlaying || now - lastHistorySyncRef.current > 15000;
+    if (!shouldSync) return;
+    lastHistorySyncRef.current = now;
+    api.history
+      .update({ movieId: historyMovieId, episode: episodeNumber, position })
+      .catch((err) => console.error("Không thể lưu tiến độ:", err));
+  };
 
   const stats = [
     { label: "Năm", value: detail?.year ?? "—" },
@@ -314,6 +372,7 @@ export function WatchPage() {
                     poster={backgroundPoster}
                     autoPlay
                     startPosition={resumePosition}
+                    onStatePush={handleHistorySync}
                   />
                 </div>
               </div>

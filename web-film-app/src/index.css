@@ -14,6 +14,51 @@ body {
   background-color: #0f172a;
 }
 
+.theme-light {
+  color-scheme: light;
+}
+
+.theme-light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.theme-light #root {
+  background-color: #f8fafc;
+}
+
+.theme-light .bg-dark {
+  background-color: #f8fafc !important;
+}
+
+.theme-light .bg-black {
+  background-color: #ffffff !important;
+}
+
+.theme-light [class*="bg-black/"] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.theme-light [class*="bg-dark/"] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.theme-light [class*="bg-white/"] {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+.theme-light [class*="border-white/"] {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+.theme-light [class*="text-slate-"] {
+  color: #475569 !important;
+}
+
 #root {
   min-height: 100vh;
 }

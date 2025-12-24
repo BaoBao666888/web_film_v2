@@ -152,6 +152,22 @@ export interface PaginatedMeta {
   totalPages: number;
 }
 
+export interface HistoryItem {
+  id: string;
+  movieId: string;
+  title: string;
+  thumbnail: string;
+  movieType?: "single" | "series";
+  episode?: number;
+  position?: number;
+  lastWatchedAt?: string;
+}
+
+export interface HistoryResponse {
+  items: HistoryItem[];
+  meta: PaginatedMeta;
+}
+
 export interface TrendingMoviesResponse {
   items: MovieStatItem[];
   meta: PaginatedMeta & { days?: number };
@@ -190,6 +206,7 @@ export interface ProfileResponse {
     role: string;
     created_at?: string;
     favorite_moods?: string[];
+    theme_preference?: "system" | "light" | "dark";
   };
   favorites: MovieSummary[];
   history: Array<{
@@ -197,6 +214,9 @@ export interface ProfileResponse {
     movieId: string;
     title: string;
     thumbnail: string;
+    movieType?: "single" | "series";
+    episode?: number;
+    position?: number;
     lastWatchedAt?: string;
   }>;
 }
@@ -266,6 +286,7 @@ export interface AuthResponse {
     name: string;
     email: string;
     avatar?: string;
+    theme_preference?: "system" | "light" | "dark";
     role?: string;
     favorite_moods?: string[];
   };

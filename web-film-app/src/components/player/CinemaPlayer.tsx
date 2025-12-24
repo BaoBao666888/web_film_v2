@@ -264,6 +264,16 @@ export function CinemaPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    if (typeof startPosition === "number" && startPosition > 0) {
+      if (!Number.isNaN(video.duration) && video.duration > 0) {
+        video.currentTime = startPosition;
+      }
+    }
+  }, [startPosition]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
     const syncPlayState = () => setIsPlaying(!video.paused);
     const syncMuteState = () => setIsMuted(video.muted);

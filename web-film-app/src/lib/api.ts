@@ -23,6 +23,7 @@ import type {
   InboxResponse,
   InboxUnreadCountResponse,
   InboxMarkReadResponse,
+  HistoryResponse,
 } from "../types/api";
 
 const envApi = import.meta.env.VITE_API_BASE_URL;
@@ -218,7 +219,13 @@ export const api = {
     profile: (id: string) => apiFetch<ProfileResponse>(`/auth/profile/${id}`),
     updateProfile: (
       id: string,
-      payload: { avatar?: string; currentPassword?: string; newPassword?: string }
+      payload: {
+        avatar?: string;
+        currentPassword?: string;
+        newPassword?: string;
+        favoriteMoods?: string[];
+        themePreference?: "system" | "light" | "dark";
+      }
     ) =>
       apiFetch<{ user: ProfileResponse["user"] }>(`/auth/profile/${id}`, {
         method: "PUT",
@@ -249,12 +256,27 @@ export const api = {
       }),
   },
   history: {
-    list: () => apiFetch(`/history`),
+    list: (params: { page?: number; limit?: number } = {}) => {
+      const search = new URLSearchParams();
+      if (params.page) search.set("page", String(params.page));
+      if (params.limit) search.set("limit", String(params.limit));
+      const qs = search.toString();
+      return apiFetch<HistoryResponse>(`/history${qs ? `?${qs}` : ""}`);
+    },
     add: (movieId: string) =>
       apiFetch(`/history`, {
         method: "POST",
         body: JSON.stringify({ movieId }),
       }),
+    update: (payload: { movieId: string; episode?: number; position?: number }) =>
+      apiFetch(`/history/update`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    resume: (movieId: string) =>
+      apiFetch<{ item: { movieId: string; episode?: number; position?: number } | null }>(
+        `/history/resume?movieId=${encodeURIComponent(movieId)}`
+      ),
     remove: (historyId: string) =>
       apiFetch(`/history/${historyId}`, {
         method: "DELETE",

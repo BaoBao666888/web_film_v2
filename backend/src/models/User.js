@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema(
     avatar: String,
     role: { type: String, default: "user" },
     favorite_moods: { type: [String], default: [] },
+    theme_preference: { type: String, default: "system" },
     password_hash: String,
     created_at: { type: Date, default: Date.now },
   },

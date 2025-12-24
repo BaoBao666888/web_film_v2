@@ -7,6 +7,7 @@ const WatchHistorySchema = new mongoose.Schema(
     viewer_id: String,
     episode: Number,
     movie_id: String,
+    last_position: { type: Number, default: 0 },
     last_watched_at: { type: Date, default: Date.now },
   },
   { timestamps: true }

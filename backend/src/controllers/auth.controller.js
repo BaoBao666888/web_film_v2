@@ -75,13 +75,19 @@ class AuthController {
   async updateProfile(req, res) {
     try {
       const { id } = req.params;
-      const { avatar, currentPassword, newPassword, favoriteMoods } = req.body;
+      const {
+        avatar,
+        currentPassword,
+        newPassword,
+        favoriteMoods,
+        themePreference,
+      } = req.body;
 
       const updatedUser = await authService.updateProfile(
         id,
         req.user.id,
         req.user.role,
-        { avatar, currentPassword, newPassword, favoriteMoods }
+        { avatar, currentPassword, newPassword, favoriteMoods, themePreference }
       );
 
       res.json({ user: updatedUser });
@@ -108,6 +114,11 @@ class AuthController {
         return res
           .status(400)
           .json({ message: "Không có dữ liệu cần cập nhật" });
+      }
+      if (error.message === "INVALID_THEME") {
+        return res
+          .status(400)
+          .json({ message: "Giao diện không hợp lệ" });
       }
       if (error.message === "UPDATE_FAILED") {
         return res

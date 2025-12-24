@@ -24,6 +24,20 @@ router.post(
   asyncHandler((req, res) => historyController.addHistory(req, res))
 );
 
+// Update history with resume position
+router.post(
+  "/update",
+  verifyToken,
+  asyncHandler((req, res) => historyController.updateHistory(req, res))
+);
+
+// Get resume info
+router.get(
+  "/resume",
+  verifyToken,
+  asyncHandler((req, res) => historyController.getResume(req, res))
+);
+
 // Remove history item
 router.delete(
   "/:historyId",

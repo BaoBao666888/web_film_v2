@@ -8,6 +8,7 @@ export interface User {
   created_at?: string;
   favorite_moods?: string[];
   role?: string;
+  theme_preference?: "system" | "light" | "dark";
 }
 
 export function useAuth() {

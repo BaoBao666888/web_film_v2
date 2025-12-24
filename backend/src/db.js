@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 import { generateId } from "./utils/id.js";
 import { Movie } from "./models/Movie.js";
 import { User } from "./models/User.js";
@@ -171,6 +172,7 @@ export const addUser = async ({ name, email, password }) => {
     email,
     role: "user",
     favorite_moods: [],
+    theme_preference: "system",
     password_hash: bcrypt.hashSync(password, 10),
     created_at: new Date(),
   });
@@ -270,19 +272,74 @@ export const getStats = async () => {
 
 // Watch history
 
-export const listWatchHistory = async (userId) => {
-  const items = await WatchHistory.find({ user_id: userId })
+export const listWatchHistory = async (
+  userId,
+  { page = 1, limit = 20 } = {}
+) => {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const items = await WatchHistory.find({
+    user_id: userId,
+    last_watched_at: { $gte: cutoff },
+  })
     .sort({ last_watched_at: -1 })
     .lean();
 
-  const movieIds = [...new Set(items.map((i) => i.movie_id))];
-  const movies = await Movie.find({ id: { $in: movieIds } }).lean();
-  const movieMap = Object.fromEntries(movies.map((m) => [m.id, m]));
+  const seenMovies = new Set();
+  const uniqueItems = [];
+  for (const item of items) {
+    if (seenMovies.has(item.movie_id)) continue;
+    seenMovies.add(item.movie_id);
+    uniqueItems.push(item);
+  }
 
-  return items.map((item) => ({
-    ...item,
-    movie: movieMap[item.movie_id] || null,
-  }));
+  const sanitizedLimit = clampNumber(limit, 20, { min: 1, max: 50 });
+  const sanitizedPage = Math.max(Number(page) || 1, 1);
+  const startIndex = (sanitizedPage - 1) * sanitizedLimit;
+  const pagedItems = uniqueItems.slice(
+    startIndex,
+    startIndex + sanitizedLimit
+  );
+
+  const movieIds = [
+    ...new Set(pagedItems.map((i) => i.movie_id).filter(Boolean)),
+  ];
+  const objectIds = movieIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const movieQuery = [
+    { id: { $in: movieIds } },
+    { slug: { $in: movieIds } },
+  ];
+  if (objectIds.length > 0) {
+    movieQuery.push({ _id: { $in: objectIds } });
+  }
+  const movies = movieIds.length
+    ? await Movie.find({ $or: movieQuery }).lean()
+    : [];
+  const movieMap = Object.fromEntries(
+    movies.flatMap((movie) => {
+      const entries = [];
+      if (movie.id) entries.push([movie.id, movie]);
+      if (movie.slug) entries.push([movie.slug, movie]);
+      if (movie._id) entries.push([String(movie._id), movie]);
+      return entries;
+    })
+  );
+
+  return {
+    items: pagedItems.map((item) => ({
+      ...item,
+      movie: movieMap[item.movie_id] || null,
+    })),
+    meta: {
+      page: sanitizedPage,
+      limit: sanitizedLimit,
+      totalItems: uniqueItems.length,
+      totalPages: sanitizedLimit
+        ? Math.max(1, Math.ceil(uniqueItems.length / sanitizedLimit))
+        : 1,
+    },
+  };
 };
 
 export const addWatchHistory = async ({
@@ -290,16 +347,84 @@ export const addWatchHistory = async ({
   movieId,
   viewerId,
   episode,
+  position,
 }) => {
-  const doc = new WatchHistory({
-    id: generateId("history"),
+  const now = new Date();
+  if (!movieId) return;
+
+  if (!userId) {
+    const positionNumber = Number(position);
+    const doc = new WatchHistory({
+      id: generateId("history"),
+      user_id: null,
+      viewer_id: viewerId,
+      movie_id: movieId,
+      episode,
+      last_position: Number.isFinite(positionNumber) ? positionNumber : 0,
+      last_watched_at: now,
+    });
+    await doc.save();
+    return;
+  }
+
+  const update = { last_watched_at: now };
+  if (viewerId !== undefined) {
+    update.viewer_id = viewerId;
+  }
+  const episodeNumber = Number(episode);
+  if (Number.isFinite(episodeNumber) && episodeNumber > 0) {
+    update.episode = episodeNumber;
+  }
+  const positionNumber = Number(position);
+  if (Number.isFinite(positionNumber) && positionNumber >= 0) {
+    update.last_position = positionNumber;
+  }
+
+  const updated = await WatchHistory.findOneAndUpdate(
+    { user_id: userId, movie_id: movieId },
+    {
+      $set: update,
+      $setOnInsert: {
+        id: generateId("history"),
+        user_id: userId,
+        movie_id: movieId,
+      },
+    },
+    { upsert: true, new: true }
+  );
+
+  if (updated?._id) {
+    await WatchHistory.deleteMany({
+      user_id: userId,
+      movie_id: movieId,
+      _id: { $ne: updated._id },
+    });
+  }
+
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  await WatchHistory.deleteMany({
     user_id: userId,
-    viewer_id: viewerId,
-    movie_id: movieId,
-    episode,
-    last_watched_at: new Date(),
+    last_watched_at: { $lt: cutoff },
   });
-  await doc.save();
+};
+
+export const getWatchHistoryByMovie = async ({ userId, movieId }) => {
+  if (!userId || !movieId) return null;
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const movie = await Movie.findOne({
+    $or: [{ id: movieId }, { slug: movieId }],
+  }).lean();
+  const candidates = new Set([movieId]);
+  if (movie?.id) candidates.add(movie.id);
+  if (movie?.slug) candidates.add(movie.slug);
+  if (movie?._id) candidates.add(String(movie._id));
+  return WatchHistory.findOne({
+    user_id: userId,
+    movie_id: { $in: Array.from(candidates) },
+    last_watched_at: { $gte: cutoff },
+  })
+    .sort({ last_watched_at: -1 })
+    .lean();
 };
 
 export const removeWatchHistory = async ({ userId, historyId }) => {
