@@ -153,7 +153,7 @@ export function ProfilePage() {
     <div className="space-y-10">
       <PageHeader
         title={`Hồ sơ của ${user?.name}`}
-        description="Thông tin cá nhân, phim yêu thích và lịch sử xem lấy từ API auth."
+        description="Thông tin cá nhân, phim yêu thích và lịch sử xem của bạn."
         actions={
           <div className="flex gap-3">
             <button

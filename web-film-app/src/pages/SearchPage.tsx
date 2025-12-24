@@ -49,7 +49,7 @@ export function SearchPage() {
     <div className="space-y-10">
       <PageHeader
         title="Tìm kiếm thông minh"
-        description="Nhập từ khóa hoặc mô tả tự nhiên để AI hiểu chính xác mood bạn muốn. Dữ liệu đang lấy trực tiếp từ API /movies và sẽ nâng cấp semantic search sau."
+        description="Nhập từ khóa hoặc mô tả tự nhiên để AI hiểu chính xác mood bạn muốn."
       />
 
       <section className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
@@ -75,8 +75,7 @@ export function SearchPage() {
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Từ khóa sẽ gọi API `/movies`. Khi chưa nhập gì, hệ thống hiển thị
-              đề xuất mặc định từ backend.
+              Khi chưa nhập gì, hệ thống hiển thị đề xuất nổi bật để bạn bắt đầu nhanh.
             </p>
           </form>
 
@@ -116,20 +115,14 @@ export function SearchPage() {
         </div>
 
         <aside className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/25 sm:p-6">
-          <p className="text-sm font-semibold text-white">
-            Bản đồ dữ liệu tìm kiếm
-          </p>
+          <p className="text-sm font-semibold text-white">Mẹo tìm kiếm nhanh</p>
           <div className="rounded-2xl bg-dark/60 p-6 text-sm text-slate-300">
-            <p>
-              - Từ khóa được chuẩn hóa và chuyển sang embedding để so khớp với
-              mô tả phim.
+            <p>- Nêu rõ mood (vui, căng thẳng, chill) và thể loại.</p>
+            <p className="mt-2">
+              - Thêm bối cảnh xem phim: một mình, gia đình, hoặc cuối tuần.
             </p>
             <p className="mt-2">
-              - Những truy vấn phức tạp sẽ gọi tính năng phân tích sentiment để
-              hiểu rõ hơn cảm xúc người dùng trước khi gợi ý playlist phù hợp.
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              Tính năng sẽ kết nối khi hoàn thiện service AI.
+              - Nếu có phim mẫu, nhập tên để hệ thống gợi ý tương tự.
             </p>
           </div>
         </aside>

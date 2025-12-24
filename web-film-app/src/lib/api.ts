@@ -9,6 +9,7 @@ import type {
   AdminStatsResponse,
   AdminUsersResponse,
   AdminMoviesResponse,
+  AdminSendNotificationsResponse,
   RatingResponse,
   AuthResponse,
   AiDashboardResponse,
@@ -19,6 +20,9 @@ import type {
   CommunityHighlightsResponse,
   CommentListResponse,
   Comment,
+  InboxResponse,
+  InboxUnreadCountResponse,
+  InboxMarkReadResponse,
 } from "../types/api";
 
 const envApi = import.meta.env.VITE_API_BASE_URL;
@@ -225,6 +229,24 @@ export const api = {
     stats: () => apiFetch<AdminStatsResponse>(`/admin/stats`),
     users: () => apiFetch<AdminUsersResponse>(`/admin/users`),
     movies: () => apiFetch<AdminMoviesResponse>(`/admin/movies`),
+    sendNotifications: (payload: {
+      userIds: string[];
+      title?: string;
+      content: string;
+      senderType?: "admin" | "bot";
+    }) =>
+      apiFetch<AdminSendNotificationsResponse>(`/admin/notifications`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+  },
+  notifications: {
+    list: () => apiFetch<InboxResponse>(`/notifications`),
+    unreadCount: () => apiFetch<InboxUnreadCountResponse>(`/notifications/unread-count`),
+    markRead: () =>
+      apiFetch<InboxMarkReadResponse>(`/notifications/mark-read`, {
+        method: "POST",
+      }),
   },
   history: {
     list: () => apiFetch(`/history`),

@@ -34,4 +34,12 @@ router.get(
   asyncHandler((req, res) => adminController.listMovies(req, res))
 );
 
+// Send inbox notifications
+router.post(
+  "/notifications",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.sendNotifications(req, res))
+);
+
 export default router;

@@ -53,7 +53,7 @@ export function RecommendPage() {
     <div className="space-y-10">
       <PageHeader
         title="Gợi ý phim AI"
-        description="Playlist này lấy trực tiếp từ API hybrid recommendation. Khi gắn model thật, chỉ cần thay đổi service AI là front hoạt động."
+        description="Playlist được cá nhân hoá dựa trên lịch sử xem và sở thích của bạn."
       />
 
       <section className="grid gap-6 md:grid-cols-[1fr_0.9fr]">
@@ -107,7 +107,7 @@ export function RecommendPage() {
 
         <aside className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
           <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-            Mô tả luồng AI (Roadmap)
+            Gợi ý nâng cao
           </h4>
           <ul className="space-y-4 text-sm text-slate-200">
             {roadmapItems.map((item) => (
@@ -120,17 +120,6 @@ export function RecommendPage() {
               </li>
             ))}
           </ul>
-          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-xs text-slate-200">
-            <p className="font-semibold text-white">Lưu ý triển khai</p>
-            <p className="mt-2">
-              - API gợi ý viết bằng Python FastAPI, trả về danh sách phim đã
-              chấm điểm theo user.
-            </p>
-            <p className="mt-1">
-              - Front-end hiển thị skeleton trong lúc đợi response, fallback sang
-              playlist chung nếu lỗi.
-            </p>
-          </div>
         </aside>
       </section>
 
@@ -150,7 +139,7 @@ export function RecommendPage() {
                 {playlist.description}
               </p>
               <p className="mt-4 text-xs text-slate-100/80">
-                Sẽ tuỳ biến theo rating mới nhất sau khi đồng bộ backend.
+                Sẽ tuỳ biến theo rating mới nhất của bạn.
               </p>
             </div>
           ))}

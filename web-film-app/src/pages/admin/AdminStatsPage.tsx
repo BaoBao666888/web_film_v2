@@ -10,7 +10,7 @@ export function AdminStatsPage() {
     <div className="space-y-10">
       <PageHeader
         title="Thống kê & phân tích"
-        description="Biểu diễn dữ liệu AI Recommendation và phản hồi người dùng. Dữ liệu lấy trực tiếp từ API admin/stats."
+        description="Theo dõi hiệu quả nội dung và xu hướng người dùng."
       />
 
       <section className="grid gap-6 md:grid-cols-3">
@@ -32,11 +32,9 @@ export function AdminStatsPage() {
         ))}
       </section>
 
-      <section className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-6">
         <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-          <p className="text-sm font-semibold text-white">
-            Biểu đồ cảm xúc (demo)
-          </p>
+          <p className="text-sm font-semibold text-white">Biểu đồ cảm xúc</p>
           <div className="flex h-64 items-end gap-3 rounded-2xl border border-white/5 bg-dark/60 p-6">
             {(data?.topMoods ?? []).length === 0 && (
               <p className="text-xs text-slate-500">
@@ -57,31 +55,7 @@ export function AdminStatsPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-slate-400">
-            Ghi chú: Sẽ dùng chart library (Recharts) và dữ liệu từ endpoint
-            `/admin/stats`.
-          </p>
         </div>
-
-        <aside className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25 text-xs text-slate-300">
-          <p className="text-sm font-semibold text-white">
-            Checklist triển khai
-          </p>
-          <ul className="space-y-3">
-            <li className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Kết nối dữ liệu recommendation engine để đo CTR playlist.
-            </li>
-            <li className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Đồng bộ phân tích sentiment từ form đánh giá.
-            </li>
-            <li className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Thêm filter theo thời gian (7 ngày, 30 ngày, quý).
-            </li>
-            <li className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Xuất báo cáo PDF cho team marketing.
-            </li>
-          </ul>
-        </aside>
       </section>
     </div>
   );

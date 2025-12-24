@@ -677,7 +677,6 @@ export function CinemaPlayer({
           onDoubleClick={toggleFullscreen}
           onClick={handleVideoClick}
           aria-label={`Trình phát ${title}`}
-          title={title}
           className={`aspect-video w-full bg-black object-contain ${
             isFullscreen
               ? "min-h-screen"

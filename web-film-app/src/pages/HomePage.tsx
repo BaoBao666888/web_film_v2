@@ -251,9 +251,7 @@ export function HomePage() {
               </Link>
             </div>
             <p className="mt-6 text-xs text-slate-400">
-              Dữ liệu lấy trực tiếp từ backend Express (cổng 4000). Khi API gián
-              đoạn, giao diện tự động dùng dữ liệu demo để bạn không bị gián
-              quãng.
+              Dữ liệu được cập nhật liên tục để bạn luôn bắt kịp xu hướng.
             </p>
           </div>
           <div className="relative">

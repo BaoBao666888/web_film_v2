@@ -49,10 +49,13 @@ export function WatchPartyRoomPage() {
     null
   );
   const [miniChatOpen, setMiniChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const latestHostStateRef = useRef<SyncedState | null>(null);
   const roomRef = useRef<WatchPartyRoom | undefined>(undefined);
   const lastMsgIdRef = useRef<string | number | null>(null);
+  const lastMessageAtRef = useRef<number>(0);
 
   useEffect(() => {
     const load = async () => {
@@ -142,6 +145,23 @@ export function WatchPartyRoomPage() {
     roomRef.current = room;
   }, [room]);
 
+  useEffect(() => {
+    const handleFullscreen = () => {
+      setIsPlayerFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreen);
+    handleFullscreen();
+    return () => document.removeEventListener("fullscreenchange", handleFullscreen);
+  }, []);
+
+  const markChatRead = (messages: WatchPartyMessage[]) => {
+    const latest = messages[messages.length - 1];
+    if (latest?.createdAt) {
+      lastMessageAtRef.current = Number(latest.createdAt);
+    }
+    setUnreadCount(0);
+  };
+
   const streamSource = useMemo(() => {
     if (watchData?.stream?.url) return watchData.stream;
     if (watchData?.videoUrl) {
@@ -177,6 +197,13 @@ export function WatchPartyRoomPage() {
     socket.on("watch-party:joined", (data: WatchPartyRoom) => {
       setRoom(data);
       const normalized = normalizeState(data.state as SyncedState | undefined);
+      if (data.messages?.length) {
+        const latest = data.messages[data.messages.length - 1];
+        if (latest?.createdAt) {
+          lastMessageAtRef.current = Number(latest.createdAt);
+        }
+        setUnreadCount(0);
+      }
       if (normalized) {
         latestHostStateRef.current = normalized;
         if (viewerIdRef.current === data.hostId) {
@@ -210,6 +237,8 @@ export function WatchPartyRoomPage() {
     socket.on("watch-party:messages", (messages) => {
       setRoom((prev) => (prev ? { ...prev, messages } : prev));
       const latest = messages[messages.length - 1];
+      const latestTime = latest?.createdAt ? Number(latest.createdAt) : 0;
+      const previousTime = lastMessageAtRef.current || 0;
       if (
         latest &&
         latest.createdAt !== lastMsgIdRef.current &&
@@ -224,6 +253,21 @@ export function WatchPartyRoomPage() {
           playMentionSound();
         }
         lastMsgIdRef.current = latest.createdAt;
+      }
+      if (latestTime > previousTime) {
+        lastMessageAtRef.current = latestTime;
+        if (!miniChatOpen) {
+          const newCount = messages.filter(
+            (msg: WatchPartyMessage) =>
+              Number(msg.createdAt) > previousTime &&
+              msg.userId !== viewerIdRef.current
+          ).length;
+          if (newCount > 0) {
+            setUnreadCount((prev) => prev + newCount);
+          }
+        } else {
+          setUnreadCount(0);
+        }
       }
     });
 
@@ -317,22 +361,32 @@ export function WatchPartyRoomPage() {
     : null;
 
   const chatMessages = room?.messages || [];
+  const showUnreadBadge =
+    !miniChatOpen && unreadCount > 0 && isPlayerFullscreen;
   const chatOverlay = (
     <div className="text-sm text-white">
       <div className="flex justify-between items-center">
         {!miniChatOpen && (
           <button
             type="button"
-            onClick={() => setMiniChatOpen((v) => !v)}
-            className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white shadow-sm shadow-black/40 hover:bg-black/80"
+            onClick={() => {
+              setMiniChatOpen(true);
+              markChatRead(chatMessages);
+            }}
+            className="relative rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white shadow-sm shadow-black/40 hover:bg-black/80"
           >
             Chat
+            {showUnreadBadge && (
+              <span className="absolute -right-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-dark">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </button>
         )}
         {miniChatOpen && (
           <button
             type="button"
-            onClick={() => setMiniChatOpen((v) => !v)}
+            onClick={() => setMiniChatOpen(false)}
             className="ml-auto rounded-full bg-black/60 px-2 py-1 text-xs font-semibold text-white shadow-sm shadow-black/40 hover:bg-black/80"
           >
             ×
@@ -345,7 +399,7 @@ export function WatchPartyRoomPage() {
             <span>Chat phòng</span>
             <span>{chatMessages.length} tin</span>
           </div>
-          <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+          <div className="chat-scroll max-h-56 space-y-2 overflow-y-auto pr-1">
             {chatMessages.length === 0 && (
               <p className="text-xs text-slate-400">Chưa có tin nhắn.</p>
             )}
@@ -515,7 +569,7 @@ export function WatchPartyRoomPage() {
           <h3 className="text-sm font-semibold text-white">Chat</h3>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/30 p-3">
+        <div className="chat-scroll max-h-[420px] flex-1 space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/30 p-3 lg:max-h-[520px]">
           {room.messages.length === 0 && (
             <p className="text-xs text-slate-400">Chưa có tin nhắn nào.</p>
           )}

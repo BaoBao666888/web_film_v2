@@ -8,6 +8,7 @@ import {
   listWatchHistory,
   updateUser,
 } from "../db.js";
+import notificationService from "./notification.service.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
@@ -33,9 +34,25 @@ class AuthService {
     // Generate token
     const token = jwt.sign({ id: newUser.id }, JWT_SECRET, { expiresIn: "7d" });
 
+    const sanitizedUser = this.sanitizeUser(newUser);
+    try {
+      await notificationService.sendToUsers({
+        userIds: [newUser.id],
+        title: "Chào mừng đến Lumi AI Cinema",
+        content:
+          `Xin chào ${sanitizedUser.name || "bạn"}! Cảm ơn bạn đã đăng ký. ` +
+          "Hãy khám phá phim mới, tạo phòng xem chung và lưu lại danh sách yêu thích. " +
+          "Nếu cần hỗ trợ, cứ nhắn cho tụi mình nhé.",
+        senderType: "bot",
+        senderName: "Lumi Bot",
+      });
+    } catch (error) {
+      console.warn("Send welcome notification failed:", error?.message || error);
+    }
+
     return {
       token,
-      user: this.sanitizeUser(newUser),
+      user: sanitizedUser,
     };
   }
 
@@ -52,9 +69,25 @@ class AuthService {
 
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
 
+    const sanitizedUser = this.sanitizeUser(user);
+    try {
+      await notificationService.sendToUsers({
+        userIds: [user.id],
+        title: "Chào mừng bạn quay lại",
+        content:
+          `Rất vui được gặp lại ${sanitizedUser.name || "bạn"}. ` +
+          "Hôm nay có nhiều phim mới và gợi ý AI phù hợp với bạn. " +
+          "Chúc bạn xem phim vui vẻ!",
+        senderType: "bot",
+        senderName: "Lumi Bot",
+      });
+    } catch (error) {
+      console.warn("Send login notification failed:", error?.message || error);
+    }
+
     return {
       token,
-      user: this.sanitizeUser(user),
+      user: sanitizedUser,
     };
   }
 

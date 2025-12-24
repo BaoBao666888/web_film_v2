@@ -209,7 +209,7 @@ export function AdminAddMoviePage() {
     <div className="space-y-10">
       <PageHeader
         title="Thêm phim mới"
-        description="Form nhập liệu chi tiết để đẩy phim lên hệ thống. Submit sẽ gọi API POST /movies."
+        description="Form nhập liệu chi tiết để thêm phim mới vào hệ thống."
         actions={
           <Link
             to="/admin/manage"

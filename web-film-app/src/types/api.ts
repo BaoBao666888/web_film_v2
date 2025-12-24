@@ -222,6 +222,34 @@ export interface AdminMoviesResponse {
   meta?: PaginatedMeta;
 }
 
+export interface InboxMessage {
+  id: string;
+  title?: string;
+  content: string;
+  senderType?: "admin" | "bot";
+  senderName?: string;
+  createdAt?: string;
+  readAt?: string | null;
+}
+
+export interface InboxResponse {
+  items: InboxMessage[];
+}
+
+export interface InboxUnreadCountResponse {
+  count: number;
+}
+
+export interface InboxMarkReadResponse {
+  success: boolean;
+  readAt?: string;
+}
+
+export interface AdminSendNotificationsResponse {
+  sent: number;
+  skipped?: number;
+}
+
 export interface RatingResponse {
   id: string;
   movieId: string;

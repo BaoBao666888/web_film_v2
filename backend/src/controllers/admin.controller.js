@@ -1,4 +1,5 @@
 import adminService from "../services/admin.service.js";
+import notificationService from "../services/notification.service.js";
 
 /**
  * Admin Controller - HTTP Request/Response Handler
@@ -44,6 +45,40 @@ class AdminController {
     } catch (error) {
       console.error("Error listing movies:", error);
       res.status(500).json({ message: "Lỗi khi lấy danh sách phim" });
+    }
+  }
+
+  /**
+   * Send inbox message to users
+   * POST /admin/notifications
+   */
+  async sendNotifications(req, res) {
+    try {
+      const { userIds, title, content, senderType } = req.body || {};
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "Cần chọn ít nhất 1 người nhận" });
+      }
+      if (!content || !String(content).trim()) {
+        return res
+          .status(400)
+          .json({ message: "Nội dung thông báo không được trống" });
+      }
+
+      const result = await notificationService.sendToUsers({
+        userIds,
+        title,
+        content,
+        senderType: senderType || "admin",
+        senderId: req.user?.id,
+        senderName: req.user?.name || "Admin",
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error sending notifications:", error);
+      res.status(500).json({ message: "Lỗi khi gửi thông báo" });
     }
   }
 }

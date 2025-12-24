@@ -145,7 +145,7 @@ export function AdminManagePage() {
     <div className="space-y-10">
       <PageHeader
         title="Quản lý phim"
-        description="Danh sách phim hiện có. Dữ liệu lấy từ API admin/movies."
+        description="Danh sách phim hiện có và các thao tác quản trị nhanh."
         actions={
           <Link
             to="/admin/add-movie"

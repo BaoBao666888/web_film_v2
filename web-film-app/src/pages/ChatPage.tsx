@@ -10,7 +10,7 @@ const assistantMessages = [
   {
     title: "Tính năng sắp triển khai",
     detail:
-      "Chatbot kết nối API NLP (Azure / OpenAI) để hiểu câu hỏi tiếng Việt tự nhiên và trả về đề xuất phim tức thì.",
+      "Chatbot được tối ưu để hiểu câu hỏi tiếng Việt tự nhiên và trả về đề xuất phim tức thì.",
   },
   {
     title: "Thông minh hơn theo thời gian",
@@ -70,7 +70,7 @@ export function ChatPage() {
     <div className="space-y-10">
       <PageHeader
         title="Chatbot AI phim"
-        description="Trò chuyện với trợ lý ảo để nhận gợi ý dựa trên mood, thể loại yêu thích, hoặc tình huống cụ thể. Tất cả request đang gọi tới API `/ai/chat` (demo)."
+        description="Trò chuyện với trợ lý ảo để nhận gợi ý dựa trên mood, thể loại yêu thích, hoặc tình huống cụ thể."
       />
 
       <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
@@ -81,7 +81,7 @@ export function ChatPage() {
                 Lumi – Trợ lý phim của bạn
               </p>
               <p className="text-xs text-slate-400">
-                Mỗi câu trả lời lấy trực tiếp từ API demo.
+                Đặt câu hỏi càng cụ thể, gợi ý càng sát gu bạn.
               </p>
             </div>
             <button
@@ -140,8 +140,7 @@ export function ChatPage() {
               </button>
             </form>
             <p className="mt-2 text-xs text-slate-500">
-              Ghi chú: Giai đoạn demo dùng REST. Khi deploy chính thức sẽ chuyển
-              sang streaming / WebSocket.
+              Gợi ý luôn có thể cải thiện nếu bạn mô tả thêm về mood hoặc thể loại.
             </p>
           </div>
         </div>

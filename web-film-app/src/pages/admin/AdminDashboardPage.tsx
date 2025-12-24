@@ -11,7 +11,7 @@ export function AdminDashboardPage() {
     <div className="space-y-10">
       <PageHeader
         title="Trung tâm quản trị"
-        description="Giám sát dữ liệu phim, người dùng và hiệu suất AI. Số liệu lấy từ API admin."
+        description="Giám sát dữ liệu phim, người dùng và hiệu suất AI."
         actions={
           <div className="flex gap-3">
             <Link
@@ -31,6 +31,12 @@ export function AdminDashboardPage() {
               className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
             >
               Xem thống kê
+            </Link>
+            <Link
+              to="/admin/users"
+              className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
+            >
+              DS Users
             </Link>
           </div>
         }
@@ -52,34 +58,6 @@ export function AdminDashboardPage() {
           </div>
         ))}
       </section>
-
-      {/* <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-          <p className="text-sm font-semibold text-white">Luồng công việc</p>
-          <div className="mt-4 space-y-4 text-xs text-slate-300">
-            <div className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Thêm phim → Up poster → Chờ duyệt → Xuất hiện trên trang chủ.
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Báo cáo nội dung → Admin kiểm tra → Khoá tạm thời → Phản hồi user.
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-dark/60 p-4">
-              • Rating bất thường → Gửi sang nhóm Data để rà spam.
-            </div>
-          </div>
-        </div>
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-          <p className="text-sm font-semibold text-white">Ghi chú triển khai</p>
-          <p className="mt-3 text-xs text-slate-300">
-            Kết nối API admin (NestJS) với auth phân quyền. Cần middleware kiểm
-            tra role trước khi truy cập các route `/admin/*`.
-          </p>
-          <p className="mt-3 text-xs text-slate-400">
-            Dữ liệu biểu đồ sẽ lấy từ service thống kê (chạy nightly). Hiện tại
-            hiển thị placeholder để kiểm thử UI.
-          </p>
-        </div>
-      </section> */}
 
       {data?.topMoods?.length ? (
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">

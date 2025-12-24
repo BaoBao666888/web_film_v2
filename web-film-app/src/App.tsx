@@ -11,6 +11,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { LogoutPage } from "./pages/LogoutPage";
 import { WatchPage } from "./pages/WatchPage";
+import { InboxPage } from "./pages/InboxPage";
 import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
 import { AdminAddMoviePage } from "./pages/admin/AdminAddMoviePage";
 import { AdminManagePage } from "./pages/admin/AdminManagePage";
@@ -50,6 +51,7 @@ function App() {
         <Route path="movie/:id" element={<MovieDetailPage />} />
         <Route path="recommend" element={<RecommendPage />} />
         <Route path="chat" element={<ChatPage />} />
+        <Route path="inbox" element={<InboxPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />

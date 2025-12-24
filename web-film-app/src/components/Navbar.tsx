@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { api } from "../lib/api";
 
 const linkBaseClasses =
   "px-3 py-2 text-sm font-medium transition-colors duration-200 hover:text-primary";
@@ -18,6 +19,7 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
@@ -50,6 +52,50 @@ export function Navbar() {
     setMenuOpen(false);
     setUserMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let active = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const loadUnread = async () => {
+      try {
+        const result = await api.notifications.unreadCount();
+        if (active) {
+          setUnreadCount(result.count || 0);
+        }
+      } catch {
+        if (active) {
+          setUnreadCount(0);
+        }
+      }
+    };
+
+    const handleFocus = () => {
+      void loadUnread();
+    };
+
+    const handleInboxRead = () => {
+      setUnreadCount(0);
+      void loadUnread();
+    };
+
+    void loadUnread();
+    timer = setInterval(loadUnread, 15000);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("inbox:read", handleInboxRead as EventListener);
+
+    return () => {
+      active = false;
+      if (timer) clearInterval(timer);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("inbox:read", handleInboxRead as EventListener);
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     return () => {
@@ -98,6 +144,17 @@ export function Navbar() {
       </div>
     )
   );
+
+  const renderUnreadBadge = (sizeClasses: string) => {
+    if (!unreadCount) return null;
+    return (
+      <span
+        className={`absolute -right-1 -top-1 flex items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white ${sizeClasses}`}
+      >
+        {unreadCount > 99 ? "99+" : unreadCount}
+      </span>
+    );
+  };
 
   const renderNavLink = (item: NavItem, isMobile?: boolean) => (
     <NavLink
@@ -190,9 +247,10 @@ export function Navbar() {
                   aria-haspopup="menu"
                   aria-expanded={userMenuOpen}
                   onClick={() => setUserMenuOpen((open) => !open)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-primary hover:text-primary"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-primary hover:text-primary"
                 >
                   {renderAvatar("h-8 w-8")}
+                  {renderUnreadBadge("min-w-5")}
                 </button>
                 <div
                   onMouseEnter={() => isDesktop && openUserMenu()}
@@ -202,10 +260,17 @@ export function Navbar() {
                   }`}
                 >
                   <NavLink
-                    to="/chat"
+                    to="/inbox"
                     className="flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/10"
                   >
-                    Hộp thư
+                    <span className="flex items-center gap-2">
+                      Hộp thư
+                      {unreadCount > 0 && (
+                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-slate-400">→</span>
                   </NavLink>
                   <NavLink
@@ -258,11 +323,12 @@ export function Navbar() {
             aria-expanded={userMenuOpen}
             aria-label="Mở menu tài khoản"
             onClick={() => setUserMenuOpen((open) => !open)}
-            className={`h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
+            className={`relative h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
               isDesktop ? "hidden" : "flex"
             }`}
           >
             {renderAvatar("h-8 w-8")}
+            {renderUnreadBadge("min-w-5")}
           </button>
         )}
       </nav>
@@ -314,10 +380,17 @@ export function Navbar() {
           <div className="mx-auto max-w-7xl px-4 pb-4">
             <div className="space-y-2 rounded-2xl border border-white/10 bg-black/80 p-4 shadow-2xl shadow-black/40 backdrop-blur">
               <NavLink
-                to="/chat"
+                to="/inbox"
                 className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition hover:border-primary hover:text-primary"
               >
-                <span>Hộp thư</span>
+                <span className="flex items-center gap-2">
+                  Hộp thư
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </span>
                 <span className="text-xs text-slate-400">→</span>
               </NavLink>
               <NavLink
