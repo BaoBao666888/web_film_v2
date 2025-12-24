@@ -181,6 +181,12 @@ body {
   border-color: rgba(255, 107, 107, 0.35) !important;
 }
 
+.theme-light .chat-status {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  color: #047857 !important;
+}
+
 .theme-light .text-emerald-300 {
   color: #047857 !important;
 }

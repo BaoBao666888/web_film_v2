@@ -64,6 +64,13 @@ TOOL_MAX_STEPS = 9
 SESSION_MEMORY = {}
 SESSION_SUMMARY_MAX = 220
 SESSION_TURN_MAX = 180
+SUMMARY_KEYWORDS = [
+    "tóm tắt",
+    "nội dung tập",
+    "kể lại tập",
+    "tập này nói về gì",
+    "review tập",
+]
 
 def _get_llama():
     global _LLAMA_INSTANCE
@@ -191,6 +198,32 @@ def _normalize_session_id(value):
     if not value:
         return "anonymous"
     return value[:64]
+
+def _is_summary_request(text):
+    if not text:
+        return False
+    lower = text.lower()
+    return any(keyword in lower for keyword in SUMMARY_KEYWORDS)
+
+def _decide_summary_mode(text):
+    if not text:
+        return False
+    if LLM_PROVIDER != "llama_cpp":
+        return _is_summary_request(text)
+    prompt = f"""
+Hãy phân loại yêu cầu dưới đây.
+- Trả lời "summary" nếu người dùng muốn tóm tắt/kể lại nội dung.
+- Trả lời "detail" nếu không phải yêu cầu tóm tắt.
+Chỉ trả đúng một từ: summary hoặc detail.
+
+Yêu cầu: "{text}"
+""".strip()
+    decision = (_try_generate_text(prompt, "summary_decider") or "").strip().lower()
+    if "summary" in decision:
+        return True
+    if "detail" in decision:
+        return False
+    return _is_summary_request(text)
 
 def _get_session_context(session_id):
     state = SESSION_MEMORY.get(session_id)
@@ -532,35 +565,18 @@ TOOL_REGISTRY = {
 }
 
 TOOL_GUIDE = """
-1) find_movie_by_name
-- Mục đích: Tìm phim theo tên/slug, kể cả gõ thiếu hoặc sai chính tả nhẹ.
-- Args: { query: string, top_k?: number }
-- Trả về: { matches: [ { id, slug, title, year, type, score, link } ] }
-
-2) search_movies_by_text
-- Mục đích: Tìm phim theo mô tả tự nhiên (dựa trên embedding).
-- Args: { query: string, top_k?: number }
-- Trả về: { matches: [ { id, slug, title, year, type, synopsis, score, link } ] }
-
-3) search_movies_by_tags
-- Mục đích: Tìm phim theo thể loại/tags (vd: "Hài", "Tình cảm").
-- Args: { tags: string[] | string, top_k?: number, match_all?: boolean }
-- Trả về: { matches: [ { id, slug, title, year, type, synopsis, link } ], tags, match_all }
-
-4) get_movie_meta
-- Mục đích: Lấy thông tin phim mới nhất (metadata).
-- Args: { movie_id?: string, slug?: string, movie_code?: string }
-- Trả về: { movie: { id, slug, title, link, type, synopsis, year, duration, rating, tags, cast, director, country, seriesStatus, episodes_count } }
-
-5) search_video_vectors
-- Mục đích: Tìm cảnh/đoạn liên quan trong video theo câu hỏi.
-- Args: { query: string, movie_id?: string, slug?: string, movie_code?: string, episode?: number, top_k?: number }
-- Trả về: { movie: { id, slug, title, year, type, link }, matches: [ { start, episode, content, score } ] }
-
-6) get_full_transcript
-- Mục đích: Lấy toàn bộ transcript của 1 tập để tóm tắt.
-- Args: { movie_id?: string, slug?: string, movie_code?: string, episode?: number, max_chars?: number }
-- Trả về: { movie: { id, slug, title, year, type, link }, episode, content, truncated }
+1) find_movie_by_name: tìm phim theo tên/slug (chịu lỗi gõ).
+   Args: { query, top_k? }
+2) search_movies_by_text: tìm phim theo mô tả tự nhiên.
+   Args: { query, top_k? }
+3) search_movies_by_tags: tìm phim theo thể loại/tags.
+   Args: { tags, top_k?, match_all? }
+4) get_movie_meta: lấy thông tin tổng quan phim.
+   Args: { movie_id?, slug?, movie_code? }
+5) search_video_vectors: tìm đoạn liên quan trong video (có thể chỉ định tập).
+   Args: { query, movie_id?, slug?, movie_code?, episode?, top_k? }
+6) get_full_transcript: lấy toàn bộ transcript của 1 tập.
+   Args: { movie_id?, slug?, movie_code?, episode?, max_chars? }
 """.strip()
 
 def get_latest_episode(movie_id):
@@ -593,11 +609,74 @@ def get_full_transcript(movie_id, episode=None):
         
     return full_text
 
+def _split_text_chunks(text, max_chars=4800, max_chunks=6):
+    if not text:
+        return []
+    lines = [line for line in text.splitlines() if line.strip()]
+    chunks = []
+    current = []
+    size = 0
+    for line in lines:
+        extra = len(line) + 1
+        if size + extra > max_chars and current:
+            chunks.append("\n".join(current))
+            current = [line]
+            size = extra
+        else:
+            current.append(line)
+            size += extra
+    if current:
+        chunks.append("\n".join(current))
+    if max_chunks and len(chunks) > max_chunks:
+        head = chunks[: max_chunks - 1]
+        tail = chunks[-1]
+        chunks = head + [tail]
+    return chunks
+
+def _summarize_transcript_chunks(transcript, title, episode):
+    chunks = _split_text_chunks(transcript)
+    if not chunks:
+        return ""
+    summaries = []
+    total = len(chunks)
+    for idx, chunk in enumerate(chunks, 1):
+        prompt = f"""
+Bạn là trợ lý phim. Hãy tóm tắt ngắn gọn nội dung đoạn {idx}/{total} của tập {episode} phim "{title}" (2-3 câu),
+nêu diễn biến chính theo thứ tự, không bịa.
+
+Nội dung:
+{chunk}
+""".strip()
+        summary = (_try_generate_text(prompt, "summary_chunk") or "").strip()
+        if summary:
+            summaries.append(summary)
+    if not summaries:
+        return ""
+    if len(summaries) == 1:
+        return summaries[0]
+    merged = "\n".join(f"- {item}" for item in summaries)
+    final_prompt = f"""
+Dựa trên các tóm tắt từng đoạn của tập {episode} phim "{title}" dưới đây, hãy viết tóm tắt 6-8 câu,
+mạch lạc, theo thứ tự thời gian, không bịa.
+
+Tóm tắt từng đoạn:
+{merged}
+""".strip()
+    final = (_try_generate_text(final_prompt, "summary_merge") or "").strip()
+    return final if final else "\n".join(summaries)
+
 def _format_tool_history(tool_history, max_chars=12000):
     if not tool_history:
         return "[]"
     payload = json.dumps(tool_history, ensure_ascii=False)
     return _truncate_text(payload, max_chars=max_chars)
+
+def _tool_signature(action, args):
+    try:
+        payload = json.dumps(args or {}, ensure_ascii=False, sort_keys=True)
+    except TypeError:
+        payload = str(args)
+    return f"{action}:{payload}"
 
 def _build_agent_prompt(user_question, tool_history, current_slug=None, current_episode=None, detected_episode=None, session_context=None):
     tool_names = ", ".join(sorted(TOOL_REGISTRY.keys()))
@@ -661,7 +740,10 @@ def _ask_chatbot_agent(user_question, current_slug=None, current_episode=None, s
     session_id = _normalize_session_id(session_id)
     session_context = _get_session_context(session_id)
 
-    for _ in range(TOOL_MAX_STEPS):
+    max_steps = TOOL_MAX_STEPS
+    if LLM_PROVIDER == "llama_cpp":
+        max_steps = min(max_steps, 3)
+    for _ in range(max_steps):
         prompt = _build_agent_prompt(
             user_question,
             tool_history,
@@ -675,6 +757,7 @@ def _ask_chatbot_agent(user_question, current_slug=None, current_episode=None, s
         plan = _safe_json_load(response_text or "")
         if not plan:
             fallback_args = {"query": user_question, "top_k": 5}
+            print(f"[TOOL] search_movies_by_text args={fallback_args} (fallback_invalid_plan)")
             fallback_result = _tool_search_movies_by_text(**fallback_args)
             tool_history.append({
                 "action": "search_movies_by_text",
@@ -694,6 +777,7 @@ def _ask_chatbot_agent(user_question, current_slug=None, current_episode=None, s
         tool = TOOL_REGISTRY.get(action)
         if not tool:
             fallback_args = {"query": user_question, "top_k": 5}
+            print(f"[TOOL] search_movies_by_text args={fallback_args} (fallback_unknown_tool:{action})")
             fallback_result = _tool_search_movies_by_text(**fallback_args)
             tool_history.append({
                 "action": "search_movies_by_text",
@@ -704,6 +788,15 @@ def _ask_chatbot_agent(user_question, current_slug=None, current_episode=None, s
             break
 
         args = plan.get("args") or {}
+        if tool_history:
+            last = tool_history[-1]
+            if last.get("action") == action:
+                last_sig = _tool_signature(last.get("action"), last.get("args"))
+                next_sig = _tool_signature(action, args)
+                if last_sig == next_sig:
+                    print(f"[TOOL] stop repeated {action} args={args}")
+                    break
+        print(f"[TOOL] {action} args={args}")
         try:
             result = tool(**args)
         except TypeError:
@@ -773,8 +866,7 @@ def _ask_chatbot_legacy(user_question, current_slug=None, current_episode=None, 
     --- CÁC ĐOẠN CHI TIẾT TÌM THẤY TRONG VIDEO ---
     """
 
-    keywords_summary = ["tóm tắt", "nội dung tập", "kể lại tập", "tập này nói về gì", "review tập"]
-    is_summary_request = any(kw in user_question.lower() for kw in keywords_summary)
+    is_summary_request = _decide_summary_mode(user_question)
 
     context_text = ""
     detected_episode = current_episode if current_episode is not None else _detect_episode(user_question)
@@ -801,6 +893,11 @@ def _ask_chatbot_legacy(user_question, current_slug=None, current_episode=None, 
         ---------------------
         """
         
+        if LLM_PROVIDER == "llama_cpp":
+            summary = _summarize_transcript_chunks(full_transcript, meta_title, ep_to_summary)
+            if summary:
+                _update_session_memory(session_id, user_question, summary)
+                return summary
         system_instruction = "Bạn hãy đọc toàn bộ kịch bản trên và viết một đoạn tóm tắt nội dung đầy đủ, hấp dẫn, nêu bật các diễn biến chính (khoảng 6-8 câu)."
 
     else:

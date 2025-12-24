@@ -37,7 +37,7 @@ const markdownComponents: Components = {
     const className = "text-primary underline underline-offset-2";
     if (href && href.startsWith("/")) {
       return (
-        <Link to={href} className={className}>
+        <Link to={href} className={className} target="_blank" rel="noreferrer">
           {children}
         </Link>
       );
@@ -154,7 +154,7 @@ export function ChatPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] text-emerald-200">
+              <span className="chat-status rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] text-emerald-200">
                 Online
               </span>
               <button
