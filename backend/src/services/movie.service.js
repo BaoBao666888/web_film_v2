@@ -380,7 +380,31 @@ class MovieService {
       embedding_synced: false,
     };
 
-    return await insertMovie(newMovie);
+    // Handle duplicate ID with auto-increment
+    let finalMovie = newMovie;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      try {
+        return await insertMovie(finalMovie);
+      } catch (error) {
+        if (error.code === 11000 && attempts < maxAttempts - 1) {
+          // Duplicate key error, try with incremented ID
+          attempts++;
+          finalMovie = {
+            ...newMovie,
+            id: `${id}-${attempts + 1}`,
+            slug: `${newMovie.slug}-${attempts + 1}`,
+          };
+          console.log(`Duplicate ID detected, retrying with: ${finalMovie.id}`);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error("Failed to create movie after multiple attempts");
   }
 
   /**

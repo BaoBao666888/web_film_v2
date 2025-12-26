@@ -60,6 +60,7 @@ export function AdminAddMoviePage() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     let didLoad = false;
@@ -129,6 +130,21 @@ export function AdminAddMoviePage() {
       ...prev,
       episodes: prev.episodes.filter((_, idx) => idx !== index),
     }));
+  };
+
+  const handleFileUpload = async (
+    file: File,
+    field: "poster" | "thumbnail" | "videoUrl"
+  ) => {
+    setUploading(true);
+    try {
+      const url = await api.upload.single(file);
+      setForm((prev) => ({ ...prev, [field]: url }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Upload thất bại");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -383,39 +399,56 @@ export function AdminAddMoviePage() {
             <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
               Link poster <span className="text-red-400">*</span>
             </label>
-            <input
-              type="url"
-              value={form.poster}
-              onChange={(event) => updateField("poster", event.target.value)}
-              placeholder="https://..."
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
-            />
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
-              Link thumbnail <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="url"
-              value={form.thumbnail}
-              onChange={(event) => updateField("thumbnail", event.target.value)}
-              placeholder="https://.../thumbnail.jpg"
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
-            />
+            <div className="mt-2 flex gap-2">
+              <input
+                type="url"
+                value={form.poster}
+                onChange={(event) => updateField("poster", event.target.value)}
+                placeholder="https://..."
+                className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+              />
+              <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
+                {uploading ? "..." : "📁"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file, "poster");
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Link thumbnail
             </label>
-            <input
-              type="url"
-              value={form.thumbnail}
-              onChange={(event) => updateField("thumbnail", event.target.value)}
-              placeholder="https://..."
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
-            />
+            <div className="mt-2 flex gap-2">
+              <input
+                type="url"
+                value={form.thumbnail}
+                onChange={(event) =>
+                  updateField("thumbnail", event.target.value)
+                }
+                placeholder="https://..."
+                className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+              />
+              <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
+                {uploading ? "..." : "📁"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file, "thumbnail");
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </div>
 
@@ -439,14 +472,32 @@ export function AdminAddMoviePage() {
             <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
               Link phim (video) <span className="text-red-400">*</span>
             </label>
-            <input
-              type="url"
-              value={form.videoUrl}
-              onChange={(event) => updateField("videoUrl", event.target.value)}
-              placeholder="https://.../playlist.m3u8"
-              disabled={form.type === "series"}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 disabled:opacity-50"
-            />
+            <div className="mt-2 flex gap-2">
+              <input
+                type="url"
+                value={form.videoUrl}
+                onChange={(event) =>
+                  updateField("videoUrl", event.target.value)
+                }
+                placeholder="https://.../playlist.m3u8"
+                disabled={form.type === "series"}
+                className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 disabled:opacity-50"
+              />
+              {form.type !== "series" && (
+                <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
+                  {uploading ? "..." : "📁"}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, "videoUrl");
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-400">
@@ -597,7 +648,7 @@ export function AdminAddMoviePage() {
           </div>
         )}
 
-        <div>
+        {/* <div>
           <label className="text-xs uppercase tracking-wide text-slate-400">
             Headers (JSON) cho nguồn được bảo vệ
           </label>
@@ -615,7 +666,7 @@ export function AdminAddMoviePage() {
             https://goatembed.com/ + user-agent chuẩn). Điền JSON khi cần
             override riêng cho phim.
           </p>
-        </div>
+        </div> */}
 
         <button
           type="submit"

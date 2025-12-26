@@ -35,6 +35,21 @@ npm run dev    # nodemon, cổng 4000
 - `POST /api/ratings` – lưu đánh giá + sentiment sơ bộ.
 - `GET /api/admin/stats|users|movies` – dashboard quản trị (token admin).
 
+### Quản lý phim nâng cao
+- **Ẩn/hiện phim với lịch tự động**:
+  - `POST /api/admin/movies/:id/toggle-visibility` – Ẩn hoặc hiện phim
+  - Hỗ trợ set `unhideDate` để tự động mở lại phim vào thời gian định trước
+  - Job tự động chạy mỗi giờ kiểm tra và mở phim đã đến hạn
+  - Phim ẩn không xuất hiện trong API public (listMovies, getMovie, trending, etc.)
+
+- **Upload file từ máy**:
+  - `POST /api/upload/single` – Upload poster/thumbnail/video từ máy
+  - Giới hạn: 2GB/file
+  - Format hỗ trợ: JPG, PNG, WEBP, MP4, WEBM, MOV, AVI, MKV
+  - File lưu tại `/backend/uploads/` và serve qua `/uploads/:filename`
+
+- **Auto-handle duplicate ID**: Tự động thêm `-2`, `-3`... vào ID nếu trùng (thử tối đa 10 lần)
+
 ### Xem chung (watch-party)
 - Model `WatchParty` lưu phòng (host, participants, state phát, chat, quyền điều khiển/tải, private/public).
 - Router `/api/watch-party`:

@@ -42,4 +42,12 @@ router.post(
   asyncHandler((req, res) => adminController.sendNotifications(req, res))
 );
 
+// Toggle movie visibility
+router.post(
+  "/movies/:id/toggle-visibility",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.toggleMovieVisibility(req, res))
+);
+
 export default router;

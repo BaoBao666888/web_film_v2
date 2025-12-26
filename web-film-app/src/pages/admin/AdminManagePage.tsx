@@ -8,6 +8,7 @@ import { api } from "../../lib/api";
 type EpisodeInput = Episode & {
   videoUrl: string;
   videoType: Movie["videoType"];
+  clientId: string; // ✅ stable key for React
 };
 
 type FormState = {
@@ -32,18 +33,47 @@ type FormState = {
   seriesStatus: "" | "Còn tiếp" | "Hoàn thành" | "Tạm ngưng";
 };
 
-const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
+const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"] as const;
+
+function makeClientId() {
+  // works in modern browsers
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `cid_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+// Convert datetime-local string (YYYY-MM-DDTHH:mm) -> ISO string
+function toISOFromDateTimeLocal(value: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
+}
 
 export function AdminManagePage() {
   const [page, setPage] = useState(1);
   const limit = 12;
+
+  const [filterHidden, setFilterHidden] = useState<
+    "all" | "visible" | "hidden"
+  >("all");
+
   const { data, loading, error, refetch } = useFetch<AdminMoviesResponse>(
     `/admin/movies?page=${page}&limit=${limit}`,
     [page]
   );
+
   const movies = data?.movies ?? [];
   const meta = data?.meta;
+
+  const filteredMovies = movies.filter((movie) => {
+    if (filterHidden === "visible") return !movie.isHidden;
+    if (filterHidden === "hidden") return movie.isHidden;
+    return true;
+  });
+
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
+
   const [formData, setFormData] = useState<FormState>({
     title: "",
     synopsis: "",
@@ -65,36 +95,71 @@ export function AdminManagePage() {
     country: "",
     seriesStatus: "",
   });
+
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
+  const [hideDialogMovie, setHideDialogMovie] = useState<Movie | null>(null);
+  const [unhideDate, setUnhideDate] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    let didLoad = false;
     fetch("/countries.json")
       .then((res) => res.json())
       .then((list: Array<{ name?: string } | string>) => {
-        if (didLoad) return;
         const names = (list || [])
           .map((item) =>
-            typeof item === "string"
-              ? item.trim()
-              : (item?.name || "").trim()
+            typeof item === "string" ? item.trim() : (item?.name || "").trim()
           )
           .filter((name) => Boolean(name));
         setCountryOptions(Array.from(new Set(names)));
-        didLoad = true;
       })
       .catch(() => setCountryOptions([]));
-    return () => {
-      didLoad = true;
-    };
   }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Bạn chắc chắn muốn xoá phim này?")) return;
     await api.movies.delete(id);
     refetch();
+  };
+
+  const handleToggleVisibility = async (movie: Movie) => {
+    const nextHidden = !movie.isHidden;
+
+    // ✅ datetime-local -> ISO to reduce timezone parsing issues on backend
+    const isoUnhide = nextHidden ? toISOFromDateTimeLocal(unhideDate) : "";
+
+    try {
+      await api.admin.toggleMovieVisibility(
+        movie.id,
+        nextHidden,
+        nextHidden ? isoUnhide || undefined : undefined
+      );
+      setHideDialogMovie(null);
+      setUnhideDate("");
+      refetch();
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Không thể thay đổi trạng thái"
+      );
+    }
+  };
+
+  const handleFileUpload = async (
+    file: File,
+    field: "poster" | "thumbnail" | "videoUrl"
+  ) => {
+    // ✅ upload should NOT depend on editingMovie
+    setUploading(true);
+    try {
+      const url = await api.upload.single(file);
+      setFormData((prev) => ({ ...prev, [field]: url }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Upload thất bại");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const addEpisodeRow = () => {
@@ -105,6 +170,7 @@ export function AdminManagePage() {
         episodes: [
           ...(prev.episodes || []),
           {
+            clientId: makeClientId(),
             number: nextNumber,
             title: `Tập ${nextNumber}`,
             videoUrl: "",
@@ -126,10 +192,7 @@ export function AdminManagePage() {
       episodes: prev.episodes.map((ep, idx) => {
         if (idx !== index) return ep;
         if (key === "videoType") {
-          return {
-            ...ep,
-            videoType: (value || "hls") as Movie["videoType"],
-          };
+          return { ...ep, videoType: (value || "hls") as Movie["videoType"] };
         }
         return { ...ep, [key]: value ?? "" };
       }),
@@ -137,9 +200,12 @@ export function AdminManagePage() {
   };
 
   const removeEpisode = (index: number) => {
+    // ✅ re-number after remove
     setFormData((prev) => ({
       ...prev,
-      episodes: prev.episodes.filter((_, idx) => idx !== index),
+      episodes: prev.episodes
+        .filter((_, idx) => idx !== index)
+        .map((ep, i) => ({ ...ep, number: i + 1 })),
     }));
   };
 
@@ -158,11 +224,49 @@ export function AdminManagePage() {
         }
       />
 
+      <div className="mb-6 flex gap-3">
+        <button
+          onClick={() => setFilterHidden("all")}
+          className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+            filterHidden === "all"
+              ? "bg-primary text-dark"
+              : "border border-white/20 text-slate-300 hover:border-primary hover:text-primary"
+          }`}
+        >
+          Tất cả ({movies.length})
+        </button>
+        <button
+          onClick={() => setFilterHidden("visible")}
+          className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+            filterHidden === "visible"
+              ? "bg-primary text-dark"
+              : "border border-white/20 text-slate-300 hover:border-primary hover:text-primary"
+          }`}
+        >
+          Đang hiện ({movies.filter((m) => !m.isHidden).length})
+        </button>
+        <button
+          onClick={() => setFilterHidden("hidden")}
+          className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+            filterHidden === "hidden"
+              ? "bg-primary text-dark"
+              : "border border-white/20 text-slate-300 hover:border-primary hover:text-primary"
+          }`}
+        >
+          Bị ẩn ({movies.filter((m) => m.isHidden).length})
+        </button>
+      </div>
+
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-black/30">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 text-sm text-slate-300">
           <span>
             Trang {meta?.page ?? page} / {meta?.totalPages ?? "?"} •{" "}
             {meta?.totalItems ?? movies.length} phim
+            {filterHidden !== "all" && (
+              <span className="ml-2 text-xs text-slate-400">
+                (Hiển thị: {filteredMovies.length})
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -187,6 +291,7 @@ export function AdminManagePage() {
             </button>
           </div>
         </div>
+
         <table className="w-full border-collapse text-left text-sm text-slate-200">
           <thead className="bg-white/5 text-xs uppercase tracking-wide text-slate-400">
             <tr>
@@ -215,7 +320,22 @@ export function AdminManagePage() {
                 </td>
               </tr>
             )}
-            {movies.map((movie) => (
+            {!loading && !error && filteredMovies.length === 0 && (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-6 py-6 text-center text-slate-400"
+                >
+                  {filterHidden === "hidden"
+                    ? "Không có phim nào bị ẩn"
+                    : filterHidden === "visible"
+                    ? "Không có phim nào đang hiện"
+                    : "Không có phim nào"}
+                </td>
+              </tr>
+            )}
+
+            {filteredMovies.map((movie) => (
               <tr
                 key={movie.id}
                 className="border-t border-white/10 transition hover:bg-white/5"
@@ -228,13 +348,29 @@ export function AdminManagePage() {
                       className="h-16 w-12 rounded-xl object-cover"
                     />
                     <div>
-                      <p className="font-semibold text-white">{movie.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-white">
+                          {movie.title}
+                        </p>
+                        {movie.isHidden && (
+                          <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                            ẨN
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400">
                         ID: {movie.id.toUpperCase()}
                       </p>
+                      {movie.isHidden && movie.unhideDate && (
+                        <p className="text-[10px] text-slate-500">
+                          Mở lại:{" "}
+                          {new Date(movie.unhideDate).toLocaleString("vi-VN")}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </td>
+
                 <td className="px-6 py-4 text-xs text-slate-300">
                   <div className="space-y-1">
                     <p className="font-semibold text-white">
@@ -245,27 +381,42 @@ export function AdminManagePage() {
                     </p>
                   </div>
                 </td>
+
                 <td className="px-6 py-4 text-xs text-slate-300">
                   {movie.year}
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-300">
-                  {movie.rating?.toFixed(1)}
+                  {typeof movie.rating === "number"
+                    ? movie.rating.toFixed(1)
+                    : ""}
                 </td>
+
                 <td className="px-6 py-4 text-right text-xs">
+                  <button
+                    onClick={() => setHideDialogMovie(movie)}
+                    className="mr-2 rounded-full border border-orange-400/40 px-3 py-1 text-orange-300 hover:bg-orange-500/10"
+                  >
+                    {movie.isHidden ? "Hiện" : "Ẩn"}
+                  </button>
+
                   <button
                     onClick={() => {
                       setEditingMovie(movie);
                       setSubmitStatus(null);
+
                       setFormData({
                         title: movie.title ?? "",
                         synopsis: movie.synopsis ?? "",
                         year: String(movie.year ?? ""),
                         duration: movie.duration ?? "",
-                        rating: movie.rating ? String(movie.rating) : "",
+                        rating:
+                          typeof movie.rating === "number"
+                            ? String(movie.rating)
+                            : "",
                         tags:
                           movie.tags
                             ?.filter(
-                              (tag) => !SERIES_STATUS_TAGS.includes(tag)
+                              (tag) => !SERIES_STATUS_TAGS.includes(tag as any)
                             )
                             .join(", ") ?? "",
                         moods: movie.moods?.join(", ") ?? "",
@@ -273,30 +424,31 @@ export function AdminManagePage() {
                         director: movie.director ?? "",
                         trailerUrl: movie.trailerUrl ?? "",
                         videoUrl: movie.videoUrl ?? "",
-                    videoType:
-                      (movie.videoType as Movie["videoType"]) ?? "hls",
-                    videoHeaders: movie.videoHeaders
-                      ? JSON.stringify(movie.videoHeaders, null, 2)
-                      : "",
-                    thumbnail: movie.thumbnail ?? "",
-                    poster: movie.poster ?? "",
-                    type: movie.type ?? "single",
-                    country: movie.country ?? "",
-                    seriesStatus:
-                      (movie.seriesStatus as FormState["seriesStatus"]) ??
-                      ((movie.tags ?? []).find((t) =>
-                        SERIES_STATUS_TAGS.includes(t)
-                      ) as FormState["seriesStatus"]) ??
-                      "",
-                    episodes:
-                      movie.episodes?.map((ep, idx) => ({
-                        number: ep.number ?? idx + 1,
-                        title: ep.title ?? `Tập ${idx + 1}`,
+                        videoType:
+                          (movie.videoType as Movie["videoType"]) ?? "hls",
+                        videoHeaders: movie.videoHeaders
+                          ? JSON.stringify(movie.videoHeaders, null, 2)
+                          : "",
+                        thumbnail: movie.thumbnail ?? "",
+                        poster: movie.poster ?? "",
+                        type: movie.type ?? "single",
+                        country: movie.country ?? "",
+                        seriesStatus:
+                          (movie.seriesStatus as FormState["seriesStatus"]) ??
+                          ((movie.tags ?? []).find((t) =>
+                            SERIES_STATUS_TAGS.includes(t as any)
+                          ) as FormState["seriesStatus"]) ??
+                          "",
+                        episodes:
+                          movie.episodes?.map((ep, idx) => ({
+                            clientId: makeClientId(),
+                            number: ep.number ?? idx + 1,
+                            title: ep.title ?? `Tập ${idx + 1}`,
                             videoUrl: ep.videoUrl ?? "",
                             videoType:
                               (ep.videoType as Movie["videoType"]) ??
-                              ((movie.videoType as Movie["videoType"]) ??
-                                "hls"),
+                              (movie.videoType as Movie["videoType"]) ??
+                              "hls",
                             duration: ep.duration ?? "",
                           })) ?? [],
                       });
@@ -305,6 +457,7 @@ export function AdminManagePage() {
                   >
                     Sửa
                   </button>
+
                   <button
                     onClick={() => handleDelete(movie.id)}
                     className="rounded-full border border-red-400/40 px-3 py-1 text-red-300 hover:bg-red-500/10"
@@ -323,6 +476,7 @@ export function AdminManagePage() {
         admin thật, cần thêm JWT & logs.
       </p>
 
+      {/* EDIT MODAL */}
       {editingMovie && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
           <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-dark/95 shadow-2xl shadow-black/60">
@@ -345,20 +499,24 @@ export function AdminManagePage() {
                 Đóng
               </button>
             </div>
+
             <form
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (!editingMovie) return;
+
                 setSubmitting(true);
                 setSubmitStatus(null);
+
                 let parsedHeaders: Record<string, string> = {};
                 try {
                   parsedHeaders = formData.videoHeaders
-                    ? (JSON.parse(
-                        formData.videoHeaders
-                      ) as Record<string, string>)
+                    ? (JSON.parse(formData.videoHeaders) as Record<
+                        string,
+                        string
+                      >)
                     : {};
-                } catch (err) {
+                } catch {
                   setSubmitStatus("Headers JSON không hợp lệ.");
                   setSubmitting(false);
                   return;
@@ -382,23 +540,49 @@ export function AdminManagePage() {
                       : [];
 
                   if (formData.type === "series" && episodes.length === 0) {
-                    setSubmitStatus("Phim bộ cần ít nhất 1 tập với link video.");
+                    setSubmitStatus(
+                      "Phim bộ cần ít nhất 1 tập với link video."
+                    );
                     setSubmitting(false);
                     return;
                   }
 
-                  const tagList = formData.tags
+                  // ✅ tags: remove status tags from manual input
+                  const baseTags = formData.tags
                     .split(",")
                     .map((tag) => tag.trim())
                     .filter(Boolean)
-                    .filter((tag) => !SERIES_STATUS_TAGS.includes(tag));
+                    .filter((tag) => !SERIES_STATUS_TAGS.includes(tag as any));
+
+                  // ✅ add seriesStatus into tags for series (as UI says)
+                  const tagList = [
+                    ...baseTags,
+                    ...(formData.type === "series" && formData.seriesStatus
+                      ? [formData.seriesStatus]
+                      : []),
+                  ];
+
+                  // ✅ year/rating no "||" bug when 0
+                  const yearValue =
+                    formData.year === ""
+                      ? editingMovie.year
+                      : Number(formData.year);
+
+                  const ratingValue =
+                    formData.rating === ""
+                      ? editingMovie.rating
+                      : Number(formData.rating);
 
                   await api.movies.update(editingMovie.id, {
                     title: formData.title,
                     synopsis: formData.synopsis,
-                    year: Number(formData.year) || editingMovie.year,
+                    year: Number.isFinite(yearValue as any)
+                      ? yearValue
+                      : editingMovie.year,
                     duration: formData.duration,
-                    rating: Number(formData.rating) || editingMovie.rating,
+                    rating: Number.isFinite(ratingValue as any)
+                      ? ratingValue
+                      : editingMovie.rating,
                     tags: tagList,
                     moods: formData.moods
                       .split(",")
@@ -418,11 +602,10 @@ export function AdminManagePage() {
                     type: formData.type,
                     country: formData.country,
                     seriesStatus:
-                      formData.type === "series"
-                        ? formData.seriesStatus
-                        : "",
+                      formData.type === "series" ? formData.seriesStatus : "",
                     episodes,
                   });
+
                   setSubmitStatus("✔ Đã cập nhật phim thành công.");
                   setEditingMovie(null);
                   refetch();
@@ -454,6 +637,7 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
+
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Đạo diễn
@@ -505,6 +689,7 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
+
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Thời lượng
@@ -520,6 +705,7 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
+
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Rating
@@ -574,6 +760,7 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
+
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Moods (cách nhau bởi dấu phẩy)
@@ -613,39 +800,68 @@ export function AdminManagePage() {
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Link poster
                   </label>
-                  <input
-                    value={formData.poster}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        poster: event.target.value,
-                      }))
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                  />
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={formData.poster}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          poster: event.target.value,
+                        }))
+                      }
+                      className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                    />
+                    <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
+                      {uploading ? "..." : "📁"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "poster");
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
+
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Link thumbnail
                   </label>
-                  <input
-                    value={formData.thumbnail}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        thumbnail: event.target.value,
-                      }))
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                  />
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={formData.thumbnail}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          thumbnail: event.target.value,
+                        }))
+                      }
+                      className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                    />
+                    <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
+                      {uploading ? "..." : "📁"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "thumbnail");
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
-                Trailer URL
-              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Trailer URL
+                  </label>
                   <input
                     value={formData.trailerUrl}
                     onChange={(event) =>
@@ -657,27 +873,45 @@ export function AdminManagePage() {
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                   />
                 </div>
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
-                Video URL
-              </label>
-              <input
-                value={formData.videoUrl}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    videoUrl: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                disabled={formData.type === "series"}
-                placeholder={
-                  formData.type === "series"
-                    ? "Phim bộ: điền link ở từng tập"
-                    : ""
-                }
-              />
-            </div>
+
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Video URL
+                  </label>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={formData.videoUrl}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          videoUrl: event.target.value,
+                        }))
+                      }
+                      className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                      disabled={formData.type === "series"}
+                      placeholder={
+                        formData.type === "series"
+                          ? "Phim bộ: điền link ở từng tập"
+                          : ""
+                      }
+                    />
+                    {formData.type !== "series" && (
+                      <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
+                        {uploading ? "..." : "📁"}
+                        <input
+                          type="file"
+                          accept="video/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(file, "videoUrl");
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Định dạng nguồn
@@ -709,8 +943,8 @@ export function AdminManagePage() {
                       onChange={(event) =>
                         setFormData((prev) => ({
                           ...prev,
-                          seriesStatus:
-                            event.target.value as FormState["seriesStatus"],
+                          seriesStatus: event.target
+                            .value as FormState["seriesStatus"],
                         }))
                       }
                       className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
@@ -752,7 +986,7 @@ export function AdminManagePage() {
                   <div className="space-y-3">
                     {formData.episodes.map((ep, index) => (
                       <div
-                        key={`edit-ep-${ep.number}-${index}`}
+                        key={ep.clientId} // ✅ stable
                         className="grid gap-3 rounded-xl border border-white/10 bg-dark/60 p-3 md:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_auto]"
                       >
                         <div>
@@ -762,12 +996,17 @@ export function AdminManagePage() {
                           <input
                             value={ep.title}
                             onChange={(event) =>
-                              updateEpisodeField(index, "title", event.target.value)
+                              updateEpisodeField(
+                                index,
+                                "title",
+                                event.target.value
+                              )
                             }
                             placeholder={`Tập ${ep.number || index + 1}`}
                             className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
                           />
                         </div>
+
                         <div>
                           <label className="text-[11px] uppercase tracking-wide text-slate-500">
                             Link video
@@ -775,12 +1014,17 @@ export function AdminManagePage() {
                           <input
                             value={ep.videoUrl}
                             onChange={(event) =>
-                              updateEpisodeField(index, "videoUrl", event.target.value)
+                              updateEpisodeField(
+                                index,
+                                "videoUrl",
+                                event.target.value
+                              )
                             }
                             placeholder="https://..."
                             className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
                           />
                         </div>
+
                         <div>
                           <label className="text-[11px] uppercase tracking-wide text-slate-500">
                             Thời lượng
@@ -788,18 +1032,23 @@ export function AdminManagePage() {
                           <input
                             value={ep.duration ?? ""}
                             onChange={(event) =>
-                              updateEpisodeField(index, "duration", event.target.value)
+                              updateEpisodeField(
+                                index,
+                                "duration",
+                                event.target.value
+                              )
                             }
                             placeholder="45m"
                             className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
                           />
                         </div>
+
                         <div>
                           <label className="text-[11px] uppercase tracking-wide text-slate-500">
                             Định dạng
                           </label>
-                    <select
-                      value={ep.videoType || formData.videoType || "hls"}
+                          <select
+                            value={ep.videoType || formData.videoType || "hls"}
                             onChange={(event) =>
                               updateEpisodeField(
                                 index,
@@ -813,6 +1062,7 @@ export function AdminManagePage() {
                             <option value="mp4">MP4</option>
                           </select>
                         </div>
+
                         <div className="flex items-end justify-end">
                           <button
                             type="button"
@@ -852,28 +1102,6 @@ export function AdminManagePage() {
                 </datalist>
               </div>
 
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-400">
-                  Headers (JSON) để vượt qua Referer/Origin
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.videoHeaders}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      videoHeaders: event.target.value,
-                    }))
-                  }
-                  placeholder='{"Referer":"https://rophim.net/"}'
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                />
-                <p className="mt-2 text-xs text-slate-500">
-                  Copy trực tiếp headers lấy từ note Rophim hoặc các tool khác
-                  để player phía client có thể gọi qua proxy bảo mật.
-                </p>
-              </div>
-
               <button
                 type="submit"
                 disabled={submitting}
@@ -881,6 +1109,7 @@ export function AdminManagePage() {
               >
                 {submitting ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
+
               {submitStatus && (
                 <p
                   className={`text-sm ${
@@ -893,6 +1122,74 @@ export function AdminManagePage() {
                 </p>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* HIDE / UNHIDE DIALOG */}
+      {hideDialogMovie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white">
+              {hideDialogMovie.isHidden ? "Hiện phim" : "Ẩn phim"}
+            </h3>
+            <p className="mt-2 text-sm text-slate-400">
+              {hideDialogMovie.isHidden
+                ? `Phim "${hideDialogMovie.title}" sẽ hiện lại ngay lập tức và người dùng có thể xem được.`
+                : `Phim "${hideDialogMovie.title}" sẽ bị ẩn khỏi danh sách công khai.`}
+            </p>
+
+            {!hideDialogMovie.isHidden && (
+              <div className="mt-4">
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Ngày mở lại (tùy chọn)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={unhideDate}
+                  onChange={(e) => setUnhideDate(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Nếu để trống, phim sẽ ẩn vô thời hạn cho đến khi bạn thủ công
+                  bật lại.
+                </p>
+              </div>
+            )}
+
+            {hideDialogMovie.isHidden && hideDialogMovie.unhideDate && (
+              <div className="mt-4 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-3">
+                <p className="text-xs text-yellow-300">
+                  ℹ️ Phim này đã được lên lịch mở lại tự động vào:{" "}
+                  <strong>
+                    {new Date(hideDialogMovie.unhideDate).toLocaleString(
+                      "vi-VN"
+                    )}
+                  </strong>
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Bấm "Xác nhận" để hủy lịch và hiện phim ngay bây giờ.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => {
+                  setHideDialogMovie(null);
+                  setUnhideDate("");
+                }}
+                className="flex-1 rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => handleToggleVisibility(hideDialogMovie)}
+                className="flex-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark hover:bg-primary/90"
+              >
+                Xác nhận
+              </button>
+            </div>
           </div>
         </div>
       )}

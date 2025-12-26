@@ -16,8 +16,15 @@ import { connectDB } from "./config/mongo.js";
 import historyRouter from "./routes/history.js";
 import hlsRouter from "./routes/hls.js";
 import watchPartyRouter from "./routes/watchParty.js";
+import uploadRouter from "./routes/upload.js";
 import { registerWatchPartySocket } from "./socket/watchParty.js";
+import { startUnhideMoviesJob } from "./jobs/unhideMovies.js";
+import path from "path";
+import { fileURLToPath } from "url";
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -50,6 +57,8 @@ app.use("/api", feedbackRouter);
 app.use("/api/history", historyRouter);
 app.use("/api/hls", hlsRouter);
 app.use("/api/watch-party", watchPartyRouter);
+app.use("/api/upload", uploadRouter);
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use((req, res) => {
   res.status(404).json({ message: `Không tìm thấy route ${req.path}` });
 });
@@ -57,6 +66,7 @@ app.use((req, res) => {
 const start = async () => {
   await connectDB();
   registerWatchPartySocket(io);
+  startUnhideMoviesJob();
   server.listen(PORT, () => {
     console.log(`Lumi AI backend đang chạy tại http://localhost:${PORT}`);
   });

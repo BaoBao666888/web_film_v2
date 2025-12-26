@@ -54,6 +54,15 @@ const MovieSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isHidden: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    unhideDate: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

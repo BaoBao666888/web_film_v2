@@ -23,6 +23,8 @@ export interface Movie extends MovieSummary {
   episodes?: Episode[];
   country?: string;
   seriesStatus?: "Còn tiếp" | "Hoàn thành" | "Tạm ngưng" | "";
+  isHidden?: boolean;
+  unhideDate?: string;
 }
 
 export interface Episode {

@@ -38,8 +38,14 @@ const hydrateMovies = async (stats) => {
 
 // Movies
 
-export const listMovies = async ({ q, mood, tag, limit = 12, page = 1 } = {}) => {
-  const query = {};
+export const listMovies = async ({
+  q,
+  mood,
+  tag,
+  limit = 12,
+  page = 1,
+} = {}) => {
+  const query = { isHidden: { $ne: true } };
 
   if (q) {
     query.$or = [
@@ -60,20 +66,20 @@ export const listMovies = async ({ q, mood, tag, limit = 12, page = 1 } = {}) =>
   const sanitizedPage = Math.max(Number(page) || 1, 1);
   const skip = (sanitizedPage - 1) * sanitizedLimit;
 
-  return Movie.find(query)
-    .skip(skip)
-    .limit(sanitizedLimit)
-    .lean();
+  return Movie.find(query).skip(skip).limit(sanitizedLimit).lean();
 };
 
 export const getMovie = async (idOrSlug) => {
   return Movie.findOne({
     $or: [{ id: idOrSlug }, { slug: idOrSlug }],
+    isHidden: { $ne: true },
   }).lean();
 };
 
 export const getRandomMovies = async ({ excludeId, limit = 4 } = {}) => {
-  const match = excludeId ? { id: { $ne: excludeId } } : {};
+  const match = excludeId
+    ? { id: { $ne: excludeId }, isHidden: { $ne: true } }
+    : { isHidden: { $ne: true } };
   const count = await Movie.countDocuments(match);
   const skip = Math.max(
     0,
@@ -295,10 +301,7 @@ export const listWatchHistory = async (
   const sanitizedLimit = clampNumber(limit, 20, { min: 1, max: 50 });
   const sanitizedPage = Math.max(Number(page) || 1, 1);
   const startIndex = (sanitizedPage - 1) * sanitizedLimit;
-  const pagedItems = uniqueItems.slice(
-    startIndex,
-    startIndex + sanitizedLimit
-  );
+  const pagedItems = uniqueItems.slice(startIndex, startIndex + sanitizedLimit);
 
   const movieIds = [
     ...new Set(pagedItems.map((i) => i.movie_id).filter(Boolean)),
@@ -306,10 +309,7 @@ export const listWatchHistory = async (
   const objectIds = movieIds
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
-  const movieQuery = [
-    { id: { $in: movieIds } },
-    { slug: { $in: movieIds } },
-  ];
+  const movieQuery = [{ id: { $in: movieIds } }, { slug: { $in: movieIds } }];
   if (objectIds.length > 0) {
     movieQuery.push({ _id: { $in: objectIds } });
   }
@@ -546,12 +546,12 @@ export const listNewestMovies = async ({ limit = 6, page = 1 } = {}) => {
   const skip = (sanitizedPage - 1) * sanitizedLimit;
 
   const [items, totalItems] = await Promise.all([
-    Movie.find()
+    Movie.find({ isHidden: { $ne: true } })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(sanitizedLimit)
       .lean(),
-    Movie.countDocuments(),
+    Movie.countDocuments({ isHidden: { $ne: true } }),
   ]);
 
   return {
