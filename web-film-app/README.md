@@ -41,8 +41,8 @@ npm run preview
 - Form đánh giá gửi đến `/api/ratings`.
 - Đăng ký/đăng nhập lấy JWT, lưu token & user vào localStorage. Navbar/Profile phản ánh trạng thái đăng nhập.
 - Admin Dashboard và Admin Manage gọi các endpoint `/api/admin/*` (yêu cầu token admin).
-- Trang “Quản lý phim” có thể thêm, xóa và **sửa phim qua modal** (gọi `PUT /api/movies/:id`).
-
+- Trang “Quản lý phim” có thể thêm, xóa và **sửa phim qua modal** (gọi `PUT /api/movies/:id`).- **Tính năng ẩn phim**: Admin có thể ẩn phim tạm thời hoặc đặt lịch tự động mở lại
+- **Upload file**: Hỗ trợ upload poster, thumbnail và video từ máy (không cần link URL)
 ### Xem chung (watch-party)
 - Tab “Xem chung” trên navbar: danh sách phòng public từ `/api/watch-party/public` + modal hướng dẫn tạo phòng.
 - Nút “Xem chung” dưới player trang xem phim: mở form tạo phòng (public/private, cho phép điều khiển, cho phép tải, auto-start).

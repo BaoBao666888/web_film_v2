@@ -28,9 +28,12 @@ import type {
 
 const envApi = import.meta.env.VITE_API_BASE_URL;
 const originApi =
-  typeof window !== "undefined" ? `${window.location.origin.replace(/\/$/, "")}/api` : "http://localhost:4000/api";
+  typeof window !== "undefined"
+    ? `${window.location.origin.replace(/\/$/, "")}/api`
+    : "http://localhost:4000/api";
 
-export const API_BASE_URL = envApi && String(envApi).trim().length ? envApi : originApi;
+export const API_BASE_URL =
+  envApi && String(envApi).trim().length ? envApi : originApi;
 
 const API_ROOT_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
@@ -103,7 +106,9 @@ export const api = {
     detail: (id: string) => apiFetch<MovieDetailResponse>(`/movies/${id}`),
     watch: (id: string, episode?: number) =>
       apiFetch<WatchResponse>(
-        `/movies/${id}/watch${episode ? `?ep=${encodeURIComponent(String(episode))}` : ""}`
+        `/movies/${id}/watch${
+          episode ? `?ep=${encodeURIComponent(String(episode))}` : ""
+        }`
       ),
     create: (payload: Partial<Movie> & { title: string }) =>
       apiFetch<{ movie: Movie }>(`/movies`, {
@@ -169,7 +174,10 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    addView: (movieId: string, payload: { viewerId?: string; episode?: number }) =>
+    addView: (
+      movieId: string,
+      payload: { viewerId?: string; episode?: number }
+    ) =>
       apiFetch<{ success: boolean }>(`/movies/${movieId}/view`, {
         method: "POST",
         body: JSON.stringify(payload),
@@ -251,10 +259,46 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    toggleMovieVisibility: (
+      movieId: string,
+      isHidden: boolean,
+      unhideDate?: string
+    ) =>
+      apiFetch<{ message: string; movie: Movie }>(
+        `/admin/movies/${movieId}/toggle-visibility`,
+        {
+          method: "POST",
+          body: JSON.stringify({ isHidden, unhideDate }),
+        }
+      ),
+  },
+  upload: {
+    single: async (file: File) => {
+      const token = localStorage.getItem("authToken");
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`${API_BASE_URL}/upload/single`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.message || "Upload failed");
+      }
+
+      const result = await response.json();
+      return result.fullUrl as string;
+    },
   },
   notifications: {
     list: () => apiFetch<InboxResponse>(`/notifications`),
-    unreadCount: () => apiFetch<InboxUnreadCountResponse>(`/notifications/unread-count`),
+    unreadCount: () =>
+      apiFetch<InboxUnreadCountResponse>(`/notifications/unread-count`),
     markRead: () =>
       apiFetch<InboxMarkReadResponse>(`/notifications/mark-read`, {
         method: "POST",
@@ -273,15 +317,19 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ movieId }),
       }),
-    update: (payload: { movieId: string; episode?: number; position?: number }) =>
+    update: (payload: {
+      movieId: string;
+      episode?: number;
+      position?: number;
+    }) =>
       apiFetch(`/history/update`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
     resume: (movieId: string) =>
-      apiFetch<{ item: { movieId: string; episode?: number; position?: number } | null }>(
-        `/history/resume?movieId=${encodeURIComponent(movieId)}`
-      ),
+      apiFetch<{
+        item: { movieId: string; episode?: number; position?: number } | null;
+      }>(`/history/resume?movieId=${encodeURIComponent(movieId)}`),
     remove: (historyId: string) =>
       apiFetch(`/history/${historyId}`, {
         method: "DELETE",

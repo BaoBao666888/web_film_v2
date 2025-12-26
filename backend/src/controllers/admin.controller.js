@@ -81,6 +81,39 @@ class AdminController {
       res.status(500).json({ message: "Lỗi khi gửi thông báo" });
     }
   }
+
+  /**
+   * Toggle movie visibility
+   * POST /admin/movies/:id/toggle-visibility
+   */
+  async toggleMovieVisibility(req, res) {
+    try {
+      const { id } = req.params;
+      const { isHidden, unhideDate } = req.body;
+
+      const movie = await adminService.toggleMovieVisibility(
+        id,
+        isHidden,
+        unhideDate
+      );
+
+      res.json({
+        message: isHidden ? "Đã ẩn phim" : "Đã hiện phim",
+        movie: {
+          id: movie.id,
+          title: movie.title,
+          isHidden: movie.isHidden,
+          unhideDate: movie.unhideDate,
+        },
+      });
+    } catch (error) {
+      console.error("Error toggling movie visibility:", error);
+      if (error.message === "Movie not found") {
+        return res.status(404).json({ message: "Không tìm thấy phim" });
+      }
+      res.status(500).json({ message: "Lỗi khi thay đổi trạng thái phim" });
+    }
+  }
 }
 
 export default new AdminController();

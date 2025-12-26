@@ -39,7 +39,7 @@ class AdminService {
     const { page = 1, limit = 20, q } = params;
     const sanitizedPage = Math.max(Number(page) || 1, 1);
     const sanitizedLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
-    const query = { page: sanitizedPage, limit: sanitizedLimit, q };
+    const skip = (sanitizedPage - 1) * sanitizedLimit;
 
     const mongoQuery = q
       ? {
@@ -50,8 +50,9 @@ class AdminService {
         }
       : {};
 
+    // ✅ Admin can see ALL movies including hidden ones
     const [movies, totalItems] = await Promise.all([
-      listMovies(query),
+      Movie.find(mongoQuery).skip(skip).limit(sanitizedLimit).lean(),
       Movie.countDocuments(mongoQuery),
     ]);
 
@@ -66,6 +67,22 @@ class AdminService {
           : 1,
       },
     };
+  }
+
+  /**
+   * Toggle movie visibility (hide/unhide)
+   */
+  async toggleMovieVisibility(movieId, isHidden, unhideDate = null) {
+    const movie = await Movie.findOne({ id: movieId });
+    if (!movie) {
+      throw new Error("Movie not found");
+    }
+
+    movie.isHidden = isHidden;
+    movie.unhideDate = isHidden && unhideDate ? new Date(unhideDate) : null;
+    await movie.save();
+
+    return movie;
   }
 }
 
