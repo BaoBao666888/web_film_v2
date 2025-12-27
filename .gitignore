@@ -9,8 +9,5 @@ dist/
 __pycache__/
 .venv/
 *.gguf
-ai/chatbot/data/
-ai/comment/data/
-ai/recommend/data/
-ai/search/data/
-ai/search/models/
+ai/*/data/
+ai/*/models/

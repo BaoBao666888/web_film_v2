@@ -9,3 +9,11 @@ flask-cors
 importlib-metadata
 llama-cpp-python
 python-dotenv
+pandas
+numpy
+scikit-learn
+scipy
+joblib
+fastapi
+uvicorn
+accelerate>=0.26.0

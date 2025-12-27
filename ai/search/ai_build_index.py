@@ -24,7 +24,7 @@ def main():
   base_dir = os.path.dirname(os.path.abspath(__file__))
 
   # CSV phim
-  movies_csv = os.path.join(base_dir, "data", "movies.csv")
+  movies_csv = os.path.join(base_dir, "data", "movies_new.csv")
   print(f"🔹 Load danh sách phim từ: {movies_csv}")
   df = pd.read_csv(movies_csv)
 

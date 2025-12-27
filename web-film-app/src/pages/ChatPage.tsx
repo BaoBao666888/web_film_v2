@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { chatbotExamples } from "../data/movies";
 import { PageHeader } from "../components/PageHeader";
 import { api } from "../lib/api";
 import type { ChatSuggestion } from "../types/api";
@@ -14,12 +13,7 @@ type ConversationMessage = {
   text: string;
 };
 
-const initialMessages: ConversationMessage[] = chatbotExamples.flatMap(
-  (example) => [
-    { role: "user", text: example.user },
-    { role: "assistant", text: example.ai },
-  ]
-);
+const initialMessages: ConversationMessage[] = [];
 
 const MOVIE_LINK_REGEX = /(^|[\s(])(\/movie\/[a-z0-9-]+)(?=\s|[).,!?]|$)/gi;
 
@@ -100,7 +94,7 @@ export function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const handleReset = () => {
-    setMessages(initialMessages);
+    setMessages([]);
     setSuggestions([]);
     setError(null);
   };
@@ -167,6 +161,16 @@ export function ChatPage() {
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+            {messages.length === 0 && (
+              <div className="rounded-2xl border border-white/10 bg-dark/50 p-6 text-sm text-slate-300">
+                <p className="text-base font-semibold text-white">
+                  Lumi luôn sẵn sàng gợi ý phim đúng mood.
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Hỏi về thể loại, cảm xúc, diễn viên hoặc nhờ tóm tắt tập phim để bắt đầu.
+                </p>
+              </div>
+            )}
             {messages.map((message, index) => {
               const displayText =
                 message.role === "assistant"

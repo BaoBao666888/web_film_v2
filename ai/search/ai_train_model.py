@@ -1,11 +1,12 @@
 import os
 import pandas as pd
 from sentence_transformers import SentenceTransformer, InputExample, losses
+import torch
 from torch.utils.data import DataLoader
 
 def load_train_data():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, "data", "train_pairs.csv")
+    csv_path = os.path.join(base_dir, "data", "train_pairs_new.csv")
 
     print(f"🔹 Đọc file train từ: {csv_path}")
 
@@ -23,7 +24,12 @@ def main():
     print("🔹 Load train data...")
     train_examples = load_train_data()
 
-    train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=8)
+    train_dataloader = DataLoader(
+        train_examples,
+        shuffle=True,
+        batch_size=8,
+        pin_memory=torch.cuda.is_available(),
+    )
     train_loss = losses.CosineSimilarityLoss(model)
 
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "movie_semantic_vi")

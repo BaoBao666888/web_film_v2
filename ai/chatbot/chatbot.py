@@ -25,6 +25,7 @@ movies_col = db["movies"]
 movie_embeddings_col = db["movie_embeddings"]
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# GEMINI_API_KEY = "AIzaSyDQc-uamu1BDViYtkSstuaxQg5CQzz3Yo0"
 genai.configure(api_key=GEMINI_API_KEY)
 
 print("⏳ Đang load Model Embedding...")
@@ -276,6 +277,13 @@ def _resolve_movie(movie_id=None, slug=None, movie_code=None):
             movie = movies_col.find_one({"_id": obj_id})
             if movie:
                 return movie
+        # Nếu movie_id không phải ObjectId thì thử coi như slug hoặc id.
+        movie = movies_col.find_one({"slug": str(movie_id)})
+        if movie:
+            return movie
+        movie = movies_col.find_one({"id": str(movie_id)})
+        if movie:
+            return movie
     if slug:
         movie = movies_col.find_one({"slug": slug})
         if movie:
@@ -577,6 +585,10 @@ TOOL_GUIDE = """
    Args: { query, movie_id?, slug?, movie_code?, episode?, top_k? }
 6) get_full_transcript: lấy toàn bộ transcript của 1 tập.
    Args: { movie_id?, slug?, movie_code?, episode?, max_chars? }
+
+Gợi ý:
+- Nếu user muốn tóm tắt tập, hãy xác định đúng phim/tập trước (find_movie_by_name hoặc search_movies_by_text),
+  sau đó gọi get_full_transcript với episode, rồi mới trả lời.
 """.strip()
 
 def get_latest_episode(movie_id):
@@ -699,6 +711,7 @@ Luật:
 - Khi gọi tool, luôn kèm args.
 - Không bịa dữ liệu; chỉ dùng dữ liệu tool trả về.
 - Nếu chưa đủ thông tin, hỏi lại người dùng trong "final".
+- Nếu câu hỏi là tóm tắt tập, ưu tiên: xác định đúng phim/tập -> get_full_transcript -> final.
 
 Tool list:
 {TOOL_GUIDE}
@@ -756,6 +769,9 @@ def _ask_chatbot_agent(user_question, current_slug=None, current_episode=None, s
 
         plan = _safe_json_load(response_text or "")
         if not plan:
+            if tool_history:
+                print("[TOOL] stop planning: invalid plan, keep current tool history")
+                break
             fallback_args = {"query": user_question, "top_k": 5}
             print(f"[TOOL] search_movies_by_text args={fallback_args} (fallback_invalid_plan)")
             fallback_result = _tool_search_movies_by_text(**fallback_args)
@@ -818,6 +834,9 @@ def _ask_chatbot_agent(user_question, current_slug=None, current_episode=None, s
                     LAST_USER_QUESTION = user_question
 
         tool_history.append({"action": action, "args": args, "result": result})
+        if action == "get_full_transcript":
+            print("[TOOL] stop planning: got full transcript")
+            break
 
     try:
         final_prompt = _build_final_prompt(user_question, tool_history, session_context=session_context)
