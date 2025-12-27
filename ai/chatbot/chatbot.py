@@ -589,6 +589,8 @@ TOOL_GUIDE = """
 Gợi ý:
 - Nếu user muốn tóm tắt tập, hãy xác định đúng phim/tập trước (find_movie_by_name hoặc search_movies_by_text),
   sau đó gọi get_full_transcript với episode, rồi mới trả lời.
+- Nếu tìm theo tên/text không ra kết quả, có thể thử search_movies_by_text (embedding). Nếu vẫn không có,
+  trả lời không tìm thấy thay vì bịa phim.
 """.strip()
 
 def get_latest_episode(movie_id):
@@ -712,6 +714,7 @@ Luật:
 - Không bịa dữ liệu; chỉ dùng dữ liệu tool trả về.
 - Nếu chưa đủ thông tin, hỏi lại người dùng trong "final".
 - Nếu câu hỏi là tóm tắt tập, ưu tiên: xác định đúng phim/tập -> get_full_transcript -> final.
+- Nếu không tìm thấy phim qua text/embedding, trả lời không có kết quả và không bịa.
 
 Tool list:
 {TOOL_GUIDE}
