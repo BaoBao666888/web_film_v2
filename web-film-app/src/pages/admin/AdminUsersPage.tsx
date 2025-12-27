@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
+import { useAuth } from "../../hooks/useAuth";
 import type {
   AdminUsersResponse,
   AdminWalletLedgerResponse,
   WalletLedgerEntry,
+  AdminUserLockLogsResponse,
 } from "../../types/api";
 import { api } from "../../lib/api";
 
@@ -19,6 +21,7 @@ const formatDateTime = (value?: string) => {
 };
 
 export function AdminUsersPage() {
+  const { user: currentUser, checkAuthStatus } = useAuth();
   const { data, loading, error, refetch } =
     useFetch<AdminUsersResponse>("/admin/users");
   const [search, setSearch] = useState("");
@@ -41,6 +44,17 @@ export function AdminUsersPage() {
     useState<{ type: "success" | "error"; message: string } | null>(null);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [ledgerPage, setLedgerPage] = useState(1);
+  const [lockDialog, setLockDialog] = useState<{
+    user: AdminUsersResponse["users"][number];
+    action: "lock" | "unlock";
+  } | null>(null);
+  const [lockReason, setLockReason] = useState("");
+  const [lockDays, setLockDays] = useState(1);
+  const [lockSubmitting, setLockSubmitting] = useState(false);
+  const [lockStatus, setLockStatus] =
+    useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [lockHistoryOpen, setLockHistoryOpen] = useState(false);
+  const [lockHistoryPage, setLockHistoryPage] = useState(1);
 
   const {
     data: ledgerData,
@@ -50,6 +64,18 @@ export function AdminUsersPage() {
   } = useFetch<AdminWalletLedgerResponse>(
     ledgerOpen ? `/admin/wallet-ledger?page=${ledgerPage}&limit=50` : null,
     [ledgerOpen, ledgerPage]
+  );
+
+  const {
+    data: lockLogData,
+    loading: lockLogLoading,
+    error: lockLogError,
+    refetch: refetchLockLogs,
+  } = useFetch<AdminUserLockLogsResponse>(
+    lockHistoryOpen
+      ? `/admin/user-lock-logs?page=${lockHistoryPage}&limit=50`
+      : null,
+    [lockHistoryOpen, lockHistoryPage]
   );
 
   const users = useMemo(() => {
@@ -72,6 +98,12 @@ export function AdminUsersPage() {
   const canPrevLedger = ledgerPage > 1;
   const canNextLedger =
     ledgerMeta?.totalPages ? ledgerPage < ledgerMeta.totalPages : false;
+
+  const lockLogItems = lockLogData?.items ?? [];
+  const lockLogMeta = lockLogData?.meta;
+  const canPrevLockLog = lockHistoryPage > 1;
+  const canNextLockLog =
+    lockLogMeta?.totalPages ? lockHistoryPage < lockLogMeta.totalPages : false;
 
   const allSelected = users.length > 0 && selectedIds.length === users.length;
 
@@ -210,12 +242,25 @@ export function AdminUsersPage() {
     setBalanceSubmitting(true);
     setBalanceStatus(null);
     try {
-      await api.admin.adjustUserBalance(balanceUser.id, {
+      const result = await api.admin.adjustUserBalance(balanceUser.id, {
         amount: payloadAmount,
         note: balanceNote.trim(),
         type: balanceMode === "reversal" ? "reversal" : "admin_adjust",
         refId: balanceMode === "reversal" ? balanceRefId : undefined,
       });
+      if (result?.admin) {
+        try {
+          const storedUser = localStorage.getItem("user");
+          if (storedUser) {
+            const parsed = JSON.parse(storedUser);
+            const updated = { ...parsed, balance: result.admin.balance };
+            localStorage.setItem("user", JSON.stringify(updated));
+            checkAuthStatus();
+          }
+        } catch (error) {
+          console.warn("Failed to sync admin balance:", error);
+        }
+      }
       setBalanceStatus({
         type: "success",
         message: "Đã điều chỉnh số dư.",
@@ -230,6 +275,64 @@ export function AdminUsersPage() {
       });
     } finally {
       setBalanceSubmitting(false);
+    }
+  };
+
+  const openLockDialog = (
+    user: AdminUsersResponse["users"][number],
+    action: "lock" | "unlock"
+  ) => {
+    setLockDialog({ user, action });
+    setLockReason("");
+    setLockDays(1);
+    setLockStatus(null);
+  };
+
+  const submitLockAction = async () => {
+    if (!lockDialog) return;
+    if (!lockReason.trim()) {
+      setLockStatus({
+        type: "error",
+        message: "Vui lòng nhập lý do.",
+      });
+      return;
+    }
+    if (lockDialog.action === "lock") {
+      const numericDays = Number(lockDays);
+      if (!Number.isFinite(numericDays) || numericDays <= 0) {
+        setLockStatus({
+          type: "error",
+          message: "Vui lòng chọn thời gian mở khóa hợp lệ.",
+        });
+        return;
+      }
+    }
+
+    setLockSubmitting(true);
+    setLockStatus(null);
+    try {
+      if (lockDialog.action === "lock") {
+        await api.admin.lockUser(
+          lockDialog.user.id,
+          lockReason.trim(),
+          Math.max(1, Math.ceil(Number(lockDays)))
+        );
+      } else {
+        await api.admin.unlockUser(lockDialog.user.id, lockReason.trim());
+      }
+      refetch();
+      if (lockHistoryOpen) {
+        refetchLockLogs();
+      }
+      setLockDialog(null);
+    } catch (err) {
+      setLockStatus({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : "Không thể cập nhật trạng thái.",
+      });
+    } finally {
+      setLockSubmitting(false);
     }
   };
 
@@ -256,6 +359,15 @@ export function AdminUsersPage() {
               Xoá lọc
             </button>
           </div>
+          <button
+            onClick={() => {
+              setLockHistoryOpen(true);
+              setLockHistoryPage(1);
+            }}
+            className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
+          >
+            Lịch sử khóa
+          </button>
           <button
             onClick={() => {
               setLedgerOpen(true);
@@ -397,7 +509,25 @@ export function AdminUsersPage() {
                     {formatVnd(user.balance)}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-300">
-                    Hoạt động
+                    <span
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        user.is_locked
+                          ? "border border-red-400/40 text-red-300"
+                          : "border border-emerald-400/40 text-emerald-300"
+                      }`}
+                    >
+                      {user.is_locked ? "Đã khóa" : "Hoạt động"}
+                    </span>
+                    {user.is_locked && user.locked_reason && (
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        {user.locked_reason}
+                      </p>
+                    )}
+                    {user.is_locked && user.locked_until && (
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Mở khóa dự kiến: {formatDateTime(user.locked_until)}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-400">
                     {user.created_at
@@ -406,14 +536,32 @@ export function AdminUsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right text-xs">
                     <button
-                      onClick={() => openBalanceDialog(user)}
-                      className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary"
+                      onClick={() => user.role === "user" && openBalanceDialog(user)}
+                      disabled={user.role !== "user"}
+                      className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary disabled:opacity-40"
                     >
                       Thay đổi số dư
                     </button>
-                    <button className="rounded-full border border-red-400/40 px-3 py-1 text-red-300 hover:bg-red-500/10">
-                      Khoá
-                    </button>
+                    {(() => {
+                      const isSelf = currentUser?.id === user.id;
+                      const canManage = user.role === "user" && !isSelf;
+                      const actionLabel = user.is_locked ? "Mở khóa" : "Khóa";
+                      const actionType = user.is_locked ? "unlock" : "lock";
+                      const styles = user.is_locked
+                        ? "border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/10"
+                        : "border border-red-400/40 text-red-300 hover:bg-red-500/10";
+                      return (
+                        <button
+                          onClick={() =>
+                            canManage && openLockDialog(user, actionType)
+                          }
+                          disabled={!canManage}
+                          className={`rounded-full px-3 py-1 ${styles} disabled:opacity-40`}
+                        >
+                          {actionLabel}
+                        </button>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}
@@ -422,7 +570,7 @@ export function AdminUsersPage() {
         </div>
 
         <p className="text-xs text-slate-500">
-          Ghi chú: Khi khoá tài khoản sẽ yêu cầu xác nhận trước khi áp dụng.
+          Ghi chú: Chỉ khóa/mở khóa tài khoản user thường và cần nhập lý do.
         </p>
       </div>
 
@@ -447,11 +595,22 @@ export function AdminUsersPage() {
             </div>
 
                 <div className="mt-4 space-y-4 text-sm text-slate-200">
-              <div className="rounded-2xl border border-white/10 bg-dark/70 px-4 py-3">
-                Số dư hiện tại:{" "}
-                <span className="font-semibold text-white">
-                  {formatVnd(balanceUser.balance)}
-                </span>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-dark/70 px-4 py-3">
+                  Số dư hiện tại (user):{" "}
+                  <span className="font-semibold text-white">
+                    {formatVnd(balanceUser.balance)}
+                  </span>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-dark/70 px-4 py-3 text-slate-200">
+                  Số dư hiện tại của bạn:{" "}
+                  <span className="font-semibold text-white">
+                    {formatVnd(currentUser?.balance)}
+                  </span>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Mỗi ngày hệ thống cộng bù để tối thiểu 500.000 VNĐ.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -610,6 +769,98 @@ export function AdminUsersPage() {
         </div>
       )}
 
+      {lockDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-lg font-semibold text-white">
+                  {lockDialog.action === "lock" ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {lockDialog.user.name} • {lockDialog.user.email}
+                </p>
+              </div>
+              <button
+                onClick={() => setLockDialog(null)}
+                className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4 text-sm text-slate-200">
+              <div className="rounded-2xl border border-white/10 bg-dark/70 px-4 py-3">
+                Trạng thái hiện tại:{" "}
+                <span className="font-semibold text-white">
+                  {lockDialog.user.is_locked ? "Đã khóa" : "Hoạt động"}
+                </span>
+              </div>
+
+              {lockDialog.action === "lock" && (
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Thời gian mở khóa (ngày)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={lockDays}
+                    onChange={(event) => setLockDays(Number(event.target.value))}
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Lý do {lockDialog.action === "lock" ? "khóa" : "mở khóa"}
+                </label>
+                <textarea
+                  value={lockReason}
+                  onChange={(event) => setLockReason(event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              {lockStatus && (
+                <p
+                  className={`text-xs ${
+                    lockStatus.type === "success"
+                      ? "text-emerald-300"
+                      : "text-red-400"
+                  }`}
+                >
+                  {lockStatus.message}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setLockDialog(null)}
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={submitLockAction}
+                  disabled={lockSubmitting}
+                  className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {lockSubmitting
+                    ? "Đang lưu..."
+                    : lockDialog.action === "lock"
+                    ? "Xác nhận khóa"
+                    : "Xác nhận mở khóa"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {ledgerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
           <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
@@ -743,6 +994,140 @@ export function AdminUsersPage() {
                   onClick={() =>
                     setLedgerPage((prev) => prev + 1)
                   }
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary disabled:opacity-40"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lockHistoryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+          <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold text-white">
+                  Lịch sử khóa tài khoản
+                </p>
+                <p className="text-xs text-slate-400">
+                  Chỉ xem, không chỉnh sửa.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => refetchLockLogs()}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Tải lại
+                </button>
+                <button
+                  onClick={() => setLockHistoryOpen(false)}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+              <table className="w-full border-collapse text-left text-xs text-slate-200">
+                <thead className="bg-white/5 text-[11px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Thời gian</th>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Hành động</th>
+                    <th className="px-4 py-3">Lý do</th>
+                    <th className="px-4 py-3">Mở khóa dự kiến</th>
+                    <th className="px-4 py-3">Admin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lockLogLoading && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-4 text-slate-400">
+                        Đang tải lịch sử...
+                      </td>
+                    </tr>
+                  )}
+                  {lockLogError && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-4 text-red-400">
+                        {lockLogError}
+                      </td>
+                    </tr>
+                  )}
+                  {!lockLogLoading &&
+                    !lockLogError &&
+                    lockLogItems.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-4 text-slate-400">
+                          Chưa có lịch sử khóa.
+                        </td>
+                      </tr>
+                    )}
+                  {lockLogItems.map((entry) => {
+                    const userInfo = userMap.get(entry.user_id);
+                    const adminInfo = entry.created_by
+                      ? userMap.get(entry.created_by)
+                      : null;
+                    const isLock = entry.action === "lock";
+                    return (
+                      <tr key={entry.id} className="border-t border-white/10">
+                        <td className="px-4 py-3 text-slate-300">
+                          {formatDateTime(entry.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-white">
+                            {userInfo?.name || "Người dùng"}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {entry.user_id}
+                          </div>
+                        </td>
+                        <td
+                          className={`px-4 py-3 font-semibold ${
+                            isLock ? "text-red-300" : "text-emerald-300"
+                          }`}
+                        >
+                          {isLock ? "Khóa" : "Mở khóa"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {entry.reason || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {entry.unlock_at ? formatDateTime(entry.unlock_at) : "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {adminInfo?.name || entry.created_by || "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+              <span>
+                Trang {lockLogMeta?.page || lockHistoryPage} /{" "}
+                {lockLogMeta?.totalPages || 1}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={!canPrevLockLog}
+                  onClick={() =>
+                    setLockHistoryPage((prev) => Math.max(1, prev - 1))
+                  }
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary disabled:opacity-40"
+                >
+                  Trước
+                </button>
+                <button
+                  disabled={!canNextLockLog}
+                  onClick={() => setLockHistoryPage((prev) => prev + 1)}
                   className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary disabled:opacity-40"
                 >
                   Sau

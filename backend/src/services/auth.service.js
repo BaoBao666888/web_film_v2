@@ -10,8 +10,64 @@ import {
   incrementUserBalance,
 } from "../db.js";
 import notificationService from "./notification.service.js";
+import { UserLockLog } from "../models/UserLockLog.js";
+import { generateId } from "../utils/id.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const resolveLockDays = (user) => {
+  const lockedAt = user?.locked_at ? new Date(user.locked_at).getTime() : null;
+  const lockedUntil = user?.locked_until
+    ? new Date(user.locked_until).getTime()
+    : null;
+  if (!lockedAt || !lockedUntil || lockedUntil <= lockedAt) return null;
+  return Math.max(1, Math.ceil((lockedUntil - lockedAt) / DAY_MS));
+};
+
+const autoUnlockIfExpired = async (user) => {
+  if (!user?.is_locked || !user?.locked_until) return { user, unlocked: false };
+  const lockedUntil = new Date(user.locked_until).getTime();
+  if (Number.isNaN(lockedUntil) || lockedUntil > Date.now()) {
+    return { user, unlocked: false };
+  }
+
+  const updatedUser = await updateUser(user.id, {
+    is_locked: false,
+    locked_reason: null,
+    locked_at: null,
+    locked_by: null,
+    locked_until: null,
+  });
+
+  try {
+    await UserLockLog.create({
+      id: generateId("lock"),
+      user_id: user.id,
+      action: "unlock",
+      reason: "Hết thời gian khóa",
+      unlock_at: user.locked_until,
+      created_by: "system",
+      created_at: new Date(),
+    });
+  } catch (error) {
+    console.warn("Auto unlock log failed:", error?.message || error);
+  }
+
+  try {
+    await notificationService.sendToUsers({
+      userIds: [user.id],
+      title: "Tài khoản đã được mở khóa",
+      content: "Tài khoản của bạn đã được mở khóa do hết thời gian khóa.",
+      senderType: "bot",
+      senderName: "Lumi Bot",
+    });
+  } catch (error) {
+    console.warn("Auto unlock notification failed:", error?.message || error);
+  }
+
+  return { user: updatedUser || user, unlocked: true };
+};
 
 /**
  * Auth Service - Business Logic Layer
@@ -63,9 +119,20 @@ class AuthService {
   async login(credentials) {
     const { email, password } = credentials;
 
-    const user = await findUserByEmail(email);
+    let user = await findUserByEmail(email);
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       throw new Error("INVALID_CREDENTIALS");
+    }
+  if (user.is_locked) {
+      const unlockResult = await autoUnlockIfExpired(user);
+      if (unlockResult.unlocked) {
+        user = unlockResult.user;
+      } else {
+        const error = new Error("USER_LOCKED");
+        error.lockDays = resolveLockDays(user);
+        error.lockReason = user.locked_reason || null;
+        throw error;
+      }
     }
 
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });

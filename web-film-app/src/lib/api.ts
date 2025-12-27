@@ -10,6 +10,7 @@ import type {
   AdminUsersResponse,
   AdminWalletLedgerResponse,
   AdminWalletLedgerEligibleResponse,
+  AdminUserLockLogsResponse,
   AdminMoviesResponse,
   AdminSendNotificationsResponse,
   RatingResponse,
@@ -298,15 +299,43 @@ export const api = {
       ),
     adjustUserBalance: (
       userId: string,
-      payload: { amount: number; note: string; type?: "admin_adjust" | "reversal"; refId?: string }
+      payload: {
+        amount: number;
+        note: string;
+        type?: "admin_adjust" | "reversal";
+        refId?: string;
+      }
     ) =>
-      apiFetch<{ user: ProfileResponse["user"] }>(
+      apiFetch<{ user: ProfileResponse["user"]; admin?: ProfileResponse["user"] }>(
         `/admin/users/${userId}/adjust-balance`,
         {
           method: "POST",
           body: JSON.stringify(payload),
         }
       ),
+    lockUser: (userId: string, reason: string, lockDays: number) =>
+      apiFetch<{ user: ProfileResponse["user"] }>(`/admin/users/${userId}/lock`, {
+        method: "POST",
+        body: JSON.stringify({ reason, lockDays }),
+      }),
+    unlockUser: (userId: string, reason: string) =>
+      apiFetch<{ user: ProfileResponse["user"] }>(
+        `/admin/users/${userId}/unlock`,
+        {
+          method: "POST",
+          body: JSON.stringify({ reason }),
+        }
+      ),
+    userLockLogs: (params: { page?: number; limit?: number; userId?: string } = {}) => {
+      const search = new URLSearchParams();
+      if (params.page) search.set("page", String(params.page));
+      if (params.limit) search.set("limit", String(params.limit));
+      if (params.userId) search.set("userId", params.userId);
+      const qs = search.toString();
+      return apiFetch<AdminUserLockLogsResponse>(
+        `/admin/user-lock-logs${qs ? `?${qs}` : ""}`
+      );
+    },
   },
   upload: {
     single: async (file: File) => {

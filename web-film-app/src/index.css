@@ -63,6 +63,14 @@ body {
   color: #475569 !important;
 }
 
+.menu-panel {
+  background-color: rgba(2, 6, 23, 0.92);
+}
+
+.theme-light .menu-panel {
+  background-color: #ffffff !important;
+}
+
 .theme-light .bg-gradient-radial {
   background-image: radial-gradient(
     circle at 20% 20%,

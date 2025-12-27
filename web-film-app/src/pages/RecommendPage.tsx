@@ -4,24 +4,6 @@ import { aiPlaylists, featuredMovies } from "../data/movies";
 import { useFetch } from "../hooks/useFetch";
 import type { RecommendationResponse } from "../types/api";
 
-const roadmapItems = [
-  {
-    title: "Thu thập dữ liệu tương tác",
-    detail:
-      "Lưu lịch sử xem, rating và lượt bỏ qua để huấn luyện mô hình collaborative filtering.",
-  },
-  {
-    title: "Xây embedding nội dung",
-    detail:
-      "Chuyển mô tả phim thành vector để hiểu chủ đề, mood và nhịp độ, kết hợp cùng lịch sử người dùng.",
-  },
-  {
-    title: "Gợi ý theo thời điểm",
-    detail:
-      "Mở rộng logic gợi ý dựa trên thời gian trong ngày và thiết bị, tạo trải nghiệm cá nhân hóa hơn.",
-  },
-];
-
 export function RecommendPage() {
   // LẤY USER ĐANG ĐĂNG NHẬP (tùy bạn lưu ở đâu – ví dụ localStorage)
   const storedUser = localStorage.getItem("user"); // đổi key nếu bạn dùng key khác
@@ -56,7 +38,7 @@ export function RecommendPage() {
         description="Playlist được cá nhân hoá dựa trên lịch sử xem và sở thích của bạn."
       />
 
-      <section className="grid gap-6 md:grid-cols-[1fr_0.9fr]">
+      <section className="space-y-6">
         <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
           <h3 className="text-lg font-semibold text-white">
             Playlist hôm nay dành cho bạn
@@ -71,7 +53,7 @@ export function RecommendPage() {
           )}
           {error && <p className="text-red-400">Lỗi: {error}</p>}
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {movies.map((movie) => (
               <div
                 key={movie.id}
@@ -104,23 +86,6 @@ export function RecommendPage() {
             ))}
           </div>
         </div>
-
-        <aside className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25">
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-            Gợi ý nâng cao
-          </h4>
-          <ul className="space-y-4 text-sm text-slate-200">
-            {roadmapItems.map((item) => (
-              <li
-                key={item.title}
-                className="rounded-2xl border border-white/10 bg-dark/60 p-4"
-              >
-                <p className="font-semibold text-white">{item.title}</p>
-                <p className="mt-2 text-xs text-slate-300">{item.detail}</p>
-              </li>
-            ))}
-          </ul>
-        </aside>
       </section>
 
       <section>

@@ -50,6 +50,21 @@ router.post(
   asyncHandler((req, res) => adminController.adjustUserBalance(req, res))
 );
 
+// Lock/unlock user accounts
+router.post(
+  "/users/:id/lock",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.lockUser(req, res))
+);
+
+router.post(
+  "/users/:id/unlock",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.unlockUser(req, res))
+);
+
 // Toggle movie visibility
 router.post(
   "/movies/:id/toggle-visibility",
@@ -71,6 +86,14 @@ router.get(
   verifyToken,
   requireAdmin,
   asyncHandler((req, res) => adminController.listReversalCandidates(req, res))
+);
+
+// User lock logs (read-only)
+router.get(
+  "/user-lock-logs",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.listUserLockLogs(req, res))
 );
 
 export default router;

@@ -209,6 +209,30 @@ class AdminController {
       if (error.message === "USER_NOT_FOUND") {
         return res.status(404).json({ message: "Không tìm thấy người dùng" });
       }
+      if (error.message === "SELF_ADJUST_FORBIDDEN") {
+        return res
+          .status(400)
+          .json({ message: "Không thể điều chỉnh số dư của chính mình" });
+      }
+      if (error.message === "TARGET_NOT_USER") {
+        return res
+          .status(400)
+          .json({ message: "Chỉ được điều chỉnh số dư cho user thường" });
+      }
+      if (error.message === "ADMIN_BALANCE_INSUFFICIENT") {
+        return res
+          .status(400)
+          .json({ message: "Số dư admin không đủ để thực hiện giao dịch" });
+      }
+      if (error.message === "ADMIN_REQUIRED" || error.message === "ADMIN_NOT_FOUND") {
+        return res.status(403).json({ message: "Không xác định admin" });
+      }
+      if (error.message === "TRANSACTION_REQUIRED") {
+        return res.status(500).json({
+          message:
+            "Hệ thống cần MongoDB replica set để đảm bảo giao dịch an toàn.",
+        });
+      }
       console.error("Error adjusting balance:", error);
       res.status(500).json({ message: "Lỗi khi điều chỉnh số dư" });
     }
@@ -284,6 +308,125 @@ class AdminController {
     } catch (error) {
       console.error("Error listing reversal candidates:", error);
       res.status(500).json({ message: "Lỗi khi lấy giao dịch hợp lệ" });
+    }
+  }
+
+  /**
+   * Lock user account
+   * POST /admin/users/:id/lock
+   */
+  async lockUser(req, res) {
+    try {
+      const { id } = req.params;
+      const { reason, lockDays } = req.body || {};
+      if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ message: "Cần nhập lý do khóa" });
+      }
+      const numericDays = Number(lockDays);
+      if (!Number.isFinite(numericDays) || numericDays <= 0) {
+        return res.status(400).json({ message: "Cần chọn thời gian mở khóa" });
+      }
+
+      const result = await adminService.updateUserLockStatus({
+        userId: id,
+        adminId: req.user?.id,
+        action: "lock",
+        reason: String(reason).trim(),
+        lockDays: numericDays,
+      });
+
+      res.json({
+        message: "Đã khóa tài khoản",
+        user: result.user,
+      });
+    } catch (error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+      if (error.message === "SELF_LOCK_FORBIDDEN") {
+        return res
+          .status(400)
+          .json({ message: "Không thể tự khóa tài khoản của mình" });
+      }
+      if (error.message === "TARGET_NOT_USER") {
+        return res
+          .status(400)
+          .json({ message: "Chỉ được khóa tài khoản người dùng thường" });
+      }
+      if (error.message === "LOCK_DAYS_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Cần chọn thời gian mở khóa" });
+      }
+      if (error.message === "ALREADY_LOCKED") {
+        return res.status(400).json({ message: "Tài khoản đã bị khóa" });
+      }
+      console.error("Error locking user:", error);
+      res.status(500).json({ message: "Lỗi khi khóa tài khoản" });
+    }
+  }
+
+  /**
+   * Unlock user account
+   * POST /admin/users/:id/unlock
+   */
+  async unlockUser(req, res) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+      if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ message: "Cần nhập lý do mở khóa" });
+      }
+
+      const result = await adminService.updateUserLockStatus({
+        userId: id,
+        adminId: req.user?.id,
+        action: "unlock",
+        reason: String(reason).trim(),
+      });
+
+      res.json({
+        message: "Đã mở khóa tài khoản",
+        user: result.user,
+      });
+    } catch (error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+      if (error.message === "SELF_LOCK_FORBIDDEN") {
+        return res
+          .status(400)
+          .json({ message: "Không thể tự khóa tài khoản của mình" });
+      }
+      if (error.message === "TARGET_NOT_USER") {
+        return res
+          .status(400)
+          .json({ message: "Chỉ được mở khóa tài khoản người dùng thường" });
+      }
+      if (error.message === "ALREADY_UNLOCKED") {
+        return res.status(400).json({ message: "Tài khoản đang hoạt động" });
+      }
+      console.error("Error unlocking user:", error);
+      res.status(500).json({ message: "Lỗi khi mở khóa tài khoản" });
+    }
+  }
+
+  /**
+   * List user lock/unlock history
+   * GET /admin/user-lock-logs
+   */
+  async listUserLockLogs(req, res) {
+    try {
+      const { page, limit, userId } = req.query;
+      const result = await adminService.listUserLockLogs({
+        page,
+        limit,
+        userId,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error listing user lock logs:", error);
+      res.status(500).json({ message: "Lỗi khi lấy lịch sử khóa" });
     }
   }
 }

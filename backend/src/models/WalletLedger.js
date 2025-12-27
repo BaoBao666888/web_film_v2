@@ -6,7 +6,7 @@ const WalletLedgerSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   type: {
     type: String,
-    enum: ["topup", "purchase", "admin_adjust", "reversal", "refund"],
+    enum: ["topup", "purchase", "admin_adjust", "reversal", "refund", "admin_daily"],
     default: "admin_adjust",
   },
   ref_id: String,

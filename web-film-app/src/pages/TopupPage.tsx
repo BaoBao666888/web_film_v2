@@ -85,8 +85,7 @@ export function TopupPage() {
                 </p>
               </div>
               <div className="rounded-2xl border border-dashed border-white/20 bg-dark/60 p-4 text-xs text-slate-300">
-                Mã QR hiện là minh họa. Muốn tạo QR MoMo tự động theo số tiền +
-                nội dung, cần tích hợp API MoMo hoặc VietQR ở backend.
+                Mã QR hiện là minh họa.
               </div>
             </div>
           </div>
@@ -134,6 +133,10 @@ export function TopupPage() {
             <p className="mt-2">
               Sau khi chuyển khoản, admin sẽ đối chiếu thủ công và cộng tiền vào
               tài khoản. Thời gian xử lý: 5-30 phút trong giờ hành chính.
+            </p>
+            <p className="mt-2 text-amber-200">
+              Hệ thống chưa hỗ trợ rút tiền về. Khi nạp tiền nghĩa là bạn chấp
+              nhận điều khoản này.
             </p>
           </div>
         </section>

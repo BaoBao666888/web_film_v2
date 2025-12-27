@@ -180,6 +180,11 @@ export const addUser = async ({ name, email, password }) => {
     favorite_moods: [],
     theme_preference: "system",
     balance: 0,
+    is_locked: false,
+    locked_reason: null,
+    locked_at: null,
+    locked_by: null,
+    locked_until: null,
     password_hash: bcrypt.hashSync(password, 10),
     created_at: new Date(),
   });
@@ -256,6 +261,11 @@ export const listUsers = async () => {
     created_at: user.created_at,
     favorite_moods: user.favorite_moods || [],
     balance: user.balance ?? 0,
+    is_locked: Boolean(user.is_locked),
+    locked_reason: user.locked_reason || null,
+    locked_at: user.locked_at || null,
+    locked_by: user.locked_by || null,
+    locked_until: user.locked_until || null,
   }));
 };
 

@@ -45,6 +45,20 @@ class AuthController {
       if (error.message === "INVALID_CREDENTIALS") {
         return res.status(401).json({ message: "Sai thông tin đăng nhập" });
       }
+      if (error.message === "USER_LOCKED") {
+        const lockDays = Number(error.lockDays);
+        const lockReason =
+          typeof error.lockReason === "string" && error.lockReason.trim()
+            ? error.lockReason.trim()
+            : null;
+        const dayLabel =
+          Number.isFinite(lockDays) && lockDays > 0 ? `${lockDays} ngày` : "";
+        return res.status(403).json({
+          message: `Tài khoản đã bị khóa${
+            dayLabel ? ` trong ${dayLabel}` : ""
+          }${lockReason ? `. Lý do: ${lockReason}` : ""}.`,
+        });
+      }
       console.error("Error in login:", error);
       res.status(500).json({ message: "Lỗi khi đăng nhập" });
     }

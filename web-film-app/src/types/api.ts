@@ -238,14 +238,34 @@ export interface AdminUsersResponse {
     created_at?: string;
     favorite_moods?: string[];
     balance?: number;
+    is_locked?: boolean;
+    locked_reason?: string | null;
+    locked_at?: string | null;
+    locked_by?: string | null;
+    locked_until?: string | null;
   }>;
+}
+
+export interface UserLockLogEntry {
+  id: string;
+  user_id: string;
+  action: "lock" | "unlock";
+  reason: string;
+  unlock_at?: string | null;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface AdminUserLockLogsResponse {
+  items: UserLockLogEntry[];
+  meta: PaginatedMeta;
 }
 
 export interface WalletLedgerEntry {
   id: string;
   user_id: string;
   amount: number;
-  type: "topup" | "purchase" | "admin_adjust" | "reversal" | "refund";
+  type: "topup" | "purchase" | "admin_adjust" | "reversal" | "refund" | "admin_daily";
   ref_id?: string;
   note?: string;
   created_by?: string;

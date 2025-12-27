@@ -20,6 +20,8 @@ import uploadRouter from "./routes/upload.js";
 import { registerWatchPartySocket } from "./socket/watchParty.js";
 import { startUnhideMoviesJob } from "./jobs/unhideMovies.js";
 import { startCleanupTempUploadsJob } from "./jobs/cleanupTempUploads.js";
+import { startUnlockUsersJob } from "./jobs/unlockUsers.js";
+import { startAdminDailyTopupJob } from "./jobs/adminDailyTopup.js";
 import path from "path";
 import { fileURLToPath } from "url";
 dotenv.config();
@@ -69,6 +71,8 @@ const start = async () => {
   registerWatchPartySocket(io);
   startUnhideMoviesJob();
   startCleanupTempUploadsJob();
+  startUnlockUsersJob();
+  startAdminDailyTopupJob();
   server.listen(PORT, () => {
     console.log(`Lumi AI backend đang chạy tại http://localhost:${PORT}`);
   });

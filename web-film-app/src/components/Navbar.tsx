@@ -18,10 +18,12 @@ interface NavItem {
 }
 
 export function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, checkAuthStatus } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const balanceRefreshRef = useRef(0);
+  const balanceRefreshingRef = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
 
@@ -113,6 +115,7 @@ export function Navbar() {
       clearTimeout(userMenuTimerRef.current);
       userMenuTimerRef.current = null;
     }
+    void refreshUserBalance();
     setUserMenuOpen(true);
   };
 
@@ -129,6 +132,27 @@ export function Navbar() {
   const handleLogout = () => {
     logout();
     window.location.reload();
+  };
+
+  const refreshUserBalance = async () => {
+    if (!isAuthenticated || !user?.id) return;
+    if (balanceRefreshingRef.current) return;
+    const now = Date.now();
+    if (now - balanceRefreshRef.current < 15000) return;
+
+    balanceRefreshingRef.current = true;
+    try {
+      const result = await api.auth.profile(user.id);
+      if (result?.user) {
+        localStorage.setItem("user", JSON.stringify(result.user));
+        checkAuthStatus();
+      }
+      balanceRefreshRef.current = now;
+    } catch {
+      // ignore refresh errors
+    } finally {
+      balanceRefreshingRef.current = false;
+    }
   };
 
   const avatarFallback = user?.name?.charAt(0).toUpperCase() || "?";
@@ -249,7 +273,15 @@ export function Navbar() {
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={userMenuOpen}
-                  onClick={() => setUserMenuOpen((open) => !open)}
+                  onClick={() =>
+                    setUserMenuOpen((open) => {
+                      const next = !open;
+                      if (next) {
+                        void refreshUserBalance();
+                      }
+                      return next;
+                    })
+                  }
                   className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-primary hover:text-primary"
                 >
                   {renderAvatar("h-8 w-8")}
@@ -258,7 +290,7 @@ export function Navbar() {
                 <div
                   onMouseEnter={() => isDesktop && openUserMenu()}
                   onMouseLeave={() => isDesktop && closeUserMenu()}
-                  className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border border-white/10 bg-black/90 p-2 text-sm text-white shadow-2xl shadow-black/50 backdrop-blur transition ${
+                  className={`menu-panel absolute right-0 top-full mt-2 w-52 rounded-2xl border border-white/10 p-2 text-sm text-white shadow-2xl shadow-black/50 backdrop-blur transition ${
                     userMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
                   }`}
                 >
@@ -343,7 +375,15 @@ export function Navbar() {
             type="button"
             aria-expanded={userMenuOpen}
             aria-label="Mở menu tài khoản"
-            onClick={() => setUserMenuOpen((open) => !open)}
+            onClick={() =>
+              setUserMenuOpen((open) => {
+                const next = !open;
+                if (next) {
+                  void refreshUserBalance();
+                }
+                return next;
+              })
+            }
             className={`relative h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-primary hover:text-primary ${
               isDesktop ? "hidden" : "flex"
             }`}
@@ -399,7 +439,7 @@ export function Navbar() {
           }`}
         >
           <div className="mx-auto max-w-7xl px-4 pb-4">
-            <div className="space-y-2 rounded-2xl border border-white/10 bg-black/80 p-4 shadow-2xl shadow-black/40 backdrop-blur">
+            <div className="menu-panel space-y-2 rounded-2xl border border-white/10 p-4 shadow-2xl shadow-black/40 backdrop-blur">
               <div className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-white shadow-glow">
                 <p className="text-[10px] uppercase tracking-wide text-emerald-300">
                   Số dư
