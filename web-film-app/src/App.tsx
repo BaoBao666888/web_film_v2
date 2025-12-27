@@ -24,6 +24,8 @@ import { WatchPartyCreatePage } from "./pages/WatchPartyCreatePage";
 import { WatchPartyListPage } from "./pages/WatchPartyListPage";
 import { WatchPartyRoomPage } from "./pages/WatchPartyRoomPage";
 import { TopupPage } from "./pages/TopupPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+
 
 function AdminGuard() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -59,6 +61,7 @@ function App() {
         <Route path="topup" element={<TopupPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="logout" element={<LogoutPage />} />
         <Route path="watch/:id" element={<WatchPage />} />
         <Route path="watch-party">

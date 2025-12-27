@@ -64,6 +64,22 @@ class AuthController {
     }
   }
 
+  // ===== FORGOT PASSWORD =====
+  async requestPasswordReset(req, res) {
+    const { email } = req.body;
+    const result = await authService.requestPasswordReset(email);
+    return res.json(result);
+  }
+  async resetPasswordWithCode(req, res) {
+    const { email, code, newPassword } = req.body;
+    const result = await authService.resetPasswordWithCode({
+      email,
+      code,
+      newPassword,
+    });
+    return res.json(result);
+  }
+
   /**
    * Get user profile
    * GET /auth/profile/:id

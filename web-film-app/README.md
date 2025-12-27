@@ -17,6 +17,7 @@ Frontend React (Vite + Tailwind) giao tiếp với backend Express/Mongo qua cá
 1. Backend (yêu cầu MongoDB chạy nền)
    ```bash
    cd backend
+   npm i nodemailer
    npm install
    npm run seed   # tùy chọn – đổ dữ liệu mẫu (có admin@lumi.ai/admin123)
    npm run dev    # http://localhost:4000

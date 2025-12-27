@@ -16,6 +16,12 @@ const UserSchema = new mongoose.Schema(
     locked_by: String,
     locked_until: Date,
     password_hash: String,
+    
+    // ===== RESET PASSWORD =====
+    reset_code_hash: { type: String, default: null },
+    reset_code_expires_at: { type: Date, default: null },
+    reset_code_attempts: { type: Number, default: 0 },
+
     created_at: { type: Date, default: Date.now },
   },
   { timestamps: true }
