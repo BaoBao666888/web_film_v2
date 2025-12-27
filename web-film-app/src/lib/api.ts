@@ -8,6 +8,8 @@ import type {
   ProfileResponse,
   AdminStatsResponse,
   AdminUsersResponse,
+  AdminWalletLedgerResponse,
+  AdminWalletLedgerEligibleResponse,
   AdminMoviesResponse,
   AdminSendNotificationsResponse,
   RatingResponse,
@@ -254,6 +256,24 @@ export const api = {
     stats: () => apiFetch<AdminStatsResponse>(`/admin/stats`),
     users: () => apiFetch<AdminUsersResponse>(`/admin/users`),
     movies: () => apiFetch<AdminMoviesResponse>(`/admin/movies`),
+    walletLedger: (params: { page?: number; limit?: number; userId?: string } = {}) => {
+      const search = new URLSearchParams();
+      if (params.page) search.set("page", String(params.page));
+      if (params.limit) search.set("limit", String(params.limit));
+      if (params.userId) search.set("userId", params.userId);
+      const qs = search.toString();
+      return apiFetch<AdminWalletLedgerResponse>(
+        `/admin/wallet-ledger${qs ? `?${qs}` : ""}`
+      );
+    },
+    walletLedgerEligible: (userId: string, limit = 50) => {
+      const search = new URLSearchParams();
+      search.set("userId", userId);
+      if (limit) search.set("limit", String(limit));
+      return apiFetch<AdminWalletLedgerEligibleResponse>(
+        `/admin/wallet-ledger/eligible?${search.toString()}`
+      );
+    },
     sendNotifications: (payload: {
       userIds: string[];
       title?: string;

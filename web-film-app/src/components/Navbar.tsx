@@ -159,6 +159,7 @@ export function Navbar() {
     );
   };
 
+
   const renderNavLink = (item: NavItem, isMobile?: boolean) => (
     <NavLink
       key={item.to}
@@ -261,11 +262,11 @@ export function Navbar() {
                     userMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
                   }`}
                 >
-                  <div className="rounded-xl px-3 py-2 text-xs text-slate-300">
-                    <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                  <div className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 text-xs text-slate-200 shadow-glow">
+                    <p className="text-[10px] uppercase tracking-wide text-emerald-300">
                       Số dư
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-white">
+                    <p className="mt-1 text-base font-semibold text-emerald-300">
                       {formatVnd(user?.balance)}
                     </p>
                   </div>
@@ -399,11 +400,11 @@ export function Navbar() {
         >
           <div className="mx-auto max-w-7xl px-4 pb-4">
             <div className="space-y-2 rounded-2xl border border-white/10 bg-black/80 p-4 shadow-2xl shadow-black/40 backdrop-blur">
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400">
+              <div className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-white shadow-glow">
+                <p className="text-[10px] uppercase tracking-wide text-emerald-300">
                   Số dư
                 </p>
-                <p className="mt-1 text-sm font-semibold">
+                <p className="mt-1 text-base font-semibold text-emerald-300">
                   {formatVnd(user?.balance)}
                 </p>
               </div>

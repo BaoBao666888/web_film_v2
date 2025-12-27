@@ -1,11 +1,22 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
-import type { AdminUsersResponse } from "../../types/api";
+import type {
+  AdminUsersResponse,
+  AdminWalletLedgerResponse,
+  WalletLedgerEntry,
+} from "../../types/api";
 import { api } from "../../lib/api";
 
 const formatVnd = (value?: number) =>
   `${new Intl.NumberFormat("vi-VN").format(value ?? 0)} VNĐ`;
+
+const formatDateTime = (value?: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("vi-VN");
+};
 
 export function AdminUsersPage() {
   const { data, loading, error, refetch } =
@@ -18,13 +29,28 @@ export function AdminUsersPage() {
   const [sendStatus, setSendStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [balanceUser, setBalanceUser] =
     useState<AdminUsersResponse["users"][number] | null>(null);
-  const [balanceMode, setBalanceMode] = useState<"add" | "subtract" | "reversal">("add");
+  const [balanceMode, setBalanceMode] = useState<"add" | "reversal">("add");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceNote, setBalanceNote] = useState("");
   const [balanceRefId, setBalanceRefId] = useState("");
+  const [reversalOptions, setReversalOptions] = useState<WalletLedgerEntry[]>([]);
+  const [reversalLoading, setReversalLoading] = useState(false);
+  const [reversalError, setReversalError] = useState<string | null>(null);
   const [balanceSubmitting, setBalanceSubmitting] = useState(false);
   const [balanceStatus, setBalanceStatus] =
     useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [ledgerPage, setLedgerPage] = useState(1);
+
+  const {
+    data: ledgerData,
+    loading: ledgerLoading,
+    error: ledgerError,
+    refetch: refetchLedger,
+  } = useFetch<AdminWalletLedgerResponse>(
+    ledgerOpen ? `/admin/wallet-ledger?page=${ledgerPage}&limit=50` : null,
+    [ledgerOpen, ledgerPage]
+  );
 
   const users = useMemo(() => {
     const list = data?.users ?? [];
@@ -35,6 +61,17 @@ export function AdminUsersPage() {
         user.email.toLowerCase().includes(search.toLowerCase())
     );
   }, [data?.users, search]);
+
+  const userMap = useMemo(
+    () => new Map((data?.users ?? []).map((user) => [user.id, user])),
+    [data?.users]
+  );
+
+  const ledgerItems = ledgerData?.items ?? [];
+  const ledgerMeta = ledgerData?.meta;
+  const canPrevLedger = ledgerPage > 1;
+  const canNextLedger =
+    ledgerMeta?.totalPages ? ledgerPage < ledgerMeta.totalPages : false;
 
   const allSelected = users.length > 0 && selectedIds.length === users.length;
 
@@ -92,8 +129,35 @@ export function AdminUsersPage() {
     setBalanceMode("add");
     setBalanceAmount("");
     setBalanceNote("");
-    setBalanceRefId("");
     setBalanceStatus(null);
+    setBalanceRefId("");
+    setReversalOptions([]);
+    setReversalLoading(false);
+    setReversalError(null);
+  };
+
+  const loadReversalOptions = async (userId: string) => {
+    setReversalLoading(true);
+    setReversalError(null);
+    try {
+      const result = await api.admin.walletLedgerEligible(userId, 50);
+      const items = result.items ?? [];
+      setReversalOptions(items);
+      const first = items[0];
+      setBalanceRefId(first?.id || "");
+      if (first) {
+        setBalanceAmount(String(Math.abs(first.amount)));
+      }
+    } catch (err) {
+      setReversalError(
+        err instanceof Error ? err.message : "Không thể tải giao dịch."
+      );
+      setReversalOptions([]);
+      setBalanceRefId("");
+      setBalanceAmount("");
+    } finally {
+      setReversalLoading(false);
+    }
   };
 
   const submitBalanceAdjust = async () => {
@@ -107,16 +171,31 @@ export function AdminUsersPage() {
       setBalanceStatus({ type: "error", message: "Cần nhập lý do điều chỉnh." });
       return;
     }
-    if (balanceMode === "reversal" && !balanceRefId.trim()) {
-      setBalanceStatus({ type: "error", message: "Cần refId để đảo giao dịch." });
+    if (balanceMode === "reversal" && !balanceRefId) {
+      setBalanceStatus({ type: "error", message: "Vui lòng chọn refId." });
       return;
     }
-
+    const selectedRef = reversalOptions.find((entry) => entry.id === balanceRefId);
+    if (balanceMode === "reversal" && !selectedRef) {
+      setBalanceStatus({ type: "error", message: "Không tìm thấy ref hợp lệ." });
+      return;
+    }
+    if (
+      balanceMode === "reversal" &&
+      selectedRef &&
+      Math.abs(amountValue) > Math.abs(selectedRef.amount)
+    ) {
+      setBalanceStatus({
+        type: "error",
+        message: "Số tiền đảo không được lớn hơn giao dịch gốc.",
+      });
+      return;
+    }
     const normalizedAmount = Math.trunc(amountValue);
     const displayAmount =
-      balanceMode === "add" ? normalizedAmount : -normalizedAmount;
+      balanceMode === "reversal" ? -Math.abs(normalizedAmount) : normalizedAmount;
     const payloadAmount =
-      balanceMode === "subtract" ? -normalizedAmount : normalizedAmount;
+      balanceMode === "reversal" ? Math.abs(normalizedAmount) : normalizedAmount;
 
     const confirmMessage = [
       "Xác nhận điều chỉnh số dư:",
@@ -135,7 +214,7 @@ export function AdminUsersPage() {
         amount: payloadAmount,
         note: balanceNote.trim(),
         type: balanceMode === "reversal" ? "reversal" : "admin_adjust",
-        refId: balanceMode === "reversal" ? balanceRefId.trim() : undefined,
+        refId: balanceMode === "reversal" ? balanceRefId : undefined,
       });
       setBalanceStatus({
         type: "success",
@@ -177,8 +256,14 @@ export function AdminUsersPage() {
               Xoá lọc
             </button>
           </div>
-          <button className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary">
-            Xuất CSV
+          <button
+            onClick={() => {
+              setLedgerOpen(true);
+              setLedgerPage(1);
+            }}
+            className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
+          >
+            Xem sổ cái
           </button>
         </div>
 
@@ -361,7 +446,7 @@ export function AdminUsersPage() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-4 text-sm text-slate-200">
+                <div className="mt-4 space-y-4 text-sm text-slate-200">
               <div className="rounded-2xl border border-white/10 bg-dark/70 px-4 py-3">
                 Số dư hiện tại:{" "}
                 <span className="font-semibold text-white">
@@ -376,15 +461,18 @@ export function AdminUsersPage() {
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   {[
                     { value: "add", label: "Cộng tiền" },
-                    { value: "subtract", label: "Trừ tiền" },
                     { value: "reversal", label: "Đảo giao dịch" },
                   ].map((option) => (
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() =>
-                        setBalanceMode(option.value as "add" | "subtract" | "reversal")
-                      }
+                      onClick={() => {
+                        const nextMode = option.value as "add" | "reversal";
+                        setBalanceMode(nextMode);
+                        if (nextMode === "reversal" && balanceUser) {
+                          void loadReversalOptions(balanceUser.id);
+                        }
+                      }}
                       className={`rounded-2xl border px-3 py-2 text-xs transition ${
                         balanceMode === option.value
                           ? "border-primary bg-primary/10 text-primary"
@@ -397,33 +485,86 @@ export function AdminUsersPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-400">
-                    Số tiền (VNĐ)
-                  </label>
-                  <input
-                    type="number"
-                    min={1000}
-                    step={1000}
-                    value={balanceAmount}
-                    onChange={(event) => setBalanceAmount(event.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-400">
-                    Ref ID (nếu đảo)
-                  </label>
-                  <input
-                    value={balanceRefId}
-                    onChange={(event) => setBalanceRefId(event.target.value)}
-                    disabled={balanceMode !== "reversal"}
-                    placeholder="ledger-xxxxx"
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none disabled:opacity-50"
-                  />
-                </div>
-              </div>
+                {balanceMode === "reversal" ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs uppercase tracking-wide text-slate-400">
+                        Ref ID (giao dịch gốc)
+                      </label>
+                      <select
+                        value={balanceRefId}
+                        onChange={(event) => {
+                          const nextId = event.target.value;
+                          setBalanceRefId(nextId);
+                          const entry = reversalOptions.find(
+                            (item) => item.id === nextId
+                          );
+                          if (entry) {
+                            setBalanceAmount(String(Math.abs(entry.amount)));
+                          }
+                        }}
+                        disabled={reversalLoading}
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none disabled:opacity-50"
+                      >
+                        {reversalOptions.length === 0 && (
+                          <option value="">
+                            {reversalLoading ? "Đang tải..." : "Không có giao dịch phù hợp"}
+                          </option>
+                        )}
+                        {reversalOptions.map((entry) => (
+                          <option key={entry.id} value={entry.id}>
+                            {entry.id}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        {reversalLoading && "Đang tải giao dịch..."}
+                        {reversalError && reversalError}
+                        {!reversalLoading &&
+                          !reversalError &&
+                          balanceRefId &&
+                          (() => {
+                            const entry = reversalOptions.find(
+                              (item) => item.id === balanceRefId
+                            );
+                            return entry
+                              ? `Số tiền cộng: ${formatVnd(entry.amount)}`
+                              : "";
+                          })()}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs uppercase tracking-wide text-slate-400">
+                        Số tiền đảo (VNĐ)
+                      </label>
+                      <input
+                        type="number"
+                        min={1000}
+                        step={1000}
+                        value={balanceAmount}
+                        onChange={(event) => setBalanceAmount(event.target.value)}
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
+                      />
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Không được lớn hơn số tiền giao dịch gốc.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Số tiền (VNĐ)
+                    </label>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      value={balanceAmount}
+                      onChange={(event) => setBalanceAmount(event.target.value)}
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                )}
 
               <div>
                 <label className="text-xs uppercase tracking-wide text-slate-400">
@@ -462,6 +603,149 @@ export function AdminUsersPage() {
                   className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
                 >
                   {balanceSubmitting ? "Đang lưu..." : "Xác nhận"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ledgerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+          <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold text-white">Sổ cái ví</p>
+                <p className="text-xs text-slate-400">
+                  Chỉ xem, không chỉnh sửa.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => refetchLedger()}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Tải lại
+                </button>
+                <button
+                  onClick={() => setLedgerOpen(false)}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+              <table className="w-full border-collapse text-left text-xs text-slate-200">
+                <thead className="bg-white/5 text-[11px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Thời gian</th>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Số tiền</th>
+                    <th className="px-4 py-3">Loại</th>
+                    <th className="px-4 py-3">ID</th>
+                    <th className="px-4 py-3">Ref</th>
+                    <th className="px-4 py-3">Lý do</th>
+                    <th className="px-4 py-3">Admin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerLoading && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-4 text-slate-400">
+                        Đang tải sổ cái...
+                      </td>
+                    </tr>
+                  )}
+                  {ledgerError && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-4 text-red-400">
+                        {ledgerError}
+                      </td>
+                    </tr>
+                  )}
+                  {!ledgerLoading && !ledgerError && ledgerItems.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-4 text-slate-400">
+                        Chưa có giao dịch nào.
+                      </td>
+                    </tr>
+                  )}
+                  {ledgerItems.map((entry) => {
+                    const userInfo = userMap.get(entry.user_id);
+                    const adminInfo = entry.created_by
+                      ? userMap.get(entry.created_by)
+                      : null;
+                    const isNegative = entry.amount < 0;
+                    return (
+                      <tr
+                        key={entry.id}
+                        className="border-t border-white/10"
+                      >
+                        <td className="px-4 py-3 text-slate-300">
+                          {formatDateTime(entry.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-white">
+                            {userInfo?.name || "Người dùng"}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {entry.user_id}
+                          </div>
+                        </td>
+                        <td
+                          className={`px-4 py-3 font-semibold ${
+                            isNegative ? "text-red-300" : "text-emerald-300"
+                          }`}
+                        >
+                          {formatVnd(entry.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {entry.type}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {entry.id || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {entry.ref_id || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {entry.note || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {adminInfo?.name || entry.created_by || "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+              <span>
+                Trang {ledgerMeta?.page || ledgerPage} /{" "}
+                {ledgerMeta?.totalPages || 1}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={!canPrevLedger}
+                  onClick={() =>
+                    setLedgerPage((prev) => Math.max(1, prev - 1))
+                  }
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary disabled:opacity-40"
+                >
+                  Trước
+                </button>
+                <button
+                  disabled={!canNextLedger}
+                  onClick={() =>
+                    setLedgerPage((prev) => prev + 1)
+                  }
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary disabled:opacity-40"
+                >
+                  Sau
                 </button>
               </div>
             </div>

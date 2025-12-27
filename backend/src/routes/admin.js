@@ -58,4 +58,19 @@ router.post(
   asyncHandler((req, res) => adminController.toggleMovieVisibility(req, res))
 );
 
+// Wallet ledger (read-only)
+router.get(
+  "/wallet-ledger",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.listWalletLedger(req, res))
+);
+
+router.get(
+  "/wallet-ledger/eligible",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.listReversalCandidates(req, res))
+);
+
 export default router;

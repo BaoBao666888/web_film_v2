@@ -241,6 +241,27 @@ export interface AdminUsersResponse {
   }>;
 }
 
+export interface WalletLedgerEntry {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: "topup" | "purchase" | "admin_adjust" | "reversal" | "refund";
+  ref_id?: string;
+  note?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface AdminWalletLedgerResponse {
+  items: WalletLedgerEntry[];
+  meta: PaginatedMeta;
+}
+
+export interface AdminWalletLedgerEligibleResponse {
+  items: WalletLedgerEntry[];
+}
+
+
 export interface AdminMoviesResponse {
   movies: Movie[];
   meta?: PaginatedMeta;
