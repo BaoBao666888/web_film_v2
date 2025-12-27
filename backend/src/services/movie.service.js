@@ -27,6 +27,53 @@ import {
   resolveVideoHeaders,
   sanitizeEpisodes,
 } from "./movie.helpers.js";
+import {
+  promoteTempUploadUrl,
+  removeFileIfExists,
+} from "../utils/uploadFiles.js";
+
+async function promotePayloadUploads(payload) {
+  if (!payload || typeof payload !== "object") {
+    return { payload, movedFiles: [] };
+  }
+
+  const movedFiles = [];
+  const next = { ...payload };
+
+  if (typeof payload.poster === "string") {
+    const result = await promoteTempUploadUrl(payload.poster);
+    if (result.promotedPath) movedFiles.push(result.promotedPath);
+    next.poster = result.url;
+  }
+
+  if (typeof payload.thumbnail === "string") {
+    const result = await promoteTempUploadUrl(payload.thumbnail);
+    if (result.promotedPath) movedFiles.push(result.promotedPath);
+    next.thumbnail = result.url;
+  }
+
+  if (typeof payload.videoUrl === "string") {
+    const result = await promoteTempUploadUrl(payload.videoUrl);
+    if (result.promotedPath) movedFiles.push(result.promotedPath);
+    next.videoUrl = result.url;
+  }
+
+  if (Array.isArray(payload.episodes)) {
+    const episodes = [];
+    for (const episode of payload.episodes) {
+      const nextEpisode = { ...episode };
+      if (typeof episode.videoUrl === "string") {
+        const result = await promoteTempUploadUrl(episode.videoUrl);
+        if (result.promotedPath) movedFiles.push(result.promotedPath);
+        nextEpisode.videoUrl = result.url;
+      }
+      episodes.push(nextEpisode);
+    }
+    next.episodes = episodes;
+  }
+
+  return { payload: next, movedFiles };
+}
 
 /**
  * Movie Service - Business Logic Layer
@@ -324,87 +371,99 @@ class MovieService {
       throw new Error("MISSING_TITLE");
     }
 
-    const id = orDefault(payload.id, slugify(payload.title));
-    const type = payload.type === "series" ? "series" : "single";
-    const computedVideoType = detectVideoType(
-      payload.videoType,
-      payload.videoUrl
-    );
-    const computedHeaders = resolveVideoHeaders(
-      computedVideoType,
-      payload.videoHeaders
-    );
-    const sanitizedEpisodes =
-      type === "series"
-        ? sanitizeEpisodes(payload.episodes, computedHeaders)
-        : [];
+    const { payload: normalized, movedFiles } =
+      await promotePayloadUploads(payload);
 
-    const newMovie = {
-      id,
-      slug: slugify(orDefault(payload.slug, payload.title)),
-      type,
-      title: payload.title,
-      synopsis: orDefault(payload.synopsis, ""),
-      year: orDefault(payload.year, new Date().getFullYear()),
-      duration: orDefault(payload.duration, ""),
-      rating: orDefault(payload.rating, 0),
-      thumbnail: orDefault(payload.thumbnail, ""),
-      poster: orDefault(payload.poster, ""),
-      trailerUrl: orDefault(payload.trailerUrl, ""),
-      videoUrl: orDefault(payload.videoUrl, ""),
-      videoType: computedVideoType,
-      videoHeaders: computedHeaders,
-      episodes:
-        type === "series" && sanitizedEpisodes.length
-          ? sanitizedEpisodes
-          : type === "series" && payload.videoUrl
-          ? sanitizeEpisodes(
-              [
-                {
-                  number: 1,
-                  title: "Tập 1",
-                  videoUrl: payload.videoUrl,
-                  videoType: computedVideoType,
-                },
-              ],
-              computedHeaders
-            )
-          : [],
-      tags: sanitizeTags(orDefault(payload.tags, [])),
-      moods: orDefault(payload.moods, []),
-      cast: orDefault(payload.cast, []),
-      director: orDefault(payload.director, ""),
-      country: orDefault(payload.country, ""),
-      seriesStatus:
-        type === "series" ? orDefault(payload.seriesStatus, "") : "",
-      embedding_synced: false,
-    };
+    try {
+      const id = orDefault(normalized.id, slugify(normalized.title));
+      const type = normalized.type === "series" ? "series" : "single";
+      const computedVideoType = detectVideoType(
+        normalized.videoType,
+        normalized.videoUrl
+      );
+      const computedHeaders = resolveVideoHeaders(
+        computedVideoType,
+        normalized.videoHeaders
+      );
+      const sanitizedEpisodes =
+        type === "series"
+          ? sanitizeEpisodes(normalized.episodes, computedHeaders)
+          : [];
 
-    // Handle duplicate ID with auto-increment
-    let finalMovie = newMovie;
-    let attempts = 0;
-    const maxAttempts = 10;
+      const newMovie = {
+        id,
+        slug: slugify(orDefault(normalized.slug, normalized.title)),
+        type,
+        title: normalized.title,
+        synopsis: orDefault(normalized.synopsis, ""),
+        year: orDefault(normalized.year, new Date().getFullYear()),
+        duration: orDefault(normalized.duration, ""),
+        rating: orDefault(normalized.rating, 0),
+        thumbnail: orDefault(normalized.thumbnail, ""),
+        poster: orDefault(normalized.poster, ""),
+        trailerUrl: orDefault(normalized.trailerUrl, ""),
+        videoUrl: orDefault(normalized.videoUrl, ""),
+        videoType: computedVideoType,
+        videoHeaders: computedHeaders,
+        episodes:
+          type === "series" && sanitizedEpisodes.length
+            ? sanitizedEpisodes
+            : type === "series" && normalized.videoUrl
+            ? sanitizeEpisodes(
+                [
+                  {
+                    number: 1,
+                    title: "Tập 1",
+                    videoUrl: normalized.videoUrl,
+                    videoType: computedVideoType,
+                  },
+                ],
+                computedHeaders
+              )
+            : [],
+        tags: sanitizeTags(orDefault(normalized.tags, [])),
+        moods: orDefault(normalized.moods, []),
+        cast: orDefault(normalized.cast, []),
+        director: orDefault(normalized.director, ""),
+        country: orDefault(normalized.country, ""),
+        seriesStatus:
+          type === "series" ? orDefault(normalized.seriesStatus, "") : "",
+        embedding_synced: false,
+      };
 
-    while (attempts < maxAttempts) {
-      try {
-        return await insertMovie(finalMovie);
-      } catch (error) {
-        if (error.code === 11000 && attempts < maxAttempts - 1) {
-          // Duplicate key error, try with incremented ID
-          attempts++;
-          finalMovie = {
-            ...newMovie,
-            id: `${id}-${attempts + 1}`,
-            slug: `${newMovie.slug}-${attempts + 1}`,
-          };
-          console.log(`Duplicate ID detected, retrying with: ${finalMovie.id}`);
-        } else {
-          throw error;
+      // Handle duplicate ID with auto-increment
+      let finalMovie = newMovie;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (attempts < maxAttempts) {
+        try {
+          return await insertMovie(finalMovie);
+        } catch (error) {
+          if (error.code === 11000 && attempts < maxAttempts - 1) {
+            // Duplicate key error, try with incremented ID
+            attempts++;
+            finalMovie = {
+              ...newMovie,
+              id: `${id}-${attempts + 1}`,
+              slug: `${newMovie.slug}-${attempts + 1}`,
+            };
+            console.log(
+              `Duplicate ID detected, retrying with: ${finalMovie.id}`
+            );
+          } else {
+            throw error;
+          }
         }
       }
-    }
 
-    throw new Error("Failed to create movie after multiple attempts");
+      throw new Error("Failed to create movie after multiple attempts");
+    } catch (error) {
+      await Promise.all(
+        movedFiles.map((filePath) => removeFileIfExists(filePath))
+      );
+      throw error;
+    }
   }
 
   /**
@@ -416,37 +475,47 @@ class MovieService {
       throw new Error("MOVIE_NOT_FOUND");
     }
 
-    const merged = { ...movie, ...payload };
-    const type = merged.type === "series" ? "series" : "single";
-    merged.type = type;
+    const { payload: normalized, movedFiles } =
+      await promotePayloadUploads(payload);
 
-    const computedVideoType = detectVideoType(
-      payload.videoType ?? movie.videoType,
-      merged.videoUrl
-    );
-    merged.videoType = computedVideoType;
-    merged.videoHeaders = resolveVideoHeaders(
-      computedVideoType,
-      payload.videoHeaders !== undefined
-        ? payload.videoHeaders
-        : movie.videoHeaders
-    );
-    merged.tags = sanitizeTags(merged.tags ?? []);
-    merged.episodes =
-      type === "series"
-        ? sanitizeEpisodes(
-            payload.episodes ?? movie.episodes ?? [],
-            merged.videoHeaders
-          )
-        : [];
-    merged.country = orDefault(payload.country, movie.country ?? "");
-    merged.seriesStatus =
-      type === "series"
-        ? orDefault(payload.seriesStatus, movie.seriesStatus ?? "")
-        : "";
-    merged.embedding_synced = false;
+    try {
+      const merged = { ...movie, ...normalized };
+      const type = merged.type === "series" ? "series" : "single";
+      merged.type = type;
 
-    return await updateMovie(movieId, merged);
+      const computedVideoType = detectVideoType(
+        normalized.videoType ?? movie.videoType,
+        merged.videoUrl
+      );
+      merged.videoType = computedVideoType;
+      merged.videoHeaders = resolveVideoHeaders(
+        computedVideoType,
+        normalized.videoHeaders !== undefined
+          ? normalized.videoHeaders
+          : movie.videoHeaders
+      );
+      merged.tags = sanitizeTags(merged.tags ?? []);
+      merged.episodes =
+        type === "series"
+          ? sanitizeEpisodes(
+              normalized.episodes ?? movie.episodes ?? [],
+              merged.videoHeaders
+            )
+          : [];
+      merged.country = orDefault(normalized.country, movie.country ?? "");
+      merged.seriesStatus =
+        type === "series"
+          ? orDefault(normalized.seriesStatus, movie.seriesStatus ?? "")
+          : "";
+      merged.embedding_synced = false;
+
+      return await updateMovie(movieId, merged);
+    } catch (error) {
+      await Promise.all(
+        movedFiles.map((filePath) => removeFileIfExists(filePath))
+      );
+      throw error;
+    }
   }
 
   /**

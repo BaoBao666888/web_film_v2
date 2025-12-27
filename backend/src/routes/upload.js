@@ -32,4 +32,16 @@ router.post(
   (req, res) => uploadController.uploadSingle(req, res)
 );
 
+/**
+ * Delete a temp upload
+ * DELETE /upload/temp
+ * Requires admin authentication
+ */
+router.delete(
+  "/temp",
+  verifyToken,
+  requireAdmin,
+  (req, res) => uploadController.deleteTemp(req, res)
+);
+
 export default router;

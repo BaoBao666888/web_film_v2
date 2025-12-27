@@ -294,6 +294,11 @@ export const api = {
       const result = await response.json();
       return result.fullUrl as string;
     },
+    deleteTemp: (url: string) =>
+      apiFetch<{ deleted: boolean }>(`/upload/temp`, {
+        method: "DELETE",
+        body: JSON.stringify({ url }),
+      }),
   },
   notifications: {
     list: () => apiFetch<InboxResponse>(`/notifications`),

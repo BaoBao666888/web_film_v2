@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
@@ -10,6 +10,8 @@ type EpisodeInput = Episode & {
   videoType: Movie["videoType"];
   clientId: string; // ✅ stable key for React
 };
+
+type VideoSource = "upload" | "hls" | "mp4";
 
 type FormState = {
   title: string;
@@ -24,6 +26,7 @@ type FormState = {
   trailerUrl: string;
   videoUrl: string;
   videoType: Movie["videoType"];
+  videoSource: VideoSource;
   videoHeaders: string;
   thumbnail: string;
   poster: string;
@@ -34,6 +37,24 @@ type FormState = {
 };
 
 const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"] as const;
+const TEMP_UPLOAD_MARKER = "/uploads/tmp/";
+
+const isTempUploadUrl = (value?: string): value is string =>
+  Boolean(value && value.includes(TEMP_UPLOAD_MARKER));
+
+const getDefaultVideoSource = (videoUrl?: string, videoType?: Movie["videoType"]) =>
+  videoUrl && videoUrl.includes("/uploads/") ? "upload" : videoType || "hls";
+
+const cleanupTempUploads = async (urls: Array<string | undefined>) => {
+  for (const url of urls) {
+    if (!isTempUploadUrl(url)) continue;
+    try {
+      await api.upload.deleteTemp(url);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+};
 
 function makeClientId() {
   // works in modern browsers
@@ -86,7 +107,8 @@ export function AdminManagePage() {
     director: "",
     trailerUrl: "",
     videoUrl: "",
-    videoType: "hls",
+    videoType: "mp4",
+    videoSource: "upload",
     videoHeaders: "",
     thumbnail: "",
     poster: "",
@@ -103,6 +125,11 @@ export function AdminManagePage() {
   const [hideDialogMovie, setHideDialogMovie] = useState<Movie | null>(null);
   const [unhideDate, setUnhideDate] = useState("");
   const [uploading, setUploading] = useState(false);
+  const tempUploadsRef = useRef({
+    poster: "",
+    thumbnail: "",
+    videoUrl: "",
+  });
 
   useEffect(() => {
     fetch("/countries.json")
@@ -117,6 +144,14 @@ export function AdminManagePage() {
       })
       .catch(() => setCountryOptions([]));
   }, []);
+
+  useEffect(() => {
+    tempUploadsRef.current = {
+      poster: formData.poster,
+      thumbnail: formData.thumbnail,
+      videoUrl: formData.videoUrl,
+    };
+  }, [formData.poster, formData.thumbnail, formData.videoUrl]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Bạn chắc chắn muốn xoá phim này?")) return;
@@ -153,13 +188,47 @@ export function AdminManagePage() {
     // ✅ upload should NOT depend on editingMovie
     setUploading(true);
     try {
+      const previousUrl = formData[field];
       const url = await api.upload.single(file);
+      if (previousUrl && previousUrl !== url && isTempUploadUrl(previousUrl)) {
+        await cleanupTempUploads([previousUrl]);
+      }
       setFormData((prev) => ({ ...prev, [field]: url }));
     } catch (error) {
       alert(error instanceof Error ? error.message : "Upload thất bại");
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleCloseEdit = () => {
+    void cleanupTempUploads(Object.values(tempUploadsRef.current));
+    setEditingMovie(null);
+    setSubmitStatus(null);
+  };
+
+  const handleVideoSourceChange = async (value: VideoSource) => {
+    if (value !== "upload" && isTempUploadUrl(formData.videoUrl)) {
+      await cleanupTempUploads([formData.videoUrl]);
+    }
+
+    setFormData((prev) => {
+      const keepTemp = value === "upload" && isTempUploadUrl(prev.videoUrl);
+      const nextVideoUrl =
+        value === "upload"
+          ? keepTemp
+            ? prev.videoUrl
+            : ""
+          : isTempUploadUrl(prev.videoUrl)
+          ? ""
+          : prev.videoUrl;
+      return {
+        ...prev,
+        videoSource: value,
+        videoType: value === "upload" ? "mp4" : value,
+        videoUrl: nextVideoUrl,
+      };
+    });
   };
 
   const addEpisodeRow = () => {
@@ -426,6 +495,13 @@ export function AdminManagePage() {
                         videoUrl: movie.videoUrl ?? "",
                         videoType:
                           (movie.videoType as Movie["videoType"]) ?? "hls",
+                        videoSource:
+                          movie.type === "series"
+                            ? ((movie.videoType as Movie["videoType"]) ?? "hls")
+                            : getDefaultVideoSource(
+                                movie.videoUrl ?? "",
+                                movie.videoType as Movie["videoType"]
+                              ),
                         videoHeaders: movie.videoHeaders
                           ? JSON.stringify(movie.videoHeaders, null, 2)
                           : "",
@@ -490,10 +566,7 @@ export function AdminManagePage() {
                 </p>
               </div>
               <button
-                onClick={() => {
-                  setEditingMovie(null);
-                  setSubmitStatus(null);
-                }}
+                onClick={handleCloseEdit}
                 className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-primary hover:text-primary"
               >
                 Đóng
@@ -523,6 +596,13 @@ export function AdminManagePage() {
                 }
 
                 try {
+                  const resolvedVideoType =
+                    formData.type === "series"
+                      ? formData.videoType
+                      : (formData.videoSource === "upload"
+                          ? "mp4"
+                          : formData.videoSource) as Movie["videoType"];
+
                   const episodes =
                     formData.type === "series"
                       ? formData.episodes
@@ -595,7 +675,7 @@ export function AdminManagePage() {
                     director: formData.director,
                     trailerUrl: formData.trailerUrl,
                     videoUrl: formData.videoUrl,
-                    videoType: formData.videoType as Movie["videoType"],
+                    videoType: resolvedVideoType,
                     videoHeaders: parsedHeaders,
                     thumbnail: formData.thumbnail,
                     poster: formData.poster,
@@ -606,6 +686,7 @@ export function AdminManagePage() {
                     episodes,
                   });
 
+                  await cleanupTempUploads(Object.values(tempUploadsRef.current));
                   setSubmitStatus("✔ Đã cập nhật phim thành công.");
                   setEditingMovie(null);
                   refetch();
@@ -731,12 +812,16 @@ export function AdminManagePage() {
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const nextType = event.target.value as "single" | "series";
+                    if (nextType === "series" && formData.videoSource === "upload") {
+                      void handleVideoSourceChange("hls");
+                    }
                     setFormData((prev) => ({
                       ...prev,
-                      type: event.target.value as "single" | "series",
-                    }))
-                  }
+                      type: nextType,
+                    }));
+                  }}
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
                 >
                   <option value="single">Phim lẻ</option>
@@ -888,14 +973,21 @@ export function AdminManagePage() {
                         }))
                       }
                       className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                      disabled={formData.type === "series"}
+                      disabled={
+                        formData.type === "series" ||
+                        formData.videoSource === "upload"
+                      }
+                      readOnly={formData.videoSource === "upload"}
                       placeholder={
                         formData.type === "series"
                           ? "Phim bộ: điền link ở từng tập"
+                          : formData.videoSource === "upload"
+                          ? "Tải file video lên để lấy link"
                           : ""
                       }
                     />
-                    {formData.type !== "series" && (
+                    {formData.type !== "series" &&
+                      formData.videoSource === "upload" && (
                       <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
                         {uploading ? "..." : "📁"}
                         <input
@@ -916,19 +1008,35 @@ export function AdminManagePage() {
                   <label className="text-xs uppercase tracking-wide text-slate-400">
                     Định dạng nguồn
                   </label>
-                  <select
-                    value={formData.videoType}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        videoType: event.target.value as Movie["videoType"],
-                      }))
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-                  >
-                    <option value="hls">HLS (.m3u8)</option>
-                    <option value="mp4">MP4 trực tiếp</option>
-                  </select>
+                  {formData.type === "series" ? (
+                    <select
+                      value={formData.videoType}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          videoType: event.target.value as Movie["videoType"],
+                        }))
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                    >
+                      <option value="hls">HLS (.m3u8)</option>
+                      <option value="mp4">MP4 trực tiếp</option>
+                    </select>
+                  ) : (
+                    <select
+                      value={formData.videoSource}
+                      onChange={(event) =>
+                        handleVideoSourceChange(
+                          event.target.value as VideoSource
+                        )
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                    >
+                      <option value="upload">Video upload (mặc định)</option>
+                      <option value="hls">Link HLS (.m3u8)</option>
+                      <option value="mp4">Link MP4</option>
+                    </select>
+                  )}
                 </div>
               </div>
 

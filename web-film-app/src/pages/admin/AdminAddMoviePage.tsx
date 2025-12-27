@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
@@ -9,6 +9,8 @@ type EpisodeInput = Episode & {
   videoUrl: string;
   videoType: Movie["videoType"];
 };
+
+type VideoSource = "upload" | "hls" | "mp4";
 
 type FormState = {
   title: string;
@@ -25,6 +27,7 @@ type FormState = {
   trailerUrl: string;
   videoUrl: string;
   videoType: Movie["videoType"];
+  videoSource: VideoSource;
   videoHeaders: string;
   type: "single" | "series";
   episodes: EpisodeInput[];
@@ -32,6 +35,21 @@ type FormState = {
 };
 
 const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
+const TEMP_UPLOAD_MARKER = "/uploads/tmp/";
+
+const isTempUploadUrl = (value?: string): value is string =>
+  Boolean(value && value.includes(TEMP_UPLOAD_MARKER));
+
+const cleanupTempUploads = async (urls: Array<string | undefined>) => {
+  for (const url of urls) {
+    if (!isTempUploadUrl(url)) continue;
+    try {
+      await api.upload.deleteTemp(url);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+};
 
 export function AdminAddMoviePage() {
   const [form, setForm] = useState<FormState>({
@@ -50,7 +68,8 @@ export function AdminAddMoviePage() {
       "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=80",
     trailerUrl: "",
     videoUrl: "",
-    videoType: "hls",
+    videoType: "mp4",
+    videoSource: "upload",
     videoHeaders: "",
     type: "single",
     episodes: [],
@@ -61,6 +80,11 @@ export function AdminAddMoviePage() {
   const [loading, setLoading] = useState(false);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const tempUploadsRef = useRef({
+    poster: "",
+    thumbnail: "",
+    videoUrl: "",
+  });
 
   useEffect(() => {
     let didLoad = false;
@@ -79,6 +103,20 @@ export function AdminAddMoviePage() {
       .catch(() => setCountryOptions([]));
     return () => {
       didLoad = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    tempUploadsRef.current = {
+      poster: form.poster,
+      thumbnail: form.thumbnail,
+      videoUrl: form.videoUrl,
+    };
+  }, [form.poster, form.thumbnail, form.videoUrl]);
+
+  useEffect(() => {
+    return () => {
+      void cleanupTempUploads(Object.values(tempUploadsRef.current));
     };
   }, []);
 
@@ -138,13 +176,41 @@ export function AdminAddMoviePage() {
   ) => {
     setUploading(true);
     try {
+      const previousUrl = form[field];
       const url = await api.upload.single(file);
+      if (previousUrl && previousUrl !== url && isTempUploadUrl(previousUrl)) {
+        await cleanupTempUploads([previousUrl]);
+      }
       setForm((prev) => ({ ...prev, [field]: url }));
     } catch (error) {
       alert(error instanceof Error ? error.message : "Upload thất bại");
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleVideoSourceChange = async (value: VideoSource) => {
+    if (value !== "upload" && isTempUploadUrl(form.videoUrl)) {
+      await cleanupTempUploads([form.videoUrl]);
+    }
+
+    setForm((prev) => {
+      const keepTemp = value === "upload" && isTempUploadUrl(prev.videoUrl);
+      const nextVideoUrl =
+        value === "upload"
+          ? keepTemp
+            ? prev.videoUrl
+            : ""
+          : isTempUploadUrl(prev.videoUrl)
+          ? ""
+          : prev.videoUrl;
+      return {
+        ...prev,
+        videoSource: value,
+        videoType: value === "upload" ? "mp4" : value,
+        videoUrl: nextVideoUrl,
+      };
+    });
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -168,6 +234,13 @@ export function AdminAddMoviePage() {
     }
 
     try {
+      const resolvedVideoType =
+        form.type === "series"
+          ? form.videoType
+          : (form.videoSource === "upload"
+              ? "mp4"
+              : form.videoSource) as Movie["videoType"];
+
       const episodes =
         form.type === "series"
           ? form.episodes
@@ -196,8 +269,10 @@ export function AdminAddMoviePage() {
         .filter(Boolean)
         .filter((tag) => !SERIES_STATUS_TAGS.includes(tag));
 
+      const { videoSource, ...payload } = form;
+
       await api.movies.create({
-        ...form,
+        ...payload,
         type: form.type,
         country: form.country,
         seriesStatus: form.type === "series" ? form.seriesStatus : "",
@@ -207,6 +282,7 @@ export function AdminAddMoviePage() {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
+        videoType: resolvedVideoType,
         videoHeaders: parsedHeaders,
         episodes,
       });
@@ -332,9 +408,13 @@ export function AdminAddMoviePage() {
           </label>
           <select
             value={form.type}
-            onChange={(event) =>
-              updateField("type", event.target.value as "single" | "series")
-            }
+            onChange={(event) => {
+              const nextType = event.target.value as "single" | "series";
+              if (nextType === "series" && form.videoSource === "upload") {
+                void handleVideoSourceChange("hls");
+              }
+              updateField("type", nextType);
+            }}
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
           >
             <option value="single">Phim lẻ</option>
@@ -479,11 +559,16 @@ export function AdminAddMoviePage() {
                 onChange={(event) =>
                   updateField("videoUrl", event.target.value)
                 }
-                placeholder="https://.../playlist.m3u8"
-                disabled={form.type === "series"}
+                placeholder={
+                  form.videoSource === "upload"
+                    ? "Tải file video lên để lấy link"
+                    : "https://.../playlist.m3u8"
+                }
+                disabled={form.type === "series" || form.videoSource === "upload"}
+                readOnly={form.videoSource === "upload"}
                 className="flex-1 rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 disabled:opacity-50"
               />
-              {form.type !== "series" && (
+              {form.type !== "series" && form.videoSource === "upload" && (
                 <label className="cursor-pointer rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs text-primary hover:bg-primary/20">
                   {uploading ? "..." : "📁"}
                   <input
@@ -503,14 +588,30 @@ export function AdminAddMoviePage() {
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Định dạng nguồn
             </label>
-            <select
-              value={form.videoType}
-              onChange={(event) => updateField("videoType", event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-            >
-              <option value="hls">HLS (.m3u8)</option>
-              <option value="mp4">MP4 trực tiếp</option>
-            </select>
+            {form.type === "series" ? (
+              <select
+                value={form.videoType}
+                onChange={(event) =>
+                  updateField("videoType", event.target.value)
+                }
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+              >
+                <option value="hls">HLS (.m3u8)</option>
+                <option value="mp4">MP4 trực tiếp</option>
+              </select>
+            ) : (
+              <select
+                value={form.videoSource}
+                onChange={(event) =>
+                  handleVideoSourceChange(event.target.value as VideoSource)
+                }
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+              >
+                <option value="upload">Video upload (mặc định)</option>
+                <option value="hls">Link HLS (.m3u8)</option>
+                <option value="mp4">Link MP4</option>
+              </select>
+            )}
           </div>
         </div>
 
