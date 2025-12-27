@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, default: "user" },
     favorite_moods: { type: [String], default: [] },
     theme_preference: { type: String, default: "system" },
+    balance: { type: Number, default: 0 },
     password_hash: String,
     created_at: { type: Date, default: Date.now },
   },

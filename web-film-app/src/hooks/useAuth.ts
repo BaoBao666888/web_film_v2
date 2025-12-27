@@ -9,6 +9,7 @@ export interface User {
   favorite_moods?: string[];
   role?: string;
   theme_preference?: "system" | "light" | "dark";
+  balance?: number;
 }
 
 export function useAuth() {

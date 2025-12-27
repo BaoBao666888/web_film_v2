@@ -42,6 +42,14 @@ router.post(
   asyncHandler((req, res) => adminController.sendNotifications(req, res))
 );
 
+// Adjust user balance (ledger)
+router.post(
+  "/users/:id/adjust-balance",
+  verifyToken,
+  requireAdmin,
+  asyncHandler((req, res) => adminController.adjustUserBalance(req, res))
+);
+
 // Toggle movie visibility
 router.post(
   "/movies/:id/toggle-visibility",

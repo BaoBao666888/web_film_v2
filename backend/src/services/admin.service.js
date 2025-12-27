@@ -1,5 +1,9 @@
+import mongoose from "mongoose";
 import { getStats, listUsers, listMovies } from "../db.js";
 import { Movie } from "../models/Movie.js";
+import { User } from "../models/User.js";
+import { WalletLedger } from "../models/WalletLedger.js";
+import { generateId } from "../utils/id.js";
 
 /**
  * Admin Service - Business Logic Layer
@@ -83,6 +87,46 @@ class AdminService {
     await movie.save();
 
     return movie;
+  }
+
+  /**
+   * Adjust user balance with ledger entry (admin only)
+   */
+  async adjustUserBalance({ userId, amount, note, type, refId, adminId }) {
+    const session = await mongoose.startSession();
+    let updatedUser;
+    let ledgerEntry;
+
+    try {
+      await session.withTransaction(async () => {
+        const user = await User.findOne({ id: userId }).session(session);
+        if (!user) {
+          throw new Error("USER_NOT_FOUND");
+        }
+
+        ledgerEntry = new WalletLedger({
+          id: generateId("ledger"),
+          user_id: userId,
+          amount,
+          type,
+          ref_id: refId || undefined,
+          note,
+          created_by: adminId,
+          created_at: new Date(),
+        });
+
+        await ledgerEntry.save({ session });
+
+        user.balance = Number(user.balance || 0) + Number(amount);
+        await user.save({ session });
+
+        updatedUser = user.toObject();
+      });
+    } finally {
+      session.endSession();
+    }
+
+    return { user: updatedUser, ledger: ledgerEntry?.toObject?.() || ledgerEntry };
   }
 }
 

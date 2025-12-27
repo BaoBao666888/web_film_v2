@@ -12,6 +12,9 @@ import {
   type ThemePreference,
 } from "../lib/theme";
 
+const formatVnd = (value?: number) =>
+  `${new Intl.NumberFormat("vi-VN").format(value ?? 0)} VNĐ`;
+
 export function ProfilePage() {
   const { user: authUser, checkAuthStatus } = useAuth();
   const { data, loading, error, refetch } = useFetch<ProfileResponse>(
@@ -69,6 +72,7 @@ export function ProfilePage() {
       setThemeSaving(false);
     }
   };
+
 
   useEffect(() => {
     setAvatarCandidate(user?.avatar ?? "");
@@ -226,6 +230,10 @@ export function ProfilePage() {
               • Thành viên từ: <span className="text-white">{joinedDate}</span>
             </p>
             <p>
+              • Số dư hiện tại:{" "}
+              <span className="text-white">{formatVnd(user?.balance)}</span>
+            </p>
+            <p>
               • Gói sử dụng: <span className="text-primary">Premium AI</span>
             </p>
             <p>
@@ -280,6 +288,27 @@ export function ProfilePage() {
                 {themeStatus.message}
               </p>
             )}
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-dark/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  Nạp tiền (VNĐ)
+                </p>
+                <p className="text-xs text-slate-400">
+                  Xem hướng dẫn và QR ở trang nạp tiền riêng.
+                </p>
+              </div>
+              <span className="text-xs text-slate-300">
+                Số dư: {formatVnd(user?.balance)}
+              </span>
+            </div>
+            <Link
+              to="/topup"
+              className="mt-4 inline-flex rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark shadow-glow transition hover:bg-primary/90"
+            >
+              Mở trang nạp tiền
+            </Link>
           </div>
 
           {isEditing && authUser && (

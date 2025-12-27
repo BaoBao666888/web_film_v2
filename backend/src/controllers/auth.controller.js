@@ -129,6 +129,27 @@ class AuthController {
       res.status(500).json({ message: "Lỗi khi cập nhật hồ sơ" });
     }
   }
+
+  /**
+   * Top up balance
+   * POST /auth/topup
+   */
+  async topUp(req, res) {
+    try {
+      const { amount } = req.body || {};
+      const updatedUser = await authService.topUpBalance(req.user.id, amount);
+      res.json({ user: updatedUser });
+    } catch (error) {
+      if (error.message === "INVALID_AMOUNT") {
+        return res.status(400).json({ message: "Số tiền không hợp lệ" });
+      }
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+      console.error("Error in topUp:", error);
+      res.status(500).json({ message: "Lỗi khi nạp tiền" });
+    }
+  }
 }
 
 export default new AuthController();

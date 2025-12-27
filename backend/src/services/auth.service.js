@@ -7,6 +7,7 @@ import {
   listFavorites,
   listWatchHistory,
   updateUser,
+  incrementUserBalance,
 } from "../db.js";
 import notificationService from "./notification.service.js";
 
@@ -194,7 +195,26 @@ class AuthService {
       created_at: user.created_at,
       favorite_moods: user.favorite_moods || [],
       theme_preference: user.theme_preference || "system",
+      balance: typeof user.balance === "number" ? user.balance : 0,
     };
+  }
+
+  /**
+   * Top up balance (VND)
+   */
+  async topUpBalance(userId, amount) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      throw new Error("INVALID_AMOUNT");
+    }
+
+    const rounded = Math.floor(numericAmount);
+    const updatedUser = await incrementUserBalance(userId, rounded);
+    if (!updatedUser) {
+      throw new Error("USER_NOT_FOUND");
+    }
+
+    return this.sanitizeUser(updatedUser);
   }
 
   /**

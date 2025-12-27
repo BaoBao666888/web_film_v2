@@ -179,6 +179,7 @@ export const addUser = async ({ name, email, password }) => {
     role: "user",
     favorite_moods: [],
     theme_preference: "system",
+    balance: 0,
     password_hash: bcrypt.hashSync(password, 10),
     created_at: new Date(),
   });
@@ -236,6 +237,15 @@ export const updateUser = async (id, updates = {}) => {
   return user ? user.toObject() : null;
 };
 
+export const incrementUserBalance = async (id, amount) => {
+  const user = await User.findOneAndUpdate(
+    { id },
+    { $inc: { balance: amount } },
+    { new: true }
+  );
+  return user ? user.toObject() : null;
+};
+
 export const listUsers = async () => {
   const users = await User.find().lean();
   return users.map((user) => ({
@@ -245,6 +255,7 @@ export const listUsers = async () => {
     role: user.role,
     created_at: user.created_at,
     favorite_moods: user.favorite_moods || [],
+    balance: user.balance ?? 0,
   }));
 };
 

@@ -23,6 +23,7 @@ import { TrendingPage } from "./pages/TrendingPage";
 import { WatchPartyCreatePage } from "./pages/WatchPartyCreatePage";
 import { WatchPartyListPage } from "./pages/WatchPartyListPage";
 import { WatchPartyRoomPage } from "./pages/WatchPartyRoomPage";
+import { TopupPage } from "./pages/TopupPage";
 
 function AdminGuard() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -55,6 +56,7 @@ function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="topup" element={<TopupPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="logout" element={<LogoutPage />} />

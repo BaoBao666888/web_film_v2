@@ -244,6 +244,11 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
+    topUp: (amount: number) =>
+      apiFetch<{ user: ProfileResponse["user"] }>(`/auth/topup`, {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+      }),
   },
   admin: {
     stats: () => apiFetch<AdminStatsResponse>(`/admin/stats`),
@@ -269,6 +274,17 @@ export const api = {
         {
           method: "POST",
           body: JSON.stringify({ isHidden, unhideDate }),
+        }
+      ),
+    adjustUserBalance: (
+      userId: string,
+      payload: { amount: number; note: string; type?: "admin_adjust" | "reversal"; refId?: string }
+    ) =>
+      apiFetch<{ user: ProfileResponse["user"] }>(
+        `/admin/users/${userId}/adjust-balance`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
         }
       ),
   },

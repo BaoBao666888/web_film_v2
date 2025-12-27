@@ -4,15 +4,27 @@ import { useFetch } from "../../hooks/useFetch";
 import type { AdminUsersResponse } from "../../types/api";
 import { api } from "../../lib/api";
 
+const formatVnd = (value?: number) =>
+  `${new Intl.NumberFormat("vi-VN").format(value ?? 0)} VNĐ`;
+
 export function AdminUsersPage() {
-  const { data, loading, error } = useFetch<AdminUsersResponse>("/admin/users");
+  const { data, loading, error, refetch } =
+    useFetch<AdminUsersResponse>("/admin/users");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [messageTitle, setMessageTitle] = useState("");
   const [messageContent, setMessageContent] = useState("");
-  const [senderType, setSenderType] = useState<"admin" | "bot">("admin");
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [balanceUser, setBalanceUser] =
+    useState<AdminUsersResponse["users"][number] | null>(null);
+  const [balanceMode, setBalanceMode] = useState<"add" | "subtract" | "reversal">("add");
+  const [balanceAmount, setBalanceAmount] = useState("");
+  const [balanceNote, setBalanceNote] = useState("");
+  const [balanceRefId, setBalanceRefId] = useState("");
+  const [balanceSubmitting, setBalanceSubmitting] = useState(false);
+  const [balanceStatus, setBalanceStatus] =
+    useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const users = useMemo(() => {
     const list = data?.users ?? [];
@@ -56,7 +68,7 @@ export function AdminUsersPage() {
         userIds: selectedIds,
         title: messageTitle.trim() || undefined,
         content: messageContent.trim(),
-        senderType,
+        senderType: "admin",
       });
       setSendStatus({
         type: "success",
@@ -72,6 +84,73 @@ export function AdminUsersPage() {
       });
     } finally {
       setSending(false);
+    }
+  };
+
+  const openBalanceDialog = (user: AdminUsersResponse["users"][number]) => {
+    setBalanceUser(user);
+    setBalanceMode("add");
+    setBalanceAmount("");
+    setBalanceNote("");
+    setBalanceRefId("");
+    setBalanceStatus(null);
+  };
+
+  const submitBalanceAdjust = async () => {
+    if (!balanceUser) return;
+    const amountValue = Number(balanceAmount);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      setBalanceStatus({ type: "error", message: "Số tiền không hợp lệ." });
+      return;
+    }
+    if (!balanceNote.trim()) {
+      setBalanceStatus({ type: "error", message: "Cần nhập lý do điều chỉnh." });
+      return;
+    }
+    if (balanceMode === "reversal" && !balanceRefId.trim()) {
+      setBalanceStatus({ type: "error", message: "Cần refId để đảo giao dịch." });
+      return;
+    }
+
+    const normalizedAmount = Math.trunc(amountValue);
+    const displayAmount =
+      balanceMode === "add" ? normalizedAmount : -normalizedAmount;
+    const payloadAmount =
+      balanceMode === "subtract" ? -normalizedAmount : normalizedAmount;
+
+    const confirmMessage = [
+      "Xác nhận điều chỉnh số dư:",
+      `User: ${balanceUser.name} (${balanceUser.email})`,
+      `Hiện tại: ${formatVnd(balanceUser.balance)}`,
+      `Thay đổi: ${formatVnd(displayAmount)}`,
+      `Lý do: ${balanceNote.trim()}`,
+    ].join("\n");
+
+    if (!confirm(confirmMessage)) return;
+
+    setBalanceSubmitting(true);
+    setBalanceStatus(null);
+    try {
+      await api.admin.adjustUserBalance(balanceUser.id, {
+        amount: payloadAmount,
+        note: balanceNote.trim(),
+        type: balanceMode === "reversal" ? "reversal" : "admin_adjust",
+        refId: balanceMode === "reversal" ? balanceRefId.trim() : undefined,
+      });
+      setBalanceStatus({
+        type: "success",
+        message: "Đã điều chỉnh số dư.",
+      });
+      refetch();
+      setBalanceUser(null);
+    } catch (err) {
+      setBalanceStatus({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : "Không thể điều chỉnh số dư.",
+      });
+    } finally {
+      setBalanceSubmitting(false);
     }
   };
 
@@ -149,16 +228,8 @@ export function AdminUsersPage() {
               />
             </div>
             <div className="space-y-3">
-              <div>
-                <p className="mb-2 text-xs text-slate-400">Nguồn gửi</p>
-                <select
-                  value={senderType}
-                  onChange={(event) => setSenderType(event.target.value as "admin" | "bot")}
-                  className="w-full rounded-xl border border-white/10 bg-dark/60 px-4 py-2 text-sm text-white"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="bot">Bot</option>
-                </select>
+              <div className="rounded-xl border border-white/10 bg-dark/60 px-3 py-3 text-xs text-slate-300">
+                Nguồn gửi: <span className="font-semibold text-white">Admin</span>
               </div>
               <button
                 type="button"
@@ -196,6 +267,7 @@ export function AdminUsersPage() {
                 <th className="px-6 py-4">Tên</th>
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4">Vai trò</th>
+                <th className="px-6 py-4">Số dư</th>
                 <th className="px-6 py-4">Trạng thái</th>
                 <th className="px-6 py-4">Ngày tham gia</th>
                 <th className="px-6 py-4 text-right">Hành động</th>
@@ -204,14 +276,14 @@ export function AdminUsersPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-6 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-6 text-center text-slate-400">
                     Đang tải người dùng…
                   </td>
                 </tr>
               )}
               {error && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-6 text-center text-red-400">
+                  <td colSpan={8} className="px-6 py-6 text-center text-red-400">
                     {error}
                   </td>
                 </tr>
@@ -237,6 +309,9 @@ export function AdminUsersPage() {
                     {user.role}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-300">
+                    {formatVnd(user.balance)}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-300">
                     Hoạt động
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-400">
@@ -245,8 +320,11 @@ export function AdminUsersPage() {
                       : "..."}
                   </td>
                   <td className="px-6 py-4 text-right text-xs">
-                    <button className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary">
-                      Đổi quyền
+                    <button
+                      onClick={() => openBalanceDialog(user)}
+                      className="mr-2 rounded-full border border-white/20 px-3 py-1 text-slate-200 hover:border-primary hover:text-primary"
+                    >
+                      Thay đổi số dư
                     </button>
                     <button className="rounded-full border border-red-400/40 px-3 py-1 text-red-300 hover:bg-red-500/10">
                       Khoá
@@ -262,6 +340,134 @@ export function AdminUsersPage() {
           Ghi chú: Khi khoá tài khoản sẽ yêu cầu xác nhận trước khi áp dụng.
         </p>
       </div>
+
+      {balanceUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-lg font-semibold text-white">
+                  Điều chỉnh số dư
+                </p>
+                <p className="text-xs text-slate-400">
+                  {balanceUser.name} • {balanceUser.email}
+                </p>
+              </div>
+              <button
+                onClick={() => setBalanceUser(null)}
+                className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4 text-sm text-slate-200">
+              <div className="rounded-2xl border border-white/10 bg-dark/70 px-4 py-3">
+                Số dư hiện tại:{" "}
+                <span className="font-semibold text-white">
+                  {formatVnd(balanceUser.balance)}
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Hình thức
+                </label>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {[
+                    { value: "add", label: "Cộng tiền" },
+                    { value: "subtract", label: "Trừ tiền" },
+                    { value: "reversal", label: "Đảo giao dịch" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setBalanceMode(option.value as "add" | "subtract" | "reversal")
+                      }
+                      className={`rounded-2xl border px-3 py-2 text-xs transition ${
+                        balanceMode === option.value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-white/10 bg-dark/70 text-white hover:border-primary/60"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Số tiền (VNĐ)
+                  </label>
+                  <input
+                    type="number"
+                    min={1000}
+                    step={1000}
+                    value={balanceAmount}
+                    onChange={(event) => setBalanceAmount(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Ref ID (nếu đảo)
+                  </label>
+                  <input
+                    value={balanceRefId}
+                    onChange={(event) => setBalanceRefId(event.target.value)}
+                    disabled={balanceMode !== "reversal"}
+                    placeholder="ledger-xxxxx"
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Lý do điều chỉnh
+                </label>
+                <textarea
+                  value={balanceNote}
+                  onChange={(event) => setBalanceNote(event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/70 px-4 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              {balanceStatus && (
+                <p
+                  className={`text-xs ${
+                    balanceStatus.type === "success"
+                      ? "text-emerald-300"
+                      : "text-red-400"
+                  }`}
+                >
+                  {balanceStatus.message}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setBalanceUser(null)}
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={submitBalanceAdjust}
+                  disabled={balanceSubmitting}
+                  className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {balanceSubmitting ? "Đang lưu..." : "Xác nhận"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

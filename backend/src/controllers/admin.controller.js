@@ -66,11 +66,13 @@ class AdminController {
           .json({ message: "Nội dung thông báo không được trống" });
       }
 
+      const normalizedSenderType = senderType === "admin" ? "admin" : "bot";
+
       const result = await notificationService.sendToUsers({
         userIds,
         title,
         content,
-        senderType: senderType || "admin",
+        senderType: normalizedSenderType,
         senderId: req.user?.id,
         senderName: req.user?.name || "Admin",
       });
@@ -79,6 +81,57 @@ class AdminController {
     } catch (error) {
       console.error("Error sending notifications:", error);
       res.status(500).json({ message: "Lỗi khi gửi thông báo" });
+    }
+  }
+
+  /**
+   * Adjust user balance with ledger
+   * POST /admin/users/:id/adjust-balance
+   */
+  async adjustUserBalance(req, res) {
+    try {
+      const { id } = req.params;
+      const { amount, note, type, refId } = req.body || {};
+
+      if (!note || !String(note).trim()) {
+        return res
+          .status(400)
+          .json({ message: "Cần nhập lý do điều chỉnh" });
+      }
+
+      const numericAmount = Number(amount);
+      if (!Number.isFinite(numericAmount) || numericAmount === 0) {
+        return res.status(400).json({ message: "Số tiền không hợp lệ" });
+      }
+
+      const entryType = type === "reversal" ? "reversal" : "admin_adjust";
+      if (entryType === "reversal" && !refId) {
+        return res
+          .status(400)
+          .json({ message: "Cần refId cho giao dịch đảo" });
+      }
+
+      const normalizedAmount =
+        entryType === "reversal"
+          ? -Math.abs(Math.trunc(numericAmount))
+          : Math.trunc(numericAmount);
+
+      const result = await adminService.adjustUserBalance({
+        userId: id,
+        amount: normalizedAmount,
+        note: String(note).trim(),
+        type: entryType,
+        refId: refId ? String(refId) : undefined,
+        adminId: req.user?.id,
+      });
+
+      res.json(result);
+    } catch (error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+      console.error("Error adjusting balance:", error);
+      res.status(500).json({ message: "Lỗi khi điều chỉnh số dư" });
     }
   }
 

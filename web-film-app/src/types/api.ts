@@ -209,6 +209,7 @@ export interface ProfileResponse {
     created_at?: string;
     favorite_moods?: string[];
     theme_preference?: "system" | "light" | "dark";
+    balance?: number;
   };
   favorites: MovieSummary[];
   history: Array<{
@@ -236,6 +237,7 @@ export interface AdminUsersResponse {
     role: string;
     created_at?: string;
     favorite_moods?: string[];
+    balance?: number;
   }>;
 }
 
@@ -291,6 +293,7 @@ export interface AuthResponse {
     theme_preference?: "system" | "light" | "dark";
     role?: string;
     favorite_moods?: string[];
+    balance?: number;
   };
 }
 

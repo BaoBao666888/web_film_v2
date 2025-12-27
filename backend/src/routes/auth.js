@@ -35,4 +35,11 @@ router.put(
   asyncHandler((req, res) => authController.updateProfile(req, res))
 );
 
+// Top up balance
+router.post(
+  "/topup",
+  verifyToken,
+  asyncHandler((req, res) => authController.topUp(req, res))
+);
+
 export default router;
