@@ -25,7 +25,7 @@ movies_col = db["movies"]
 movie_embeddings_col = db["movie_embeddings"]
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-# GEMINI_API_KEY = "AIzaSyDQc-uamu1BDViYtkSstuaxQg5CQzz3Yo0"
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 print("⏳ Đang load Model Embedding...")
