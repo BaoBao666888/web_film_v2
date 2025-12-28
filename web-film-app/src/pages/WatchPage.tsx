@@ -404,6 +404,46 @@ export function WatchPage() {
       });
   }, [isPremiereReplay, premiereReplayRoomId]);
 
+  const premiereInfo = watchData?.premiere;
+  const isPremiereLive = premiereInfo?.status === "live";
+  const isPremiereUpcoming = premiereInfo?.status === "upcoming";
+  const viewerCount =
+    premiereParticipants.length || premiereInfo?.viewerCount || 0;
+  const liveEdgeSeconds = (() => {
+    if (!isPremiereLive || !premiereInfo?.premiereAt) return null;
+    const startAt = new Date(premiereInfo.premiereAt).getTime();
+    if (Number.isNaN(startAt)) return null;
+    return Math.max(0, (premiereNow - startAt) / 1000);
+  })();
+
+  useEffect(() => {
+    if (isPremiereLive) {
+      premiereWasLiveRef.current = true;
+    }
+  }, [isPremiereLive]);
+
+  useEffect(() => {
+    if (!isPremiereLive && premiereWasLiveRef.current) {
+      navigate("/", { replace: true });
+    }
+  }, [isPremiereLive, navigate]);
+
+  useEffect(() => {
+    if (!isPremiereLive || !premiereInfo?.endsAt) return;
+    const endTime = new Date(premiereInfo.endsAt).getTime();
+    if (Number.isNaN(endTime)) return;
+    const now = Date.now();
+    const diff = endTime - now;
+    if (diff <= 0) {
+      navigate("/", { replace: true });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      navigate("/", { replace: true });
+    }, diff);
+    return () => window.clearTimeout(timer);
+  }, [isPremiereLive, premiereInfo?.endsAt, navigate]);
+
   // ================================
   //  RENDER UI
   // ================================
@@ -529,11 +569,6 @@ export function WatchPage() {
     setPremiereChatVisible((visible) => !visible);
   };
 
-  const premiereInfo = watchData.premiere;
-  const isPremiereLive = premiereInfo?.status === "live";
-  const isPremiereUpcoming = premiereInfo?.status === "upcoming";
-  const viewerCount =
-    premiereParticipants.length || premiereInfo?.viewerCount || 0;
   const viewerLabel = isPremiereLive
     ? `${viewFormatter.format(viewerCount)} đang xem`
     : `${viewFormatter.format(watchData.views ?? 0)} lượt xem`;
@@ -542,39 +577,6 @@ export function WatchPage() {
       ? viewerLabel
       : "Sắp công chiếu"
     : viewerLabel;
-  const liveEdgeSeconds = (() => {
-    if (!isPremiereLive || !premiereInfo?.premiereAt) return null;
-    const startAt = new Date(premiereInfo.premiereAt).getTime();
-    if (Number.isNaN(startAt)) return null;
-    return Math.max(0, (premiereNow - startAt) / 1000);
-  })();
-  useEffect(() => {
-    if (isPremiereLive) {
-      premiereWasLiveRef.current = true;
-    }
-  }, [isPremiereLive]);
-
-  useEffect(() => {
-    if (!isPremiereLive && premiereWasLiveRef.current) {
-      navigate("/", { replace: true });
-    }
-  }, [isPremiereLive, navigate]);
-
-  useEffect(() => {
-    if (!isPremiereLive || !premiereInfo?.endsAt) return;
-    const endTime = new Date(premiereInfo.endsAt).getTime();
-    if (Number.isNaN(endTime)) return;
-    const now = Date.now();
-    const diff = endTime - now;
-    if (diff <= 0) {
-      navigate("/", { replace: true });
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      navigate("/", { replace: true });
-    }, diff);
-    return () => window.clearTimeout(timer);
-  }, [isPremiereLive, premiereInfo?.endsAt, navigate]);
   const countdownLabel = (() => {
     if (!premiereInfo?.premiereAt) return "Chưa có lịch công chiếu";
     const target = new Date(premiereInfo.premiereAt).getTime();
