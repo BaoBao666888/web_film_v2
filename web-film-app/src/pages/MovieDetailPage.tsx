@@ -36,6 +36,36 @@ export function MovieDetailPage() {
     movie?.type === "series" && movie.seriesStatus
       ? movie.seriesStatus
       : null;
+  const now = Date.now();
+  const premiereEpisodes = (movie?.episodes ?? [])
+    .filter((ep) => ep.status === "premiere" && ep.premiereAt)
+    .sort((a, b) => {
+      const aTime = new Date(a.premiereAt ?? "").getTime();
+      const bTime = new Date(b.premiereAt ?? "").getTime();
+      return aTime - bTime;
+    });
+  const premiereEpisode = premiereEpisodes[0] ?? null;
+  const premiereAt =
+    movie?.type === "series" ? premiereEpisode?.premiereAt : movie?.premiereAt;
+  const premiereTime = premiereAt ? new Date(premiereAt) : null;
+  const isPremiere = movie?.status === "premiere";
+  const isUpcomingPremiere =
+    Boolean(isPremiere && premiereTime && premiereTime.getTime() > now);
+  const isLivePremiere =
+    Boolean(isPremiere && premiereTime && premiereTime.getTime() <= now);
+  const previewEnabled =
+    movie?.type === "series"
+      ? Boolean(premiereEpisode?.previewEnabled)
+      : Boolean(movie?.previewEnabled);
+  const previewPrice =
+    movie?.type === "series"
+      ? premiereEpisode?.previewPrice
+      : movie?.previewPrice;
+  const previewEpisodeNumber =
+    movie?.type === "series" ? premiereEpisode?.number : undefined;
+  const watchTarget = previewEpisodeNumber
+    ? `/watch/${movie?.id}?ep=${previewEpisodeNumber}`
+    : `/watch/${movie?.id}`;
 
   useEffect(() => {
     setRatingValue(8);
@@ -159,23 +189,67 @@ export function MovieDetailPage() {
         description={movie.synopsis}
         actions={
           <div className="flex flex-wrap gap-3">
-            <a
-              href={movie.trailerUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
-            >
-              Trailer
-            </a>
-            <Link
-              to={`/watch/${movie.id}`}
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow hover:bg-primary/90"
-            >
-              Xem ngay
-            </Link>
+            {movie.trailerUrl && (
+              <a
+                href={movie.trailerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-white/20 px-4 py-2 text-sm text-white hover:border-primary hover:text-primary"
+              >
+                Trailer
+              </a>
+            )}
+            {isUpcomingPremiere ? (
+              previewEnabled ? (
+                <Link
+                  to={watchTarget}
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow hover:bg-primary/90"
+                >
+                  Xem trước
+                  {previewPrice
+                    ? ` • ${previewPrice.toLocaleString("vi-VN")}₫`
+                    : ""}
+                </Link>
+              ) : (
+                <span className="rounded-full border border-white/20 px-4 py-2 text-sm text-slate-400">
+                  Chưa mở xem trước
+                </span>
+              )
+            ) : isLivePremiere ? (
+              <Link
+                to={watchTarget}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow hover:bg-primary/90"
+              >
+                Vào công chiếu
+              </Link>
+            ) : (
+              <Link
+                to={`/watch/${movie.id}`}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark shadow-glow hover:bg-primary/90"
+              >
+                Xem ngay
+              </Link>
+            )}
           </div>
         }
       />
+      {isPremiere && premiereTime && (
+        <div className="rounded-3xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-200">
+          <p className="font-semibold">
+            Suất công chiếu{" "}
+            {isUpcomingPremiere ? "sắp diễn ra" : "đang diễn ra"}
+          </p>
+          <p className="mt-1 text-xs text-orange-100/80">
+            Thời gian:{" "}
+            {premiereTime.toLocaleString("vi-VN", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+      )}
       {favoriteStatus && (
         <p
           className={`text-sm ${

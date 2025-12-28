@@ -42,6 +42,27 @@ const MovieSchema = new mongoose.Schema(
           default: {},
         },
         duration: String,
+        status: {
+          type: String,
+          enum: ["public", "hidden", "premiere"],
+          default: "public",
+        },
+        premiereAt: {
+          type: Date,
+          default: null,
+        },
+        previewEnabled: {
+          type: Boolean,
+          default: false,
+        },
+        previewPrice: {
+          type: Number,
+          default: 0,
+        },
+        releasedAt: {
+          type: Date,
+          default: null,
+        },
       },
     ],
     tags: [String],
@@ -60,6 +81,28 @@ const MovieSchema = new mongoose.Schema(
       index: true,
     },
     unhideDate: {
+      type: Date,
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ["public", "hidden", "premiere"],
+      default: "public",
+      index: true,
+    },
+    premiereAt: {
+      type: Date,
+      default: null,
+    },
+    previewEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    previewPrice: {
+      type: Number,
+      default: 0,
+    },
+    releasedAt: {
       type: Date,
       default: null,
     },

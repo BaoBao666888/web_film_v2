@@ -11,6 +11,7 @@ export type WatchPartyMessage = {
   userId: string;
   userName: string;
   content: string;
+  position?: number;
   createdAt: number;
 };
 

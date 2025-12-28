@@ -34,7 +34,10 @@ export const watchPartyApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  chat: (roomId: string, payload: { viewerId: string; userName?: string; content: string }) =>
+  chat: (
+    roomId: string,
+    payload: { viewerId: string; userName?: string; content: string; position?: number }
+  ) =>
     apiFetch<WatchPartyMessage[]>(`/watch-party/${roomId}/chat`, {
       method: "POST",
       body: JSON.stringify(payload),

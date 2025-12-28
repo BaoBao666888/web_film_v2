@@ -25,6 +25,11 @@ export interface Movie extends MovieSummary {
   seriesStatus?: "Còn tiếp" | "Hoàn thành" | "Tạm ngưng" | "";
   isHidden?: boolean;
   unhideDate?: string;
+  status?: "public" | "hidden" | "premiere";
+  premiereAt?: string;
+  previewEnabled?: boolean;
+  previewPrice?: number;
+  releasedAt?: string;
 }
 
 export interface Episode {
@@ -33,6 +38,10 @@ export interface Episode {
   duration?: string;
   videoUrl?: string;
   videoType?: "mp4" | "hls";
+  status?: "public" | "hidden" | "premiere";
+  premiereAt?: string;
+  previewEnabled?: boolean;
+  previewPrice?: number;
 }
 
 export interface MovieListResponse {
@@ -106,6 +115,22 @@ export interface WatchResponse {
   episodes?: Episode[];
   currentEpisode?: Episode | null;
   views?: number;
+  viewsHidden?: boolean;
+  access?: {
+    canPlay: boolean;
+    requiresPreview?: boolean;
+    previewEnabled?: boolean;
+    previewPrice?: number;
+    previewPurchased?: boolean;
+    lockReason?: string;
+  };
+  premiere?: {
+    status: "upcoming" | "live" | "ended";
+    premiereAt: string;
+    endsAt?: string | null;
+    roomId?: string | null;
+    viewerCount?: number | null;
+  } | null;
   nextUp: Array<{
     id: string;
     movieId?: string;
@@ -178,6 +203,29 @@ export interface TrendingMoviesResponse {
 export interface NewMoviesResponse {
   items: Movie[];
   meta: PaginatedMeta;
+}
+
+export interface PremiereItem {
+  movieId: string;
+  episodeNumber?: number | null;
+  title: string;
+  synopsis?: string;
+  poster?: string;
+  thumbnail?: string;
+  duration?: string;
+  rating?: number;
+  type?: "single" | "series";
+  premiereAt: string;
+  endsAt?: string | null;
+  previewEnabled?: boolean;
+  previewPrice?: number;
+  episodeTitle?: string | null;
+  viewerCount?: number | null;
+  roomId?: string | null;
+}
+
+export interface PremiereListResponse {
+  items: PremiereItem[];
 }
 
 export interface CommunityHighlightsResponse {

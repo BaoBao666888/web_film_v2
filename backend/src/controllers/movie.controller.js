@@ -54,6 +54,21 @@ class MovieController {
   }
 
   /**
+   * Get premiere movies
+   * GET /movies/premieres
+   */
+  async getPremieres(req, res) {
+    try {
+      const { state = "live", limit = 6 } = req.query;
+      const payload = await movieService.listPremieres({ state, limit });
+      res.json(payload);
+    } catch (error) {
+      console.error("Error getting premieres:", error);
+      res.status(500).json({ message: "Không thể lấy danh sách công chiếu" });
+    }
+  }
+
+  /**
    * Get community highlights
    * GET /movies/community-highlights
    */
@@ -139,11 +154,18 @@ class MovieController {
   async getWatchData(req, res) {
     try {
       const episodeQuery = req.query.ep;
-      const data = await movieService.getWatchData(req.params.id, episodeQuery);
+      const data = await movieService.getWatchData(
+        req.params.id,
+        episodeQuery,
+        req.user?.id
+      );
       res.json(data);
     } catch (error) {
       if (error.message === "MOVIE_NOT_FOUND") {
         return res.status(404).json({ message: "Không tìm thấy phim" });
+      }
+      if (error.message === "EPISODE_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy tập phim" });
       }
       console.error("Error getting watch data:", error);
       res.status(500).json({ message: "Lỗi khi lấy dữ liệu xem phim" });
@@ -170,6 +192,38 @@ class MovieController {
       }
       console.error("Error recording view:", error);
       res.status(500).json({ message: "Lỗi khi ghi nhận lượt xem" });
+    }
+  }
+
+  /**
+   * Purchase preview access
+   * POST /movies/:id/preview/purchase
+   */
+  async purchasePreview(req, res) {
+    try {
+      const episode = req.body?.episode;
+      const payload = await movieService.purchasePreview(
+        req.params.id,
+        req.user.id,
+        episode
+      );
+      res.status(201).json(payload);
+    } catch (error) {
+      const message = error.message || "";
+      if (message === "MOVIE_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy phim" });
+      }
+      if (message === "EPISODE_NOT_FOUND") {
+        return res.status(404).json({ message: "Không tìm thấy tập phim" });
+      }
+      if (message === "PREVIEW_DISABLED") {
+        return res.status(400).json({ message: "Phim chưa bật xem trước" });
+      }
+      if (message === "BALANCE_INSUFFICIENT") {
+        return res.status(400).json({ message: "Số dư không đủ để xem trước" });
+      }
+      console.error("Error purchasing preview:", error);
+      res.status(500).json({ message: "Lỗi khi thanh toán xem trước" });
     }
   }
 
@@ -245,6 +299,46 @@ class MovieController {
       if (error.message === "MISSING_TITLE") {
         return res.status(400).json({ message: "Thiếu tiêu đề" });
       }
+      if (error.message === "PREVIEW_PRICE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Cần nhập giá xem trước hợp lệ" });
+      }
+      if (error.message === "PREMIERE_TIME_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Cần chọn thời gian công chiếu" });
+      }
+      if (error.message === "SERIES_EPISODE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Phim bộ cần ít nhất 1 tập" });
+      }
+      if (error.message === "SERIES_PUBLIC_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Phim bộ public cần ít nhất 1 tập public" });
+      }
+      if (error.message === "SERIES_PREMIERE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Phim bộ công chiếu cần ít nhất 1 tập công chiếu" });
+      }
+      if (error.message === "EPISODE_PREVIEW_PRICE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Tập phim xem trước cần giá hợp lệ" });
+      }
+      if (error.message === "EPISODE_PREMIERE_TIME_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Tập công chiếu cần thời gian công chiếu" });
+      }
+      if (error.message === "EPISODE_PREMIERE_ORDER") {
+        return res.status(400).json({
+          message: "Thời gian công chiếu tập sau phải sau tập trước",
+        });
+      }
       console.error("Error creating movie:", error);
       res.status(500).json({ message: "Lỗi khi tạo phim" });
     }
@@ -261,6 +355,51 @@ class MovieController {
     } catch (error) {
       if (error.message === "MOVIE_NOT_FOUND") {
         return res.status(404).json({ message: "Không tìm thấy phim" });
+      }
+      if (error.message === "STATUS_TRANSITION_FORBIDDEN") {
+        return res.status(400).json({
+          message: "Phim public không được chuyển sang công chiếu",
+        });
+      }
+      if (error.message === "PREVIEW_PRICE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Cần nhập giá xem trước hợp lệ" });
+      }
+      if (error.message === "PREMIERE_TIME_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Cần chọn thời gian công chiếu" });
+      }
+      if (error.message === "SERIES_EPISODE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Phim bộ cần ít nhất 1 tập" });
+      }
+      if (error.message === "SERIES_PUBLIC_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Phim bộ public cần ít nhất 1 tập public" });
+      }
+      if (error.message === "SERIES_PREMIERE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Phim bộ công chiếu cần ít nhất 1 tập công chiếu" });
+      }
+      if (error.message === "EPISODE_PREVIEW_PRICE_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Tập phim xem trước cần giá hợp lệ" });
+      }
+      if (error.message === "EPISODE_PREMIERE_TIME_REQUIRED") {
+        return res
+          .status(400)
+          .json({ message: "Tập công chiếu cần thời gian công chiếu" });
+      }
+      if (error.message === "EPISODE_PREMIERE_ORDER") {
+        return res.status(400).json({
+          message: "Thời gian công chiếu tập sau phải sau tập trước",
+        });
       }
       console.error("Error updating movie:", error);
       res.status(500).json({ message: "Lỗi khi cập nhật phim" });

@@ -15,6 +15,7 @@ export const orDefault = (value, fallback) =>
   value === undefined || value === null ? fallback : value;
 
 export const SERIES_STATUS_VALUES = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
+export const MOVIE_STATUS_VALUES = ["public", "hidden", "premiere"];
 
 export const sanitizeTags = (tags = []) => {
   if (!Array.isArray(tags)) return [];
@@ -80,6 +81,12 @@ export const sanitizeEpisodes = (episodes = [], fallbackHeaders = {}) => {
       const videoUrl = episode.videoUrl || "";
       if (!videoUrl) return null;
       const videoType = detectVideoType(episode.videoType, videoUrl);
+      const status = MOVIE_STATUS_VALUES.includes(episode.status)
+        ? episode.status
+        : "public";
+      const premiereAt = episode.premiereAt ? new Date(episode.premiereAt) : null;
+      const previewEnabled = Boolean(episode.previewEnabled);
+      const previewPrice = Number(episode.previewPrice) || 0;
       return {
         number,
         title: episode.title || `Tập ${number}`,
@@ -90,8 +97,37 @@ export const sanitizeEpisodes = (episodes = [], fallbackHeaders = {}) => {
           episode.videoHeaders ?? fallbackHeaders
         ),
         duration: episode.duration || "",
+        status,
+        premiereAt: premiereAt && !Number.isNaN(premiereAt.getTime()) ? premiereAt : null,
+        previewEnabled,
+        previewPrice,
+        releasedAt: episode.releasedAt ? new Date(episode.releasedAt) : null,
       };
     })
     .filter(Boolean)
     .sort((a, b) => a.number - b.number);
+};
+
+export const parseDurationToSeconds = (value) => {
+  if (!value) return 0;
+  const raw = String(value).toLowerCase();
+  const hoursMatch = raw.match(/(\d+(?:\.\d+)?)\s*h/);
+  const minutesMatch = raw.match(/(\d+(?:\.\d+)?)\s*m/);
+  let minutes = 0;
+
+  if (hoursMatch) {
+    minutes += Number(hoursMatch[1]) * 60;
+  }
+  if (minutesMatch) {
+    minutes += Number(minutesMatch[1]);
+  }
+
+  if (!hoursMatch && !minutesMatch) {
+    const numeric = Number(raw.replace(/[^\d.]/g, ""));
+    if (Number.isFinite(numeric)) {
+      minutes += numeric;
+    }
+  }
+
+  return Math.max(0, Math.round(minutes * 60));
 };

@@ -20,6 +20,7 @@ import type {
   HlsAnalyzeResponse,
   TrendingMoviesResponse,
   NewMoviesResponse,
+  PremiereListResponse,
   CommunityHighlightsResponse,
   CommentListResponse,
   Comment,
@@ -164,6 +165,18 @@ export const api = {
       const qs = params.toString();
       return apiFetch<NewMoviesResponse>(`/movies/new${qs ? `?${qs}` : ""}`);
     },
+    premieres: (query: Record<string, string | number | undefined> = {}) => {
+      const params = new URLSearchParams();
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      const qs = params.toString();
+      return apiFetch<PremiereListResponse>(
+        `/movies/premieres${qs ? `?${qs}` : ""}`
+      );
+    },
     communityHighlights: () =>
       apiFetch<CommunityHighlightsResponse>(`/movies/community-highlights`),
     comments: (movieId: string, limit?: number) =>
@@ -185,6 +198,19 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    purchasePreview: (movieId: string, payload: { episode?: number }) =>
+      apiFetch<{
+        purchased: boolean;
+        balance?: number;
+        purchaseId?: string;
+        alreadyPurchased?: boolean;
+      }>(
+        `/movies/${movieId}/preview/purchase`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }
+      ),
   },
   hls: {
     analyze: (payload: {

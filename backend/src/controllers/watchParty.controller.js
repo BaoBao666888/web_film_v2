@@ -253,7 +253,7 @@ class WatchPartyController {
    */
   async sendMessage(req, res) {
     try {
-      const { userName, content } = req.body || {};
+      const { userName, content, position } = req.body || {};
       const viewerId = req.body?.viewerId || req.user?.id;
 
       if (!viewerId || !content) {
@@ -266,7 +266,8 @@ class WatchPartyController {
         req.params.id,
         viewerId,
         userName || req.user?.name,
-        content
+        content,
+        position
       );
 
       if (!room) {

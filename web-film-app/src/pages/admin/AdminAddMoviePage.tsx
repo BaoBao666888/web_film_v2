@@ -8,6 +8,10 @@ import type { Episode, Movie } from "../../types/api";
 type EpisodeInput = Episode & {
   videoUrl: string;
   videoType: Movie["videoType"];
+  status: "public" | "hidden" | "premiere";
+  premiereAt: string;
+  previewEnabled: boolean;
+  previewPrice: number;
 };
 
 type VideoSource = "upload" | "hls" | "mp4";
@@ -32,6 +36,10 @@ type FormState = {
   type: "single" | "series";
   episodes: EpisodeInput[];
   country: string;
+  status: "public" | "hidden" | "premiere";
+  premiereAt: string;
+  previewEnabled: boolean;
+  previewPrice: number;
 };
 
 const SERIES_STATUS_TAGS = ["Còn tiếp", "Hoàn thành", "Tạm ngưng"];
@@ -49,6 +57,13 @@ const cleanupTempUploads = async (urls: Array<string | undefined>) => {
       // ignore cleanup errors
     }
   }
+};
+
+const toISOFromDateTimeLocal = (value: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
 };
 
 export function AdminAddMoviePage() {
@@ -74,6 +89,10 @@ export function AdminAddMoviePage() {
     type: "single",
     episodes: [],
     country: "",
+    status: "public",
+    premiereAt: "",
+    previewEnabled: false,
+    previewPrice: 0,
   });
 
   const [status, setStatus] = useState<string | null>(null);
@@ -120,7 +139,10 @@ export function AdminAddMoviePage() {
     };
   }, []);
 
-  const updateField = (key: keyof FormState, value: string | number) => {
+  const updateField = (
+    key: keyof FormState,
+    value: string | number | boolean
+  ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -137,6 +159,15 @@ export function AdminAddMoviePage() {
             videoUrl: "",
             videoType: prev.videoType,
             duration: "",
+            status:
+              prev.status === "hidden"
+                ? "hidden"
+                : prev.status === "premiere"
+                ? "premiere"
+                : "public",
+            premiereAt: "",
+            previewEnabled: false,
+            previewPrice: 0,
           },
         ],
       };
@@ -145,8 +176,16 @@ export function AdminAddMoviePage() {
 
   const updateEpisodeField = (
     index: number,
-    key: "title" | "videoUrl" | "videoType" | "duration",
-    value: string | undefined
+    key:
+      | "title"
+      | "videoUrl"
+      | "videoType"
+      | "duration"
+      | "status"
+      | "premiereAt"
+      | "previewEnabled"
+      | "previewPrice",
+    value: string | boolean | number | undefined
   ) => {
     setForm((prev) => ({
       ...prev,
@@ -156,6 +195,20 @@ export function AdminAddMoviePage() {
           return {
             ...ep,
             videoType: (value || "hls") as Movie["videoType"],
+          };
+        }
+        if (key === "status") {
+          return {
+            ...ep,
+            status: (value || "public") as EpisodeInput["status"],
+          };
+        }
+        if (key === "previewEnabled") {
+          const enabled = Boolean(value);
+          return {
+            ...ep,
+            previewEnabled: enabled,
+            previewPrice: enabled ? ep.previewPrice : 0,
           };
         }
         return { ...ep, [key]: value ?? "" };
@@ -241,6 +294,27 @@ export function AdminAddMoviePage() {
               ? "mp4"
               : form.videoSource) as Movie["videoType"];
 
+      if (!form.status) {
+        setStatus("Vui lòng chọn trạng thái phim.");
+        setLoading(false);
+        return;
+      }
+
+      const previewPriceValue = Number(form.previewPrice) || 0;
+      if (form.previewEnabled && previewPriceValue <= 0) {
+        setStatus("Giá xem trước phải lớn hơn 0.");
+        setLoading(false);
+        return;
+      }
+
+      if (form.type === "single" && form.status === "premiere") {
+        if (!form.premiereAt) {
+          setStatus("Phim công chiếu cần thời gian công chiếu.");
+          setLoading(false);
+          return;
+        }
+      }
+
       const episodes =
         form.type === "series"
           ? form.episodes
@@ -253,6 +327,15 @@ export function AdminAddMoviePage() {
                   (form.videoType as Movie["videoType"]) ??
                   "hls",
                 duration: ep.duration,
+                status:
+                  form.status === "hidden"
+                    ? "hidden"
+                    : ep.status || "public",
+                premiereAt: ep.premiereAt
+                  ? toISOFromDateTimeLocal(ep.premiereAt)
+                  : "",
+                previewEnabled: Boolean(ep.previewEnabled),
+                previewPrice: Number(ep.previewPrice) || 0,
               }))
               .filter((ep) => ep.videoUrl)
           : [];
@@ -261,6 +344,51 @@ export function AdminAddMoviePage() {
         setStatus("Phim bộ cần ít nhất 1 tập với link video.");
         setLoading(false);
         return;
+      }
+
+      if (form.type === "series") {
+        if (
+          form.status === "public" &&
+          !episodes.some((ep) => ep.status === "public")
+        ) {
+          setStatus("Phim bộ public cần ít nhất 1 tập public.");
+          setLoading(false);
+          return;
+        }
+        if (
+          form.status === "premiere" &&
+          !episodes.some((ep) => ep.status === "premiere")
+        ) {
+          setStatus("Phim bộ công chiếu cần ít nhất 1 tập công chiếu.");
+          setLoading(false);
+          return;
+        }
+
+        for (const episode of episodes) {
+          if (episode.status === "premiere" && !episode.premiereAt) {
+            setStatus("Tập công chiếu cần thời gian công chiếu.");
+            setLoading(false);
+            return;
+          }
+          if (episode.previewEnabled && episode.previewPrice <= 0) {
+            setStatus("Giá xem trước của tập phải lớn hơn 0.");
+            setLoading(false);
+            return;
+          }
+        }
+
+        const premiereEpisodes = episodes
+          .filter((ep) => ep.status === "premiere")
+          .sort((a, b) => a.number - b.number);
+        for (let i = 1; i < premiereEpisodes.length; i += 1) {
+          const prevTime = new Date(premiereEpisodes[i - 1].premiereAt || "");
+          const currentTime = new Date(premiereEpisodes[i].premiereAt || "");
+          if (prevTime && currentTime && currentTime <= prevTime) {
+            setStatus("Thời gian công chiếu tập sau phải sau tập trước.");
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       const tagList = form.tags
@@ -285,6 +413,12 @@ export function AdminAddMoviePage() {
         videoType: resolvedVideoType,
         videoHeaders: parsedHeaders,
         episodes,
+        status: form.status,
+        premiereAt: form.premiereAt
+          ? toISOFromDateTimeLocal(form.premiereAt)
+          : "",
+        previewEnabled: form.previewEnabled,
+        previewPrice: previewPriceValue,
       });
 
       setStatus("Đã thêm phim mới! Bạn có thể kiểm tra ở mục Quản lý phim.");
@@ -421,6 +555,91 @@ export function AdminAddMoviePage() {
             <option value="series">Phim bộ</option>
           </select>
         </div>
+
+        <div>
+          <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-400">
+            Trạng thái phim <span className="text-red-400">*</span>
+          </label>
+          <select
+            value={form.status}
+            onChange={(event) => {
+              const nextStatus = event.target.value as FormState["status"];
+              setForm((prev) => ({
+                ...prev,
+                status: nextStatus,
+                premiereAt:
+                  nextStatus === "premiere" ? prev.premiereAt : "",
+                previewEnabled:
+                  nextStatus === "premiere" ? prev.previewEnabled : false,
+                previewPrice:
+                  nextStatus === "premiere" ? prev.previewPrice : 0,
+                episodes: prev.episodes.map((episode) => {
+                  if (nextStatus === "hidden") {
+                    return {
+                      ...episode,
+                      status: "hidden",
+                      previewEnabled: false,
+                      previewPrice: 0,
+                    };
+                  }
+                  return episode;
+                }),
+              }));
+            }}
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+          >
+            <option value="public">Hiển thị</option>
+            <option value="hidden">Ẩn</option>
+            <option value="premiere">Công chiếu</option>
+          </select>
+        </div>
+
+        {form.status === "premiere" && form.type === "single" && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Thời gian công chiếu
+              </label>
+              <input
+                type="datetime-local"
+                value={form.premiereAt}
+                onChange={(event) =>
+                  updateField("premiereAt", event.target.value)
+                }
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+              />
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <label className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                <span>Cho phép xem trước</span>
+                <input
+                  type="checkbox"
+                  checked={form.previewEnabled}
+                  onChange={(event) =>
+                    updateField("previewEnabled", event.target.checked)
+                  }
+                  className="h-4 w-4 accent-primary"
+                />
+              </label>
+              {form.previewEnabled && (
+                <div className="mt-3">
+                  <label className="text-xs uppercase tracking-wide text-slate-400">
+                    Giá xem trước (VND)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.previewPrice}
+                    onChange={(event) =>
+                      updateField("previewPrice", Number(event.target.value))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {form.type === "series" && (
           <div>
@@ -666,7 +885,7 @@ export function AdminAddMoviePage() {
               {form.episodes.map((ep, index) => (
                 <div
                   key={`ep-${ep.number}-${index}`}
-                  className="grid gap-3 rounded-xl border border-white/10 bg-black/30 p-3 md:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_auto]"
+                  className="grid gap-3 rounded-xl border border-white/10 bg-black/30 p-3 md:grid-cols-[1.1fr_1.1fr_0.7fr_0.7fr_0.7fr_auto]"
                 >
                   <div>
                     <label className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -734,6 +953,27 @@ export function AdminAddMoviePage() {
                       <option value="mp4">MP4</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Trạng thái
+                    </label>
+                    <select
+                      value={ep.status}
+                      onChange={(event) =>
+                        updateEpisodeField(
+                          index,
+                          "status",
+                          event.target.value as EpisodeInput["status"]
+                        )
+                      }
+                      disabled={form.status === "hidden"}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none disabled:opacity-60"
+                    >
+                      <option value="public">Public</option>
+                      <option value="hidden">Ẩn</option>
+                      <option value="premiere">Công chiếu</option>
+                    </select>
+                  </div>
                   <div className="flex items-end justify-end">
                     <button
                       type="button"
@@ -743,6 +983,60 @@ export function AdminAddMoviePage() {
                       Xoá
                     </button>
                   </div>
+                  {ep.status === "premiere" && (
+                    <div className="md:col-span-6 grid gap-3 rounded-xl border border-white/10 bg-dark/60 p-3 md:grid-cols-[1fr_1fr]">
+                      <div>
+                        <label className="text-[11px] uppercase tracking-wide text-slate-500">
+                          Thời gian công chiếu
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={ep.premiereAt}
+                          onChange={(event) =>
+                            updateEpisodeField(
+                              index,
+                              "premiereAt",
+                              event.target.value
+                            )
+                          }
+                          className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
+                          <span>Cho phép xem trước</span>
+                          <input
+                            type="checkbox"
+                            checked={ep.previewEnabled}
+                            onChange={(event) =>
+                              updateEpisodeField(
+                                index,
+                                "previewEnabled",
+                                event.target.checked
+                              )
+                            }
+                            className="h-4 w-4 accent-primary"
+                          />
+                        </label>
+                        {ep.previewEnabled && (
+                          <input
+                            type="number"
+                            min={0}
+                            value={ep.previewPrice}
+                            onChange={(event) =>
+                              updateEpisodeField(
+                                index,
+                                "previewPrice",
+                                Number(event.target.value)
+                              )
+                            }
+                            placeholder="Giá xem trước (VND)"
+                            className="w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

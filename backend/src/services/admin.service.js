@@ -85,6 +85,7 @@ class AdminService {
     }
 
     movie.isHidden = isHidden;
+    movie.status = isHidden ? "hidden" : "public";
     movie.unhideDate = isHidden && unhideDate ? new Date(unhideDate) : null;
     await movie.save();
 

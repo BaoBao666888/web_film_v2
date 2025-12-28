@@ -18,7 +18,11 @@ const hydrateMovies = async (stats) => {
   const movieIds = stats.map((entry) => entry._id);
   if (movieIds.length === 0) return [];
 
-  const movies = await Movie.find({ id: { $in: movieIds } }).lean();
+  const movies = await Movie.find({
+    id: { $in: movieIds },
+    isHidden: { $ne: true },
+    status: { $nin: ["hidden", "premiere"] },
+  }).lean();
   const movieMap = Object.fromEntries(movies.map((movie) => [movie.id, movie]));
 
   return stats
@@ -45,7 +49,10 @@ export const listMovies = async ({
   limit = 12,
   page = 1,
 } = {}) => {
-  const query = { isHidden: { $ne: true } };
+  const query = {
+    isHidden: { $ne: true },
+    status: { $nin: ["hidden", "premiere"] },
+  };
 
   if (q) {
     query.$or = [
@@ -73,13 +80,18 @@ export const getMovie = async (idOrSlug) => {
   return Movie.findOne({
     $or: [{ id: idOrSlug }, { slug: idOrSlug }],
     isHidden: { $ne: true },
+    status: { $ne: "hidden" },
   }).lean();
 };
 
 export const getRandomMovies = async ({ excludeId, limit = 4 } = {}) => {
   const match = excludeId
-    ? { id: { $ne: excludeId }, isHidden: { $ne: true } }
-    : { isHidden: { $ne: true } };
+    ? {
+        id: { $ne: excludeId },
+        isHidden: { $ne: true },
+        status: { $nin: ["hidden", "premiere"] },
+      }
+    : { isHidden: { $ne: true }, status: { $nin: ["hidden", "premiere"] } };
   const count = await Movie.countDocuments(match);
   const skip = Math.max(
     0,
@@ -484,7 +496,11 @@ export const listFavorites = async (userId, limit = 6) => {
     .lean();
 
   const movieIds = favs.map((f) => f.movie_id);
-  const movies = await Movie.find({ id: { $in: movieIds } }).lean();
+  const movies = await Movie.find({
+    id: { $in: movieIds },
+    isHidden: { $ne: true },
+    status: { $nin: ["hidden", "premiere"] },
+  }).lean();
   const movieMap = Object.fromEntries(movies.map((m) => [m.id, m]));
 
   return favs.map((fav) => movieMap[fav.movie_id]).filter(Boolean);
@@ -567,12 +583,18 @@ export const listNewestMovies = async ({ limit = 6, page = 1 } = {}) => {
   const skip = (sanitizedPage - 1) * sanitizedLimit;
 
   const [items, totalItems] = await Promise.all([
-    Movie.find({ isHidden: { $ne: true } })
-      .sort({ createdAt: -1 })
+    Movie.find({
+      isHidden: { $ne: true },
+      status: { $nin: ["hidden", "premiere"] },
+    })
+      .sort({ releasedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(sanitizedLimit)
       .lean(),
-    Movie.countDocuments({ isHidden: { $ne: true } }),
+    Movie.countDocuments({
+      isHidden: { $ne: true },
+      status: { $nin: ["hidden", "premiere"] },
+    }),
   ]);
 
   return {
@@ -629,7 +651,11 @@ export const listRecentComments = async (limit = 5) => {
 
   const [users, movies] = await Promise.all([
     User.find({ id: { $in: userIds } }).lean(),
-    Movie.find({ id: { $in: movieIds } })
+    Movie.find({
+      id: { $in: movieIds },
+      isHidden: { $ne: true },
+      status: { $nin: ["hidden", "premiere"] },
+    })
       .select({ id: 1, title: 1, thumbnail: 1 })
       .lean(),
   ]);

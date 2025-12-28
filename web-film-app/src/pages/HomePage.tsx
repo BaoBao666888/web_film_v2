@@ -6,6 +6,7 @@ import { useFetch } from "../hooks/useFetch";
 import type {
   CommunityHighlightsResponse,
   NewMoviesResponse,
+  PremiereListResponse,
   RecommendationResponse,
   TrendingMoviesResponse,
 } from "../types/api";
@@ -36,6 +37,18 @@ const formatFavorites = (value?: number) =>
     ? `${numberFormatter.format(value)} lượt yêu thích`
     : "Chưa có dữ liệu";
 
+const formatPremiereTime = (value?: string) => {
+  if (!value) return "Chưa rõ thời gian";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa rõ thời gian";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const uniqueStrings = (items?: (string | null | undefined)[]) =>
   (items ?? [])
     .map((item) => item?.trim())
@@ -44,6 +57,24 @@ const uniqueStrings = (items?: (string | null | undefined)[]) =>
 
 const resolveTags = (movie: { tags?: string[]; moods?: string[] }) =>
   uniqueStrings(movie.tags?.length ? movie.tags : movie.moods ?? []);
+
+const formatCountdown = (targetTime: string | undefined, now: number) => {
+  if (!targetTime) return "Chưa có lịch";
+  const target = new Date(targetTime).getTime();
+  if (Number.isNaN(target)) return "Chưa có lịch";
+  const diff = target - now;
+  if (diff <= 0) return "Sắp bắt đầu";
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0 || days > 0) parts.push(`${hours}h`);
+  parts.push(`${minutes}m`, `${seconds}s`);
+  return parts.join(" ");
+};
 
 type PreviewMovie = {
   id: string;
@@ -63,6 +94,12 @@ export function HomePage() {
     useFetch<TrendingMoviesResponse>("/movies/trending?limit=6&days=7");
   const { data: newMoviesData } = useFetch<NewMoviesResponse>(
     "/movies/new?limit=6"
+  );
+  const { data: livePremiereData } = useFetch<PremiereListResponse>(
+    "/movies/premieres?state=live&limit=6"
+  );
+  const { data: upcomingPremiereData } = useFetch<PremiereListResponse>(
+    "/movies/premieres?state=upcoming&limit=6"
   );
   const { data: communityData } = useFetch<CommunityHighlightsResponse>(
     "/movies/community-highlights"
@@ -85,6 +122,8 @@ export function HomePage() {
 
   const heroMovies = trendingItems.slice(0, 2).map((item) => item.movie);
   const recommendationList = aiData?.items ?? latestMovies.slice(0, 3);
+  const livePremieres = livePremiereData?.items ?? [];
+  const upcomingPremieres = upcomingPremiereData?.items ?? [];
 
   const trendingScrollRef = useRef<HTMLDivElement>(null);
   const newMoviesScrollRef = useRef<HTMLDivElement>(null);
@@ -100,6 +139,7 @@ export function HomePage() {
   const showPreviewTimeoutRef = useRef<number | null>(null);
   const hidePreviewTimeoutRef = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const element = trendingScrollRef.current;
@@ -138,6 +178,13 @@ export function HomePage() {
       window.removeEventListener("resize", updateButtons);
     };
   }, [latestMovies.length]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const scrollCarousel = (
     element: HTMLDivElement | null,
@@ -320,6 +367,138 @@ export function HomePage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-dark/80 to-black/80 p-5 shadow-lg shadow-black/30 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-orange-300">
+              Phim đang công chiếu
+            </p>
+            <h3 className="mt-1 text-2xl font-semibold text-white">
+              Trực tiếp như Youtube Premiere
+            </h3>
+            <p className="text-sm text-slate-400">
+              Cùng xem đồng thời và chat realtime ngay trên khung công chiếu.
+            </p>
+          </div>
+        </div>
+        {livePremieres.length === 0 ? (
+          <p className="mt-6 text-sm text-slate-400">
+            Chưa có suất công chiếu trực tiếp nào.
+          </p>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {livePremieres.map((item) => (
+              <Link
+                key={`${item.movieId}-${item.episodeNumber ?? "single"}`}
+                to={`/watch/${item.movieId}${
+                  item.episodeNumber ? `?ep=${item.episodeNumber}` : ""
+                }`}
+                className="group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-orange-400/60"
+              >
+                <div className="relative">
+                  <img
+                    src={item.thumbnail || item.poster}
+                    alt={item.title}
+                    className="h-48 w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute left-4 top-4 flex items-center gap-2">
+                    <StatusBadge label="LIVE" tone="warning" />
+                    <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                      {numberFormatter.format(item.viewerCount ?? 0)} đang xem
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2 p-5">
+                  <p className="text-lg font-semibold text-white">
+                    {item.title}
+                  </p>
+                  {item.episodeTitle && (
+                    <p className="text-xs text-orange-200">
+                      {item.episodeTitle}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 line-clamp-2">
+                    {item.synopsis}
+                  </p>
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>{item.duration || "Đang phát"}</span>
+                    <span className="text-orange-300">Vào xem ngay →</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-500/10 via-dark/80 to-black/80 p-5 shadow-lg shadow-black/30 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-sky-300">
+              Phim sắp công chiếu
+            </p>
+            <h3 className="mt-1 text-2xl font-semibold text-white">
+              Đếm ngược đến giờ lên sóng
+            </h3>
+            <p className="text-sm text-slate-400">
+              Ưu tiên suất gần nhất và mở bán vé xem trước nếu có.
+            </p>
+          </div>
+        </div>
+        {upcomingPremieres.length === 0 ? (
+          <p className="mt-6 text-sm text-slate-400">
+            Chưa có lịch công chiếu sắp tới.
+          </p>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {upcomingPremieres.map((item) => (
+              <Link
+                key={`${item.movieId}-${item.episodeNumber ?? "single"}`}
+                to={`/movie/${item.movieId}`}
+                className="group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-sky-400/60"
+              >
+                <div className="relative">
+                  <img
+                    src={item.thumbnail || item.poster}
+                    alt={item.title}
+                    className="h-48 w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute left-4 top-4 flex flex-col gap-2">
+                    <StatusBadge label="Sắp chiếu" tone="info" />
+                    <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                      {formatCountdown(item.premiereAt, now)}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2 p-5">
+                  <p className="text-lg font-semibold text-white">
+                    {item.title}
+                  </p>
+                  {item.episodeTitle && (
+                    <p className="text-xs text-sky-200">
+                      {item.episodeTitle}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 line-clamp-2">
+                    {item.synopsis}
+                  </p>
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>{formatPremiereTime(item.premiereAt)}</span>
+                    {item.previewEnabled && item.previewPrice ? (
+                      <span className="rounded-full border border-sky-500/40 px-2 py-1 text-[10px] text-sky-200">
+                        Xem trước {numberFormatter.format(item.previewPrice)}₫
+                      </span>
+                    ) : (
+                      <span className="text-sky-200">Xem trailer</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 sm:p-6">

@@ -28,6 +28,12 @@ router.get(
   asyncHandler((req, res) => movieController.getNewestMovies(req, res))
 );
 
+// Premiere movies
+router.get(
+  "/premieres",
+  asyncHandler((req, res) => movieController.getPremieres(req, res))
+);
+
 // Community highlights
 router.get(
   "/community-highlights",
@@ -56,7 +62,15 @@ router.post(
 // Get watch data
 router.get(
   "/:id/watch",
+  optionalAuth,
   asyncHandler((req, res) => movieController.getWatchData(req, res))
+);
+
+// Purchase preview access
+router.post(
+  "/:id/preview/purchase",
+  verifyToken,
+  asyncHandler((req, res) => movieController.purchasePreview(req, res))
 );
 
 // Record view

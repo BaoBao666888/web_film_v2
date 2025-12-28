@@ -190,7 +190,9 @@ export const registerWatchPartySocket = (io) => {
       }
     });
 
-    socket.on("watch-party:chat", async ({ roomId, viewerId, userName, content }) => {
+    socket.on(
+      "watch-party:chat",
+      async ({ roomId, viewerId, userName, content, position }) => {
       if (!roomId || !viewerId || !content) return;
       const now = Date.now();
       const room = await savePartyWithRetry(roomId, async (party) => {
@@ -198,6 +200,7 @@ export const registerWatchPartySocket = (io) => {
           userId: viewerId,
           userName: userName || "Ẩn danh",
           content: String(content).slice(0, 500),
+          position: Number.isFinite(Number(position)) ? Number(position) : undefined,
           createdAt: now,
         });
         party.messages = party.messages.slice(-50);

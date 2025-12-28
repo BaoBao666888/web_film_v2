@@ -12,7 +12,7 @@ export async function checkAndUnhideMovies() {
         unhideDate: { $ne: null, $lte: now },
       },
       {
-        $set: { isHidden: false },
+        $set: { isHidden: false, status: "public" },
         $unset: { unhideDate: "" },
       }
     );

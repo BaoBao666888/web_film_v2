@@ -249,7 +249,7 @@ class WatchPartyService {
   /**
    * Send chat message
    */
-  async sendMessage(roomId, viewerId, userName, content) {
+  async sendMessage(roomId, viewerId, userName, content, position) {
     const now = Date.now();
 
     const room = await savePartyWithRetry(roomId, async (party) => {
@@ -257,6 +257,7 @@ class WatchPartyService {
         userId: viewerId,
         userName: userName || "Ẩn danh",
         content: String(content).slice(0, 500),
+        position: Number.isFinite(Number(position)) ? Number(position) : undefined,
         createdAt: now,
       });
       party.messages = party.messages.slice(-50);

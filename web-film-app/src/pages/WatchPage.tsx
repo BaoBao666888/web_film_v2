@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { io, type Socket } from "socket.io-client";
 import { useFetch } from "../hooks/useFetch";
 import type {
   CommentListResponse,
@@ -9,11 +10,16 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../hooks/useAuth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { api } from "../lib/api";
+import { api, API_BASE_URL } from "../lib/api";
 import { CinemaPlayer } from "../components/player/CinemaPlayer";
+import type {
+  WatchPartyMessage,
+  WatchPartyParticipant,
+} from "../types/watchParty";
 
 // URL API lọc bình luận (Flask)
 const COMMENT_FILTER_URL = "http://127.0.0.1:5002/api/moderate";
+const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
 export function WatchPage() {
   const { id } = useParams();
@@ -23,12 +29,13 @@ export function WatchPage() {
   const hasEpisodeParam = searchParams.has("ep");
   const episodeNumber =
     Number.isFinite(episodeParam) && episodeParam > 0 ? episodeParam : 1;
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, checkAuthStatus } = useAuth();
 
   const {
     data: watchData,
     loading,
     error,
+    refetch: refetchWatchData,
   } = useFetch<WatchResponse>(
     id ? `/movies/${id}/watch${episodeNumber ? `?ep=${episodeNumber}` : ""}` : null,
     [id, episodeNumber]
@@ -52,9 +59,26 @@ export function WatchPage() {
   >(null);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [theaterMode, setTheaterMode] = useState(true);
+  const [premiereNow, setPremiereNow] = useState(Date.now());
+  const [premiereMessages, setPremiereMessages] = useState<
+    WatchPartyMessage[]
+  >([]);
+  const [premiereParticipants, setPremiereParticipants] = useState<
+    WatchPartyParticipant[]
+  >([]);
+  const [premiereMessage, setPremiereMessage] = useState("");
+  const [premiereChatStatus, setPremiereChatStatus] = useState<string | null>(
+    null
+  );
+  const [previewStatus, setPreviewStatus] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
+  const [purchasingPreview, setPurchasingPreview] = useState(false);
   const viewerIdRef = useRef<string | null>(null);
   const lastHistorySyncRef = useRef(0);
   const lastPositionRef = useRef(0);
+  const premiereStartRef = useRef<number | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const historyMovieId = watchData?.movieId ?? id;
 
   const { data: resumeData } = useFetch<{
@@ -79,14 +103,84 @@ export function WatchPage() {
   }, []);
 
   useEffect(() => {
+    if (!watchData?.premiere) return;
+    const timer = window.setInterval(() => {
+      setPremiereNow(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [watchData?.premiere?.premiereAt]);
+
+  useEffect(() => {
+    if (watchData?.premiere?.status !== "live" || !watchData.premiere.premiereAt) {
+      premiereStartRef.current = null;
+      return;
+    }
+    premiereStartRef.current = Math.max(
+      0,
+      (Date.now() - new Date(watchData.premiere.premiereAt).getTime()) / 1000
+    );
+  }, [watchData?.premiere?.premiereAt, watchData?.premiere?.status]);
+
+  useEffect(() => {
     if (!id) return;
     const timer = setTimeout(() => {
+      if (!watchData?.access?.canPlay) return;
       api.movies
-        .addView(id, { viewerId: viewerIdRef.current || undefined, episode: episodeNumber })
+        .addView(id, {
+          viewerId: viewerIdRef.current || undefined,
+          episode: episodeNumber,
+        })
         .catch((err) => console.error("Không thể ghi nhận lượt xem:", err));
     }, 1000);
     return () => clearTimeout(timer);
-  }, [id, episodeNumber]);
+  }, [id, episodeNumber, watchData?.access?.canPlay]);
+
+  useEffect(() => {
+    if (!watchData?.premiere?.roomId || !viewerIdRef.current) return;
+    const roomId = watchData.premiere.roomId;
+    const socket = io(SOCKET_URL, { transports: ["websocket"] });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("watch-party:join", {
+        roomId,
+        viewerId: viewerIdRef.current,
+        name: user?.name ?? "Khách",
+      });
+      socket.emit("watch-party:sync-request", { roomId });
+    });
+
+    socket.on("watch-party:joined", (room) => {
+      setPremiereMessages(room?.messages ?? []);
+      setPremiereParticipants(room?.participants ?? []);
+    });
+
+    socket.on("watch-party:participants", (participants) => {
+      setPremiereParticipants(participants ?? []);
+    });
+
+    socket.on("watch-party:messages", (messages) => {
+      setPremiereMessages(messages ?? []);
+    });
+
+    socket.on("watch-party:error", (err) => {
+      console.error("Premiere chat error:", err);
+    });
+
+    const hb = window.setInterval(() => {
+      if (!viewerIdRef.current) return;
+      socket.emit("watch-party:heartbeat", {
+        roomId,
+        viewerId: viewerIdRef.current,
+      });
+    }, 8000);
+
+    return () => {
+      window.clearInterval(hb);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [watchData?.premiere?.roomId, user?.name]);
 
   useEffect(() => {
     if (!id || !resumeItem?.episode || hasEpisodeParam) return;
@@ -260,6 +354,101 @@ export function WatchPage() {
       .catch((err) => console.error("Không thể lưu tiến độ:", err));
   };
 
+  const handlePurchasePreview = async () => {
+    if (!id) return;
+    if (!isAuthenticated) {
+      setPreviewStatus({
+        type: "error",
+        message: "Bạn cần đăng nhập để mua quyền xem trước.",
+      });
+      return;
+    }
+    setPurchasingPreview(true);
+    setPreviewStatus(null);
+    try {
+      const response = await api.movies.purchasePreview(id, {
+        episode: isSeries ? currentEpisodeNumber : undefined,
+      });
+      if (typeof response.balance === "number") {
+        const stored = localStorage.getItem("user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          localStorage.setItem(
+            "user",
+            JSON.stringify({ ...parsed, balance: response.balance })
+          );
+        }
+        checkAuthStatus();
+      }
+      setPreviewStatus({
+        type: "success",
+        message: response.alreadyPurchased
+          ? "Bạn đã mua quyền xem trước."
+          : "Thanh toán thành công. Bạn có thể xem ngay!",
+      });
+      refetchWatchData();
+    } catch (err) {
+      setPreviewStatus({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Không thể thanh toán xem trước.",
+      });
+    } finally {
+      setPurchasingPreview(false);
+    }
+  };
+
+  const handleSendPremiereMessage = () => {
+    if (!watchData?.premiere?.roomId || !viewerIdRef.current) return;
+    const trimmed = premiereMessage.trim();
+    if (!trimmed) return;
+    socketRef.current?.emit("watch-party:chat", {
+      roomId: watchData.premiere.roomId,
+      viewerId: viewerIdRef.current,
+      userName: user?.name ?? "Khách",
+      content: trimmed,
+      position: lastPositionRef.current,
+    });
+    setPremiereMessage("");
+    setPremiereChatStatus(null);
+  };
+
+  const premiereInfo = watchData.premiere;
+  const isPremiereLive = premiereInfo?.status === "live";
+  const isPremiereUpcoming = premiereInfo?.status === "upcoming";
+  const viewerCount =
+    premiereParticipants.length || premiereInfo?.viewerCount || 0;
+  const viewerLabel = isPremiereLive
+    ? `${viewFormatter.format(viewerCount)} đang xem`
+    : `${viewFormatter.format(watchData.views ?? 0)} lượt xem`;
+  const viewChip = watchData.viewsHidden
+    ? isPremiereLive
+      ? viewerLabel
+      : "Sắp công chiếu"
+    : viewerLabel;
+  const countdownLabel = (() => {
+    if (!premiereInfo?.premiereAt) return "Chưa có lịch công chiếu";
+    const target = new Date(premiereInfo.premiereAt).getTime();
+    if (Number.isNaN(target)) return "Chưa có lịch công chiếu";
+    const diff = target - premiereNow;
+    if (diff <= 0) return "Đang bắt đầu...";
+    const totalSeconds = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const hourLabel = hours > 0 ? `${hours}h ` : "";
+    return `${hourLabel}${minutes}m ${seconds}s`;
+  })();
+  const canPlay = watchData.access?.canPlay ?? true;
+  const playerStartPosition =
+    isPremiereLive && premiereStartRef.current !== null
+      ? premiereStartRef.current
+      : resumePosition;
+  const showPremiereChat = Boolean(premiereInfo?.roomId);
+  const showPremiereCountdown = isPremiereUpcoming && !canPlay;
+
   const stats = [
     { label: "Năm", value: detail?.year ?? "—" },
     {
@@ -275,8 +464,10 @@ export function WatchPage() {
       )}/10 người xem (${ratingStats.count})`,
     },
     {
-      label: "Lượt xem",
-      value: `${viewFormatter.format(watchData.views ?? 0)} lượt`,
+      label: isPremiereLive ? "Đang xem" : "Lượt xem",
+      value: isPremiereLive
+        ? `${viewFormatter.format(viewerCount)} người`
+        : `${viewFormatter.format(watchData.views ?? 0)} lượt`,
     },
   ];
 
@@ -311,7 +502,7 @@ export function WatchPage() {
                     : detail?.duration ?? "Phim lẻ"}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
-                  {viewFormatter.format(watchData.views ?? 0)} lượt xem
+                  {viewChip}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
                   IMDb {detail?.rating?.toFixed(1) ?? "0.0"} • Người xem{" "}
@@ -365,15 +556,160 @@ export function WatchPage() {
                   }}
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/60" />
-                <div className="relative">
-                  <CinemaPlayer
-                    stream={streamSource}
-                    title={detail?.title ?? watchData.title}
-                    poster={backgroundPoster}
-                    autoPlay
-                    startPosition={resumePosition}
-                    onStatePush={handleHistorySync}
-                  />
+                <div
+                  className={`grid gap-6 ${
+                    showPremiereChat ? "lg:grid-cols-[1fr_320px]" : ""
+                  }`}
+                >
+                  <div className="relative">
+                    {showPremiereCountdown ? (
+                      <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 rounded-[24px] border border-white/10 bg-black/50 p-6 text-center text-white">
+                        <StatusBadge label="Sắp công chiếu" tone="info" />
+                        <h2 className="text-3xl font-semibold">
+                          {countdownLabel}
+                        </h2>
+                        <p className="text-sm text-slate-300">
+                          Suất chiếu sẽ bắt đầu lúc{" "}
+                          <span className="text-white">
+                            {new Date(
+                              premiereInfo?.premiereAt ?? Date.now()
+                            ).toLocaleString("vi-VN", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center gap-3">
+                          {watchData.trailerUrl && (
+                            <a
+                              href={watchData.trailerUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-primary hover:text-primary"
+                            >
+                              Xem trailer
+                            </a>
+                          )}
+                          {watchData.access?.requiresPreview && (
+                            <button
+                              type="button"
+                              onClick={handlePurchasePreview}
+                              disabled={purchasingPreview}
+                              className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-dark shadow-glow transition hover:bg-primary/90 disabled:opacity-60"
+                            >
+                              {purchasingPreview
+                                ? "Đang thanh toán..."
+                                : `Xem trước ${
+                                    watchData.access?.previewPrice
+                                      ? `${watchData.access.previewPrice.toLocaleString(
+                                          "vi-VN"
+                                        )}₫`
+                                      : ""
+                                  }`}
+                            </button>
+                          )}
+                        </div>
+                        {previewStatus && (
+                          <p
+                            className={`text-xs ${
+                              previewStatus.type === "success"
+                                ? "text-emerald-300"
+                                : "text-red-300"
+                            }`}
+                          >
+                            {previewStatus.message}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <CinemaPlayer
+                        stream={streamSource}
+                        title={detail?.title ?? watchData.title}
+                        poster={backgroundPoster}
+                        autoPlay
+                        startPosition={playerStartPosition}
+                        onStatePush={handleHistorySync}
+                        controlsEnabled={!isPremiereLive}
+                        lockMessage={
+                          isPremiereLive
+                            ? "Đang công chiếu trực tiếp"
+                            : undefined
+                        }
+                      />
+                    )}
+                  </div>
+                  {showPremiereChat && (
+                    <aside className="flex flex-col rounded-3xl border border-white/10 bg-dark/70 p-4 text-sm text-white shadow-xl shadow-black/40">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">
+                            Chat công chiếu
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {viewChip}
+                          </p>
+                        </div>
+                        {isPremiereLive && (
+                          <span className="rounded-full bg-red-500/20 px-2 py-1 text-[10px] font-semibold text-red-200">
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
+                        {premiereMessages.length === 0 && (
+                          <p className="text-xs text-slate-400">
+                            Chưa có tin nhắn nào. Hãy bắt đầu trò chuyện!
+                          </p>
+                        )}
+                        {premiereMessages.map((msg, idx) => (
+                          <div
+                            key={`${msg.createdAt}-${idx}`}
+                            className="rounded-2xl border border-white/10 bg-black/30 p-2"
+                          >
+                            <p className="text-xs font-semibold text-white">
+                              {msg.userName || "Ẩn danh"}
+                            </p>
+                            <p className="text-xs text-slate-300">
+                              {msg.content}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 border-t border-white/10 pt-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={premiereMessage}
+                            onChange={(event) =>
+                              setPremiereMessage(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleSendPremiereMessage();
+                              }
+                            }}
+                            placeholder="Nhập tin nhắn..."
+                            className="flex-1 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSendPremiereMessage}
+                            className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-dark shadow-glow"
+                          >
+                            Gửi
+                          </button>
+                        </div>
+                        {premiereChatStatus && (
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            {premiereChatStatus}
+                          </p>
+                        )}
+                      </div>
+                    </aside>
+                  )}
                 </div>
               </div>
 

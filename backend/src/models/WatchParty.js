@@ -15,6 +15,7 @@ const MessageSchema = new mongoose.Schema(
     userId: { type: String, required: true },
     userName: { type: String, default: "Ẩn danh" },
     content: { type: String, required: true },
+    position: { type: Number },
     createdAt: { type: Number, default: () => Date.now() },
   },
   { _id: false }
