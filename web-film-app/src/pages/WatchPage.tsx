@@ -10,16 +10,50 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../hooks/useAuth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { api, API_BASE_URL } from "../lib/api";
+import { api, API_BASE_URL, apiFetch } from "../lib/api";
 import { CinemaPlayer } from "../components/player/CinemaPlayer";
 import type {
   WatchPartyMessage,
   WatchPartyParticipant,
+  WatchPartyRoom,
 } from "../types/watchParty";
 
 // URL API lọc bình luận (Flask)
 const COMMENT_FILTER_URL = "http://127.0.0.1:5002/api/moderate";
 const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const formatChatTime = (timeSeconds: number) => {
+  if (!Number.isFinite(timeSeconds)) return "";
+  const totalSeconds = Math.max(0, Math.floor(timeSeconds));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${minutes.toString().padStart(2, "0")}:${seconds
+    .toString()
+    .padStart(2, "0")}`;
+};
+
+const resolveChatTime = (
+  message: WatchPartyMessage,
+  premiereAt?: string | null
+) => {
+  if (Number.isFinite(message.position)) {
+    return Number(message.position);
+  }
+  if (!premiereAt || !message.createdAt) return null;
+  const createdAt =
+    typeof message.createdAt === "string"
+      ? new Date(message.createdAt).getTime()
+      : Number(message.createdAt);
+  const premiereTime = new Date(premiereAt).getTime();
+  if (Number.isNaN(createdAt) || Number.isNaN(premiereTime)) return null;
+  return Math.max(0, (createdAt - premiereTime) / 1000);
+};
 
 export function WatchPage() {
   const { id } = useParams();
@@ -70,6 +104,8 @@ export function WatchPage() {
   const [premiereChatStatus, setPremiereChatStatus] = useState<string | null>(
     null
   );
+  const [premiereChatVisible, setPremiereChatVisible] = useState(true);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<
     { type: "success" | "error"; message: string } | null
   >(null);
@@ -83,6 +119,7 @@ export function WatchPage() {
   const premiereAutoRefetchRef = useRef(0);
   const socketRef = useRef<Socket | null>(null);
   const historyMovieId = watchData?.movieId ?? id;
+  const premiereWasLiveRef = useRef(false);
 
   const { data: resumeData } = useFetch<{
     item: { movieId: string; episode?: number; position?: number } | null;
@@ -119,8 +156,10 @@ export function WatchPage() {
       return;
     }
     setPremiereStartPosition(
-      0,
-      (Date.now() - new Date(watchData.premiere.premiereAt).getTime()) / 1000
+      Math.max(
+        0,
+        (Date.now() - new Date(watchData.premiere.premiereAt).getTime()) / 1000
+      )
     );
   }, [watchData?.premiere?.premiereAt, watchData?.premiere?.status]);
 
@@ -131,11 +170,22 @@ export function WatchPage() {
     const target = new Date(watchData.premiere.premiereAt).getTime();
     if (Number.isNaN(target)) return;
     const now = Date.now();
-    if (premiereNow >= target && now - premiereAutoRefetchRef.current > 3000) {
+    const canPlayPreview = Boolean(watchData?.access?.canPlay);
+    if (
+      premiereNow >= target &&
+      !canPlayPreview &&
+      now - premiereAutoRefetchRef.current > 3000
+    ) {
       premiereAutoRefetchRef.current = now;
       refetchWatchData();
     }
-  }, [premiereNow, refetchWatchData, watchData?.premiere?.premiereAt, watchData?.premiere?.status]);
+  }, [
+    premiereNow,
+    refetchWatchData,
+    watchData?.premiere?.premiereAt,
+    watchData?.premiere?.status,
+    watchData?.access?.canPlay,
+  ]);
 
   useEffect(() => {
     if (!id) return;
@@ -152,6 +202,7 @@ export function WatchPage() {
   }, [id, episodeNumber, watchData?.access?.canPlay]);
 
   useEffect(() => {
+    if (watchData?.premiere?.status !== "live") return;
     if (!watchData?.premiere?.roomId || !viewerIdRef.current) return;
     const roomId = watchData.premiere.roomId;
     const socket = io(SOCKET_URL, { transports: ["websocket"] });
@@ -196,7 +247,14 @@ export function WatchPage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [watchData?.premiere?.roomId, user?.name]);
+  }, [watchData?.premiere?.roomId, watchData?.premiere?.status, user?.name]);
+
+  useEffect(() => {
+    if (watchData?.premiere?.roomId) {
+      setPremiereChatVisible(true);
+    }
+  }, [watchData?.premiere?.roomId]);
+
 
   useEffect(() => {
     if (!id || !resumeItem?.episode || hasEpisodeParam) return;
@@ -308,6 +366,44 @@ export function WatchPage() {
     }
   };
 
+  const detail = detailData?.movie;
+  const currentEpisodeNumber =
+    watchData?.currentEpisode?.number ?? episodeNumber;
+  const premiereSourceAt =
+    watchData?.type === "series"
+      ? watchData?.currentEpisode?.premiereAt
+      : detail?.premiereAt;
+  const premiereStartAt = premiereSourceAt
+    ? new Date(premiereSourceAt).getTime()
+    : null;
+  const isPremiereReplay =
+    watchData && !watchData.premiere && premiereStartAt !== null
+      ? !Number.isNaN(premiereStartAt) && Date.now() >= premiereStartAt
+      : false;
+  const premiereReplayRoomId =
+    isPremiereReplay && (watchData?.movieId ?? id)
+      ? `premiere-${watchData?.movieId ?? id}-${
+          watchData?.type === "series" ? currentEpisodeNumber : 0
+        }`
+      : null;
+
+  useEffect(() => {
+    if (isPremiereReplay) {
+      setPremiereChatVisible(true);
+    }
+  }, [isPremiereReplay]);
+
+  useEffect(() => {
+    if (!premiereReplayRoomId || !isPremiereReplay) return;
+    apiFetch<WatchPartyRoom>(`/watch-party/${premiereReplayRoomId}`)
+      .then((room) => {
+        setPremiereMessages(room?.messages ?? []);
+      })
+      .catch((err) => {
+        console.error("Không tải được chat công chiếu:", err);
+      });
+  }, [isPremiereReplay, premiereReplayRoomId]);
+
   // ================================
   //  RENDER UI
   // ================================
@@ -327,15 +423,12 @@ export function WatchPage() {
     );
   }
 
-  const detail = detailData?.movie;
   const suggestions = detailData?.suggestions ?? [];
   const comments = commentData?.items ?? [];
   const ratingStats = detailData?.ratingStats ?? { average: 0, count: 0 };
   const viewFormatter = new Intl.NumberFormat("vi-VN");
   const isSeries = watchData.type === "series";
   const episodes = watchData.episodes ?? [];
-  const currentEpisodeNumber =
-    watchData.currentEpisode?.number ?? episodeNumber;
   const currentEpisodeTitle =
     watchData.currentEpisode?.title ?? `Tập ${currentEpisodeNumber}`;
 
@@ -358,6 +451,7 @@ export function WatchPage() {
   }) => {
     const position = Number(state.position) || 0;
     lastPositionRef.current = position;
+    setPlaybackPosition(position);
     if (!isAuthenticated || !historyMovieId) return;
     if (position <= 1) return;
 
@@ -431,6 +525,10 @@ export function WatchPage() {
     setPremiereChatStatus(null);
   };
 
+  const togglePremiereChat = () => {
+    setPremiereChatVisible((visible) => !visible);
+  };
+
   const premiereInfo = watchData.premiere;
   const isPremiereLive = premiereInfo?.status === "live";
   const isPremiereUpcoming = premiereInfo?.status === "upcoming";
@@ -450,6 +548,33 @@ export function WatchPage() {
     if (Number.isNaN(startAt)) return null;
     return Math.max(0, (premiereNow - startAt) / 1000);
   })();
+  useEffect(() => {
+    if (isPremiereLive) {
+      premiereWasLiveRef.current = true;
+    }
+  }, [isPremiereLive]);
+
+  useEffect(() => {
+    if (!isPremiereLive && premiereWasLiveRef.current) {
+      navigate("/", { replace: true });
+    }
+  }, [isPremiereLive, navigate]);
+
+  useEffect(() => {
+    if (!isPremiereLive || !premiereInfo?.endsAt) return;
+    const endTime = new Date(premiereInfo.endsAt).getTime();
+    if (Number.isNaN(endTime)) return;
+    const now = Date.now();
+    const diff = endTime - now;
+    if (diff <= 0) {
+      navigate("/", { replace: true });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      navigate("/", { replace: true });
+    }, diff);
+    return () => window.clearTimeout(timer);
+  }, [isPremiereLive, premiereInfo?.endsAt, navigate]);
   const countdownLabel = (() => {
     if (!premiereInfo?.premiereAt) return "Chưa có lịch công chiếu";
     const target = new Date(premiereInfo.premiereAt).getTime();
@@ -468,36 +593,107 @@ export function WatchPage() {
     isPremiereLive && premiereStartPosition !== null
       ? premiereStartPosition
       : resumePosition;
-  const showPremiereChat = Boolean(premiereInfo?.roomId);
+  const showPremiereChat = isPremiereLive || isPremiereReplay;
   const showPremiereCountdown = isPremiereUpcoming && !canPlay;
-  const formatChatTime = (timeSeconds: number) => {
-    if (!Number.isFinite(timeSeconds)) return "";
-    const totalSeconds = Math.max(0, Math.floor(timeSeconds));
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
-  };
-  const resolveChatTime = (message: WatchPartyMessage) => {
-    if (Number.isFinite(message.position)) {
-      return Number(message.position);
-    }
-    if (!premiereInfo?.premiereAt || !message.createdAt) return null;
-    const createdAt =
-      typeof message.createdAt === "string"
-        ? new Date(message.createdAt).getTime()
-        : Number(message.createdAt);
-    const premiereAt = new Date(premiereInfo.premiereAt).getTime();
-    if (Number.isNaN(createdAt) || Number.isNaN(premiereAt)) return null;
-    return Math.max(0, (createdAt - premiereAt) / 1000);
-  };
+  const commentsLocked = Boolean(premiereInfo);
+
+  const premiereChatPanel = showPremiereChat ? (
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-dark/80 p-4 text-sm text-white shadow-xl shadow-black/40">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold">Chat công chiếu</p>
+          <p className="text-[11px] text-slate-400">{viewChip}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isPremiereLive && (
+            <span className="rounded-full bg-red-500/20 px-2 py-1 text-[10px] font-semibold text-red-200">
+              LIVE
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={togglePremiereChat}
+            className="rounded-full border border-white/10 px-2 py-1 text-[10px] text-white/70 transition hover:border-primary/60 hover:text-white"
+            title="Ẩn chat"
+          >
+            X
+          </button>
+        </div>
+      </div>
+      <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
+        {premiereMessages.length === 0 && (
+          <p className="text-xs text-slate-400">
+            Chưa có tin nhắn nào. Hãy bắt đầu trò chuyện!
+          </p>
+        )}
+        {premiereMessages.map((msg, idx) => {
+          const chatTime = resolveChatTime(
+            msg,
+            premiereInfo?.premiereAt ?? premiereSourceAt ?? null
+          );
+          if (
+            isPremiereReplay &&
+            typeof chatTime === "number" &&
+            chatTime > playbackPosition + 0.5
+          ) {
+            return null;
+          }
+          const chatLabel =
+            typeof chatTime === "number" ? formatChatTime(chatTime) : null;
+          return (
+            <div
+              key={`${msg.createdAt}-${idx}`}
+              className="rounded-2xl border border-white/10 bg-black/30 p-2"
+            >
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <p className="text-xs font-semibold text-white">
+                  {msg.userName || "Ẩn danh"}
+                </p>
+                {chatLabel && <span>{chatLabel}</span>}
+              </div>
+              <p className="text-xs text-slate-300">{msg.content}</p>
+            </div>
+          );
+        })}
+      </div>
+      {!isPremiereReplay && (
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={premiereMessage}
+              onChange={(event) => setPremiereMessage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleSendPremiereMessage();
+                }
+              }}
+              placeholder="Nhập tin nhắn..."
+              className="flex-1 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleSendPremiereMessage}
+              className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-dark shadow-glow"
+            >
+              Gửi
+            </button>
+          </div>
+          {premiereChatStatus && (
+            <p className="mt-2 text-[11px] text-slate-400">
+              {premiereChatStatus}
+            </p>
+          )}
+        </div>
+      )}
+      {isPremiereReplay && (
+        <p className="mt-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-300">
+          Chat đã kết thúc cùng buổi công chiếu. Bạn chỉ có thể xem lại nội dung.
+        </p>
+      )}
+    </div>
+  ) : null;
 
   const stats = [
     { label: "Năm", value: detail?.year ?? "—" },
@@ -598,7 +794,7 @@ export function WatchPage() {
             }`}
           >
             <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-black/60 p-2 shadow-[0_40px_90px_rgba(0,0,0,0.65)]">
+              <div className="premiere-player-shell relative overflow-hidden rounded-[34px] border border-white/10 bg-black/40 p-2 shadow-[0_40px_90px_rgba(0,0,0,0.65)]">
                 <div
                   className="pointer-events-none absolute inset-0 opacity-35 blur-3xl"
                   style={{
@@ -607,10 +803,11 @@ export function WatchPage() {
                     backgroundPosition: "center",
                   }}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/60" />
                 <div
-                  className={`grid gap-6 ${
-                    showPremiereChat ? "lg:grid-cols-[1fr_320px]" : ""
+                  className={`grid items-stretch gap-6 ${
+                    showPremiereChat && premiereChatVisible
+                      ? "lg:grid-cols-[1fr_320px]"
+                      : ""
                   }`}
                 >
                   <div className="relative">
@@ -684,88 +881,18 @@ export function WatchPage() {
                         startPosition={playerStartPosition}
                         liveMode={isPremiereLive}
                         liveEdgeSeconds={liveEdgeSeconds}
+                        chatSlot={premiereChatPanel}
+                        chatVariant="fullscreen"
+                        showChatToggle={showPremiereChat}
+                        chatVisible={premiereChatVisible}
+                        onToggleChat={togglePremiereChat}
                         onStatePush={handleHistorySync}
                       />
                     )}
                   </div>
-                  {showPremiereChat && (
-                    <aside className="flex flex-col rounded-3xl border border-white/10 bg-dark/70 p-4 text-sm text-white shadow-xl shadow-black/40">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold">
-                            Chat công chiếu
-                          </p>
-                          <p className="text-[11px] text-slate-400">
-                            {viewChip}
-                          </p>
-                        </div>
-                        {isPremiereLive && (
-                          <span className="rounded-full bg-red-500/20 px-2 py-1 text-[10px] font-semibold text-red-200">
-                            LIVE
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
-                        {premiereMessages.length === 0 && (
-                          <p className="text-xs text-slate-400">
-                            Chưa có tin nhắn nào. Hãy bắt đầu trò chuyện!
-                          </p>
-                        )}
-                        {premiereMessages.map((msg, idx) => {
-                          const chatTime = resolveChatTime(msg);
-                          const chatLabel =
-                            typeof chatTime === "number"
-                              ? formatChatTime(chatTime)
-                              : null;
-                          return (
-                            <div
-                              key={`${msg.createdAt}-${idx}`}
-                              className="rounded-2xl border border-white/10 bg-black/30 p-2"
-                            >
-                              <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                <p className="text-xs font-semibold text-white">
-                                  {msg.userName || "Ẩn danh"}
-                                </p>
-                                {chatLabel && <span>{chatLabel}</span>}
-                              </div>
-                              <p className="text-xs text-slate-300">
-                                {msg.content}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-3 border-t border-white/10 pt-3">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={premiereMessage}
-                            onChange={(event) =>
-                              setPremiereMessage(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                handleSendPremiereMessage();
-                              }
-                            }}
-                            placeholder="Nhập tin nhắn..."
-                            className="flex-1 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSendPremiereMessage}
-                            className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-dark shadow-glow"
-                          >
-                            Gửi
-                          </button>
-                        </div>
-                        {premiereChatStatus && (
-                          <p className="mt-2 text-[11px] text-slate-400">
-                            {premiereChatStatus}
-                          </p>
-                        )}
-                      </div>
+                  {showPremiereChat && premiereChatVisible && (
+                    <aside className="h-full self-stretch">
+                      {premiereChatPanel}
                     </aside>
                   )}
                 </div>
@@ -786,14 +913,29 @@ export function WatchPage() {
                       Tập {Math.min(currentEpisodeNumber, episodes.length)} / {episodes.length}
                     </span>
                   </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {episodes.map((episode) => {
-                      const isActive = episode.number === currentEpisodeNumber;
-                      return (
-                        <Link
-                          key={`ep-${episode.number}`}
-                          to={`/watch/${watchData.movieId}?ep=${episode.number}`}
-                          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                <div className="mt-4 grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {episodes.map((episode) => {
+                    const isActive = episode.number === currentEpisodeNumber;
+                    const premiereStart = episode.premiereAt
+                      ? new Date(episode.premiereAt).getTime()
+                      : null;
+                    const isLiveEpisode =
+                      watchData.premiere?.status === "live" &&
+                      watchData.currentEpisode?.number === episode.number;
+                    const isUpcomingEpisode =
+                      episode.status === "premiere" &&
+                      premiereStart !== null &&
+                      premiereStart > premiereNow;
+                    const statusLabel = isLiveEpisode
+                      ? "Đang công chiếu"
+                      : isUpcomingEpisode
+                        ? "Sắp chiếu"
+                        : null;
+                    return (
+                      <Link
+                        key={`ep-${episode.number}`}
+                        to={`/watch/${watchData.movieId}?ep=${episode.number}`}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
                             isActive
                               ? "border-primary/70 bg-primary/15 text-white shadow-[0_10px_30px_rgba(255,107,107,0.25)]"
                               : "border-white/10 bg-white/5 text-slate-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/10"
@@ -803,6 +945,17 @@ export function WatchPage() {
                           <span className="line-clamp-1">
                             {episode.title || `Tập ${episode.number}`}
                           </span>
+                          {statusLabel && (
+                            <span
+                              className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                isLiveEpisode
+                                  ? "border-red-400/60 bg-red-500/20 text-red-100"
+                                  : "border-amber-400/50 bg-amber-500/15 text-amber-100"
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -871,8 +1024,8 @@ export function WatchPage() {
               </div>
 
               <div className="flex flex-wrap gap-2 text-xs text-white/80">
-                {detail?.moods?.map((m) => (
-                  <StatusBadge key={m} label={m} tone="info" />
+                {detail?.tags?.map((tag) => (
+                  <StatusBadge key={tag} label={tag} tone="info" />
                 ))}
               </div>
             </aside>
@@ -885,81 +1038,89 @@ export function WatchPage() {
         <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/30">
           <h3 className="text-lg font-semibold text-white">Bình luận</h3>
 
-          {commentsLoading && (
-            <p className="text-sm text-slate-400">Đang tải bình luận...</p>
-          )}
-          {commentsError && (
-            <p className="text-sm text-red-400">{commentsError}</p>
-          )}
-          {!commentsLoading && !comments.length && (
-            <p className="text-sm text-slate-400">
-              Chưa có bình luận nào cho phim này. Hãy là người đầu tiên!
-            </p>
-          )}
-
-          <div className="space-y-4">
-            {comments.map((comment) => (
-              <div
-                key={comment.id}
-                className="p-4 rounded-2xl bg-dark/60 border border-white/10"
-              >
-                <p className="text-sm font-semibold text-white">
-                  {comment.user?.name ?? "Ẩn danh"}
+          {commentsLocked ? (
+            <div className="rounded-2xl border border-white/10 bg-dark/60 p-4 text-sm text-slate-300">
+              Bình luận sẽ được mở sau khi công chiếu kết thúc.
+            </div>
+          ) : (
+            <>
+              {commentsLoading && (
+                <p className="text-sm text-slate-400">Đang tải bình luận...</p>
+              )}
+              {commentsError && (
+                <p className="text-sm text-red-400">{commentsError}</p>
+              )}
+              {!commentsLoading && !comments.length && (
+                <p className="text-sm text-slate-400">
+                  Chưa có bình luận nào cho phim này. Hãy là người đầu tiên!
                 </p>
-                <p className="text-xs text-slate-500">
-                  {comment.created_at
-                    ? new Date(comment.created_at).toLocaleString("vi-VN")
-                    : "Vừa xong"}
-                </p>
-                <p className="mt-2 text-sm text-slate-200">
-                  {comment.content}
-                </p>
-              </div>
-            ))}
-          </div>
+              )}
 
-          <div className="mt-6 border-t border-white/10 pt-4">
-            {isAuthenticated ? (
-              <form className="space-y-3" onSubmit={handleSubmitComment}>
-                <textarea
-                  rows={3}
-                  value={commentValue}
-                  onChange={(e) => setCommentValue(e.target.value)}
-                  placeholder="Bạn nghĩ gì về phim này?"
-                  className="w-full px-4 py-3 text-sm text-white bg-dark/60 rounded-2xl border border-white/10 outline-none"
-                />
-
-                <div className="flex items-center justify-end gap-3">
-                  {commentStatus && (
-                    <p
-                      className={`text-xs ${
-                        commentStatus.type === "success"
-                          ? "text-emerald-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {commentStatus.message}
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={submittingComment}
-                    className="px-5 py-2 text-xs font-semibold bg-primary text-dark rounded-full shadow-glow hover:bg-primary/90 disabled:opacity-60"
+              <div className="space-y-4">
+                {comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="p-4 rounded-2xl bg-dark/60 border border-white/10"
                   >
-                    {submittingComment ? "Đang gửi" : "Gửi bình luận"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <p className="text-xs text-slate-400 bg-dark/60 p-4 rounded-2xl border border-white/10">
-                <Link to="/login" className="text-primary">
-                  Đăng nhập
-                </Link>{" "}
-                để bình luận.
-              </p>
-            )}
-          </div>
+                    <p className="text-sm font-semibold text-white">
+                      {comment.user?.name ?? "Ẩn danh"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {comment.created_at
+                        ? new Date(comment.created_at).toLocaleString("vi-VN")
+                        : "Vừa xong"}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-200">
+                      {comment.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 border-t border-white/10 pt-4">
+                {isAuthenticated ? (
+                  <form className="space-y-3" onSubmit={handleSubmitComment}>
+                    <textarea
+                      rows={3}
+                      value={commentValue}
+                      onChange={(e) => setCommentValue(e.target.value)}
+                      placeholder="Bạn nghĩ gì về phim này?"
+                      className="w-full px-4 py-3 text-sm text-white bg-dark/60 rounded-2xl border border-white/10 outline-none"
+                    />
+
+                    <div className="flex items-center justify-end gap-3">
+                      {commentStatus && (
+                        <p
+                          className={`text-xs ${
+                            commentStatus.type === "success"
+                              ? "text-emerald-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {commentStatus.message}
+                        </p>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={submittingComment}
+                        className="px-5 py-2 text-xs font-semibold bg-primary text-dark rounded-full shadow-glow hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        {submittingComment ? "Đang gửi" : "Gửi bình luận"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="text-xs text-slate-400 bg-dark/60 p-4 rounded-2xl border border-white/10">
+                    <Link to="/login" className="text-primary">
+                      Đăng nhập
+                    </Link>{" "}
+                    để bình luận.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ================== Suggestions ================== */}

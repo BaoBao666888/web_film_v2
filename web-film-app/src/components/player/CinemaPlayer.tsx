@@ -35,6 +35,10 @@ interface CinemaPlayerProps {
   externalState?: ExternalState | null;
   onStatePush?: (state: ExternalState) => void;
   chatSlot?: ReactNode;
+  chatVariant?: "overlay" | "panel" | "fullscreen";
+  showChatToggle?: boolean;
+  chatVisible?: boolean;
+  onToggleChat?: () => void;
   autoPlay?: boolean;
   startPosition?: number | null;
   hlsRoomId?: string;
@@ -60,6 +64,10 @@ export function CinemaPlayer({
   externalState = null,
   onStatePush,
   chatSlot,
+  chatVariant = "overlay",
+  showChatToggle = false,
+  chatVisible = true,
+  onToggleChat,
   autoPlay = false,
   startPosition = null,
   hlsRoomId,
@@ -82,6 +90,7 @@ export function CinemaPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
   const playerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -629,18 +638,20 @@ export function CinemaPlayer({
     ? Math.min((bufferedAhead / effectiveDuration) * 100, 100 - playedPercent)
     : 0;
   const bufferEndPercent = Math.min(playedPercent + bufferedAheadPercent, 100);
-  const showKnob = effectiveDuration > 0 && currentTime > 0.05;
-  const liveEdgePercent =
-    liveEdgeClamped !== null && effectiveDuration > 0
-      ? Math.min((liveEdgeClamped / effectiveDuration) * 100, 100)
-      : liveEdgeClamped !== null
-        ? 100
-        : null;
   const behindLiveSeconds =
     liveEdgeClamped !== null ? Math.max(liveEdgeClamped - currentTime, 0) : 0;
   const isAtLiveEdge = liveEdgeClamped !== null && behindLiveSeconds < 2.5;
   const showGoLive = liveEdgeClamped !== null && behindLiveSeconds > 3;
   const liveClickable = liveMode && showGoLive;
+  const showKnob =
+    effectiveDuration > 0 && currentTime > 0.05 && (!liveMode || !isAtLiveEdge);
+  const activeQualityLabel =
+    qualityOptions.find((option) => option.id === activeQuality)?.label ??
+    "Auto";
+  const isChatVisible =
+    Boolean(chatSlot) &&
+    chatVisible &&
+    (chatVariant !== "fullscreen" || isFullscreen);
 
   useEffect(() => {
     autoLiveSeekRef.current = false;
@@ -671,6 +682,16 @@ export function CinemaPlayer({
       video.removeEventListener("loadedmetadata", seekLive);
     };
   }, [autoPlay, liveEdgeClamped, liveMode]);
+
+  useEffect(() => {
+    if (!controlsVisible) {
+      setQualityMenuOpen(false);
+    }
+  }, [controlsVisible]);
+
+  useEffect(() => {
+    setQualityMenuOpen(false);
+  }, [activeQuality]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -746,7 +767,11 @@ export function CinemaPlayer({
         }`}
       >
         <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-white/5" />
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0"
+          }`}
+        />
         {needsStart && (
           <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/50">
             <button
@@ -775,15 +800,25 @@ export function CinemaPlayer({
               : "min-h-[360px] md:min-h-[440px] lg:min-h-[520px] rounded-[20px]"
           }`}
         />
-        {chatSlot && (
-          <div className="pointer-events-auto absolute right-3 top-3 z-30 max-w-[320px]">
+        {isChatVisible && (
+          <div
+            className={`pointer-events-auto absolute z-30 ${
+              chatVariant === "panel" || chatVariant === "fullscreen"
+                ? "right-4 top-4 bottom-20 w-[320px]"
+                : "right-3 top-3 max-w-[320px]"
+            }`}
+          >
             {chatSlot}
           </div>
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+        <div
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 via-black/40 to-transparent transition-opacity duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0"
+          }`}
+        />
 
         <div
-          className={`pointer-events-none absolute inset-0 flex flex-col justify-between p-4 text-xs transition-opacity duration-300 ${
+          className={`cinema-controls pointer-events-none absolute inset-0 flex flex-col justify-between p-4 text-xs transition-opacity duration-300 ${
             controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
@@ -836,14 +871,6 @@ export function CinemaPlayer({
                     }}
                   />
                 </div>
-                {liveEdgePercent !== null && (
-                  <span
-                    className="absolute top-1/2 z-30 h-3 w-3 -translate-y-1/2 -translate-x-1/2 rounded-full border border-red-400/60 bg-red-500 shadow-[0_0_10px_rgba(248,113,113,0.65)]"
-                    style={{
-                      left: `${liveEdgePercent}%`,
-                    }}
-                  />
-                )}
                 <span
                   className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_0_2px_rgba(15,23,42,0.7),0_0_8px_rgba(255,107,107,0.5)] transition-opacity ${
                     showKnob ? "opacity-100" : "opacity-0"
@@ -932,6 +959,26 @@ export function CinemaPlayer({
                     <IconPiP />
                   </ControlButton>
                 )}
+                {qualityOptions.length > 1 && (
+                  <ControlButton
+                    label="Chất lượng"
+                    onClick={() => setQualityMenuOpen((open) => !open)}
+                    active={qualityMenuOpen}
+                  >
+                    <span className="text-[10px] font-semibold">
+                      {activeQualityLabel}
+                    </span>
+                  </ControlButton>
+                )}
+                {showChatToggle && (
+                  <ControlButton
+                    label={isChatVisible ? "Ẩn chat" : "Hiện chat"}
+                    onClick={onToggleChat}
+                    active={isChatVisible}
+                  >
+                    <IconChat />
+                  </ControlButton>
+                )}
                 <ControlButton
                   label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
                   onClick={toggleFullscreen}
@@ -949,36 +996,38 @@ export function CinemaPlayer({
             )}
           </div>
         </div>
-      </div>
-
-      {qualityOptions.length > 0 && (
-        <div className="player-quality rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80">
+        {qualityMenuOpen && qualityOptions.length > 1 && (
+          <div className="pointer-events-auto absolute bottom-24 right-6 z-40 w-48 rounded-2xl border border-white/10 bg-black/85 p-3 text-xs text-white shadow-2xl shadow-black/40">
+            <p className="mb-2 text-[10px] uppercase tracking-widest text-slate-300">
               Chất lượng
-            </span>
-            {qualityOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setActiveQuality(option.id)}
-                className={`rounded-full border px-4 py-1.5 text-xs transition ${
-                  activeQuality === option.id
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-white/10 text-slate-300 hover:border-primary/60 hover:text-white"
-                }`}
-              >
-                {option.label}
-                {option.description && (
-                  <span className="ml-2 text-[11px] text-slate-500">
-                    {option.description}
-                  </span>
-                )}
-              </button>
-            ))}
+            </p>
+            <div className="space-y-1">
+              {qualityOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveQuality(option.id);
+                    setQualityMenuOpen(false);
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition ${
+                    activeQuality === option.id
+                      ? "border-primary bg-primary/20 text-primary"
+                      : "border-white/10 text-slate-200 hover:border-primary/60 hover:text-white"
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {option.description && (
+                    <span className="ml-2 text-[10px] text-slate-400">
+                      {option.description}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
       {!resolvedStream?.url && (
         <div className="rounded-2xl border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-200">
           Không tìm thấy link phát. Hãy vào trang admin để cập nhật URL HLS hoặc
@@ -1132,6 +1181,19 @@ function IconCompress() {
     <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
       <path
         d="M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconChat() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={iconProps}>
+      <path
+        d="M6 8h12v7H9l-3 3v-3H6V8z"
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"

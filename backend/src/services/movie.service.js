@@ -783,42 +783,49 @@ class MovieService {
       throw new Error("USER_NOT_FOUND");
     }
 
+    const isAdmin = user.role === "admin";
+    const chargeAmount = isAdmin ? 0 : previewPrice;
+
     const currentBalance = Number(user.balance || 0);
-    if (currentBalance < previewPrice) {
+    if (!isAdmin && currentBalance < chargeAmount) {
       throw new Error("BALANCE_INSUFFICIENT");
     }
 
     const purchaseId = generateId("preview");
     const now = new Date();
-    user.balance = currentBalance - previewPrice;
-    await user.save();
+    if (chargeAmount > 0) {
+      user.balance = currentBalance - chargeAmount;
+      await user.save();
+    }
 
     await PreviewPurchase.create({
       id: purchaseId,
       user_id: userId,
       movie_id: movie.id,
       episode: episodeKey,
-      amount: previewPrice,
+      amount: chargeAmount,
       created_at: now,
     });
 
-    await WalletLedger.create({
-      id: generateId("ledger"),
-      user_id: userId,
-      amount: -Math.abs(previewPrice),
-      type: "purchase",
-      ref_id: purchaseId,
-      note:
-        movieType === "series" && selectedEpisode
-          ? `Preview ${movie.title} - Tập ${selectedEpisode.number}`
-          : `Preview ${movie.title}`,
-      created_by: userId,
-      created_at: now,
-    });
+    if (chargeAmount > 0) {
+      await WalletLedger.create({
+        id: generateId("ledger"),
+        user_id: userId,
+        amount: -Math.abs(chargeAmount),
+        type: "purchase",
+        ref_id: purchaseId,
+        note:
+          movieType === "series" && selectedEpisode
+            ? `Preview ${movie.title} - Tập ${selectedEpisode.number}`
+            : `Preview ${movie.title}`,
+        created_by: userId,
+        created_at: now,
+      });
+    }
 
     return {
       purchased: true,
-      balance: user.balance ?? 0,
+      balance: user.balance ?? currentBalance,
       purchaseId,
     };
   }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../../components/PageHeader";
 import { useFetch } from "../../hooks/useFetch";
 import { useAuth } from "../../hooks/useAuth";
@@ -44,6 +44,7 @@ export function AdminUsersPage() {
     useState<{ type: "success" | "error"; message: string } | null>(null);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerPageInput, setLedgerPageInput] = useState("1");
   const [lockDialog, setLockDialog] = useState<{
     user: AdminUsersResponse["users"][number];
     action: "lock" | "unlock";
@@ -55,6 +56,7 @@ export function AdminUsersPage() {
     useState<{ type: "success" | "error"; message: string } | null>(null);
   const [lockHistoryOpen, setLockHistoryOpen] = useState(false);
   const [lockHistoryPage, setLockHistoryPage] = useState(1);
+  const [lockHistoryPageInput, setLockHistoryPageInput] = useState("1");
 
   const {
     data: ledgerData,
@@ -104,6 +106,14 @@ export function AdminUsersPage() {
   const canPrevLockLog = lockHistoryPage > 1;
   const canNextLockLog =
     lockLogMeta?.totalPages ? lockHistoryPage < lockLogMeta.totalPages : false;
+
+  useEffect(() => {
+    setLedgerPageInput(String(ledgerPage));
+  }, [ledgerPage]);
+
+  useEffect(() => {
+    setLockHistoryPageInput(String(lockHistoryPage));
+  }, [lockHistoryPage]);
 
   const allSelected = users.length > 0 && selectedIds.length === users.length;
 
@@ -863,7 +873,7 @@ export function AdminUsersPage() {
 
       {ledgerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
-          <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+          <div className="flex w-full max-w-5xl max-h-[80vh] flex-col rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-lg font-semibold text-white">Sổ cái ví</p>
@@ -887,7 +897,7 @@ export function AdminUsersPage() {
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+            <div className="mt-4 flex-1 overflow-auto rounded-2xl border border-white/10">
               <table className="w-full border-collapse text-left text-xs text-slate-200">
                 <thead className="bg-white/5 text-[11px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -980,6 +990,27 @@ export function AdminUsersPage() {
                 {ledgerMeta?.totalPages || 1}
               </span>
               <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={ledgerPageInput}
+                  onChange={(event) => setLedgerPageInput(event.target.value)}
+                  className="w-16 rounded-lg border border-white/15 bg-black/40 px-2 py-1 text-center text-xs text-white outline-none"
+                />
+                <button
+                  onClick={() => {
+                    const raw = Number(ledgerPageInput);
+                    const target = Number.isFinite(raw) ? raw : 1;
+                    const capped = Math.min(
+                      Math.max(1, target),
+                      ledgerMeta?.totalPages || target || 1
+                    );
+                    setLedgerPage(capped);
+                  }}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Đi đến
+                </button>
                 <button
                   disabled={!canPrevLedger}
                   onClick={() =>
@@ -1006,7 +1037,7 @@ export function AdminUsersPage() {
 
       {lockHistoryOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
-          <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
+          <div className="flex w-full max-w-5xl max-h-[80vh] flex-col rounded-3xl border border-white/10 bg-dark/95 p-6 shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-lg font-semibold text-white">
@@ -1032,7 +1063,7 @@ export function AdminUsersPage() {
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+            <div className="mt-4 flex-1 overflow-auto rounded-2xl border border-white/10">
               <table className="w-full border-collapse text-left text-xs text-slate-200">
                 <thead className="bg-white/5 text-[11px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -1116,6 +1147,29 @@ export function AdminUsersPage() {
                 {lockLogMeta?.totalPages || 1}
               </span>
               <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={lockHistoryPageInput}
+                  onChange={(event) =>
+                    setLockHistoryPageInput(event.target.value)
+                  }
+                  className="w-16 rounded-lg border border-white/15 bg-black/40 px-2 py-1 text-center text-xs text-white outline-none"
+                />
+                <button
+                  onClick={() => {
+                    const raw = Number(lockHistoryPageInput);
+                    const target = Number.isFinite(raw) ? raw : 1;
+                    const capped = Math.min(
+                      Math.max(1, target),
+                      lockLogMeta?.totalPages || target || 1
+                    );
+                    setLockHistoryPage(capped);
+                  }}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs text-white hover:border-primary hover:text-primary"
+                >
+                  Đi đến
+                </button>
                 <button
                   disabled={!canPrevLockLog}
                   onClick={() =>
