@@ -81,7 +81,7 @@ export function LoginPage() {
             />
             Ghi nhớ đăng nhập
           </label>
-          <Link to="#" className="text-primary">
+          <Link to="/forgot-password" className="text-primary">
             Quên mật khẩu?
           </Link>
         </div>

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import emailService from "./email.service.js";
 import {
   addUser,
   findUserByEmail,
@@ -15,6 +16,10 @@ import { generateId } from "../utils/id.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const RESET_CODE_TTL_MS = 10 * 60 * 1000; // 10 phút
+const generateResetCode = () =>
+  String(Math.floor(100000 + Math.random() * 900000)); // 6 số
 
 const resolveLockDays = (user) => {
   const lockedAt = user?.locked_at ? new Date(user.locked_at).getTime() : null;
@@ -157,6 +162,69 @@ class AuthService {
       token,
       user: sanitizedUser,
     };
+  }
+
+  // 1) Gửi mã về email
+  async requestPasswordReset(email) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    if (!normalizedEmail) throw new Error("EMAIL_REQUIRED");
+
+    const user = await findUserByEmail(normalizedEmail);
+
+    // Không lộ email tồn tại hay không
+    if (!user) return { ok: true };
+
+    const code = generateResetCode();
+    const codeHash = bcrypt.hashSync(code, 10);
+
+    await updateUser(user.id, {
+      reset_code_hash: codeHash,
+      reset_code_expires_at: new Date(Date.now() + RESET_CODE_TTL_MS),
+      reset_code_attempts: 0,
+    });
+
+    await emailService.sendResetCode(normalizedEmail, code);
+    return { ok: true };
+  }
+
+  // 2) Nhập code + mật khẩu mới -> đổi mật khẩu
+  async resetPasswordWithCode({ email, code, newPassword }) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const inputCode = String(code || "").trim();
+    const nextPassword = String(newPassword || "");
+
+    if (!normalizedEmail) throw new Error("EMAIL_REQUIRED");
+    if (!inputCode) throw new Error("CODE_REQUIRED");
+    if (!nextPassword || nextPassword.length < 6) throw new Error("WEAK_PASSWORD");
+
+    const user = await findUserByEmail(normalizedEmail);
+    if (!user) throw new Error("INVALID_RESET_CODE");
+
+    const attempts = Number(user.reset_code_attempts || 0);
+    if (attempts >= 5) throw new Error("TOO_MANY_ATTEMPTS");
+
+    const expiresAt = user.reset_code_expires_at
+      ? new Date(user.reset_code_expires_at).getTime()
+      : 0;
+
+    if (!user.reset_code_hash || !expiresAt || expiresAt < Date.now()) {
+      throw new Error("RESET_CODE_EXPIRED");
+    }
+
+    const ok = bcrypt.compareSync(inputCode, user.reset_code_hash);
+    if (!ok) {
+      await updateUser(user.id, { reset_code_attempts: attempts + 1 });
+      throw new Error("INVALID_RESET_CODE");
+    }
+
+    await updateUser(user.id, {
+      password_hash: bcrypt.hashSync(nextPassword, 10),
+      reset_code_hash: null,
+      reset_code_expires_at: null,
+      reset_code_attempts: 0,
+    });
+
+    return { ok: true };
   }
 
   /**

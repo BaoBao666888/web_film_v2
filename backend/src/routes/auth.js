@@ -43,3 +43,21 @@ router.post(
 );
 
 export default router;
+
+// ===== FORGOT PASSWORD =====
+
+// Gửi mã xác thực về email
+router.post(
+  "/forgot-password/request",
+  asyncHandler((req, res) =>
+    authController.requestPasswordReset(req, res)
+  )
+);
+
+// Xác thực mã + đổi mật khẩu
+router.post(
+  "/forgot-password/reset",
+  asyncHandler((req, res) =>
+    authController.resetPasswordWithCode(req, res)
+  )
+);

@@ -252,6 +252,17 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ amount }),
       }),
+    // ✅ QUÊN MẬT KHẨU
+    requestPasswordReset: (payload: { email: string }) =>
+      apiFetch<{ ok: true }>(`/auth/forgot-password/request`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    resetPasswordWithCode: (payload: { email: string; code: string; newPassword: string }) =>
+      apiFetch<{ ok: true }>(`/auth/forgot-password/reset`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
   admin: {
     stats: () => apiFetch<AdminStatsResponse>(`/admin/stats`),
