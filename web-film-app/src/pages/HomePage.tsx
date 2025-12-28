@@ -55,8 +55,8 @@ const uniqueStrings = (items?: (string | null | undefined)[]) =>
     .filter((item): item is string => Boolean(item))
     .filter((item, index, arr) => arr.indexOf(item) === index);
 
-const resolveTags = (movie: { tags?: string[]; moods?: string[] }) =>
-  uniqueStrings(movie.tags?.length ? movie.tags : movie.moods ?? []);
+const resolveTags = (movie: { tags?: string[] }) =>
+  uniqueStrings(movie.tags ?? []);
 
 const formatCountdown = (targetTime: string | undefined, now: number) => {
   if (!targetTime) return "Chưa có lịch";
@@ -369,7 +369,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-dark/80 to-black/80 p-5 shadow-lg shadow-black/30 sm:p-6">
+      <section className="premiere-section premiere-live rounded-3xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-dark/80 to-black/80 p-5 shadow-lg shadow-black/30 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-orange-300">
@@ -395,7 +395,7 @@ export function HomePage() {
                 to={`/watch/${item.movieId}${
                   item.episodeNumber ? `?ep=${item.episodeNumber}` : ""
                 }`}
-                className="group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-orange-400/60"
+                className="premiere-card group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-orange-400/60"
               >
                 <div className="relative">
                   <img
@@ -433,7 +433,7 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-500/10 via-dark/80 to-black/80 p-5 shadow-lg shadow-black/30 sm:p-6">
+      <section className="premiere-section premiere-upcoming rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-500/10 via-dark/80 to-black/80 p-5 shadow-lg shadow-black/30 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-sky-300">
@@ -459,7 +459,7 @@ export function HomePage() {
                 to={`/watch/${item.movieId}${
                   item.episodeNumber ? `?ep=${item.episodeNumber}` : ""
                 }`}
-                className="group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-sky-400/60"
+                className="premiere-card group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-sky-400/60"
               >
                 <div className="relative">
                   <img
