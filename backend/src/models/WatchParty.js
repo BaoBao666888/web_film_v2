@@ -34,6 +34,12 @@ const WatchPartySchema = new mongoose.Schema(
     allowDownload: { type: Boolean, default: false }, // legacy, hidden in UI
     isLive: { type: Boolean, default: false },
     isPrivate: { type: Boolean, default: false },
+    roomType: {
+      type: String,
+      enum: ["party", "premiere"],
+      default: "party",
+      index: true,
+    },
     autoStart: { type: Boolean, default: true },
     currentPosition: { type: Number, default: 0 },
     state: {

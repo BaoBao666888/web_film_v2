@@ -29,6 +29,7 @@ export type WatchPartyRoom = {
   allowDownload?: boolean;
   isLive: boolean;
   isPrivate: boolean;
+  roomType?: "party" | "premiere";
   autoStart: boolean;
   currentPosition: number;
   state?: {

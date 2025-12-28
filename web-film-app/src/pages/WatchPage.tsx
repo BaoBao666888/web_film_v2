@@ -74,10 +74,13 @@ export function WatchPage() {
     { type: "success" | "error"; message: string } | null
   >(null);
   const [purchasingPreview, setPurchasingPreview] = useState(false);
+  const [premiereStartPosition, setPremiereStartPosition] = useState<
+    number | null
+  >(null);
   const viewerIdRef = useRef<string | null>(null);
   const lastHistorySyncRef = useRef(0);
   const lastPositionRef = useRef(0);
-  const premiereStartRef = useRef<number | null>(null);
+  const premiereAutoRefetchRef = useRef(0);
   const socketRef = useRef<Socket | null>(null);
   const historyMovieId = watchData?.movieId ?? id;
 
@@ -112,14 +115,27 @@ export function WatchPage() {
 
   useEffect(() => {
     if (watchData?.premiere?.status !== "live" || !watchData.premiere.premiereAt) {
-      premiereStartRef.current = null;
+      setPremiereStartPosition(null);
       return;
     }
-    premiereStartRef.current = Math.max(
+    setPremiereStartPosition(
       0,
       (Date.now() - new Date(watchData.premiere.premiereAt).getTime()) / 1000
     );
   }, [watchData?.premiere?.premiereAt, watchData?.premiere?.status]);
+
+  useEffect(() => {
+    if (watchData?.premiere?.status !== "upcoming" || !watchData.premiere.premiereAt) {
+      return;
+    }
+    const target = new Date(watchData.premiere.premiereAt).getTime();
+    if (Number.isNaN(target)) return;
+    const now = Date.now();
+    if (premiereNow >= target && now - premiereAutoRefetchRef.current > 3000) {
+      premiereAutoRefetchRef.current = now;
+      refetchWatchData();
+    }
+  }, [premiereNow, refetchWatchData, watchData?.premiere?.premiereAt, watchData?.premiere?.status]);
 
   useEffect(() => {
     if (!id) return;
@@ -340,9 +356,9 @@ export function WatchPage() {
     playbackRate: number;
     updatedAt: number;
   }) => {
-    if (!isAuthenticated || !historyMovieId) return;
     const position = Number(state.position) || 0;
     lastPositionRef.current = position;
+    if (!isAuthenticated || !historyMovieId) return;
     if (position <= 1) return;
 
     const now = Date.now();
@@ -428,6 +444,12 @@ export function WatchPage() {
       ? viewerLabel
       : "Sắp công chiếu"
     : viewerLabel;
+  const liveEdgeSeconds = (() => {
+    if (!isPremiereLive || !premiereInfo?.premiereAt) return null;
+    const startAt = new Date(premiereInfo.premiereAt).getTime();
+    if (Number.isNaN(startAt)) return null;
+    return Math.max(0, (premiereNow - startAt) / 1000);
+  })();
   const countdownLabel = (() => {
     if (!premiereInfo?.premiereAt) return "Chưa có lịch công chiếu";
     const target = new Date(premiereInfo.premiereAt).getTime();
@@ -443,11 +465,39 @@ export function WatchPage() {
   })();
   const canPlay = watchData.access?.canPlay ?? true;
   const playerStartPosition =
-    isPremiereLive && premiereStartRef.current !== null
-      ? premiereStartRef.current
+    isPremiereLive && premiereStartPosition !== null
+      ? premiereStartPosition
       : resumePosition;
   const showPremiereChat = Boolean(premiereInfo?.roomId);
   const showPremiereCountdown = isPremiereUpcoming && !canPlay;
+  const formatChatTime = (timeSeconds: number) => {
+    if (!Number.isFinite(timeSeconds)) return "";
+    const totalSeconds = Math.max(0, Math.floor(timeSeconds));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`;
+    }
+    return `${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
+  };
+  const resolveChatTime = (message: WatchPartyMessage) => {
+    if (Number.isFinite(message.position)) {
+      return Number(message.position);
+    }
+    if (!premiereInfo?.premiereAt || !message.createdAt) return null;
+    const createdAt =
+      typeof message.createdAt === "string"
+        ? new Date(message.createdAt).getTime()
+        : Number(message.createdAt);
+    const premiereAt = new Date(premiereInfo.premiereAt).getTime();
+    if (Number.isNaN(createdAt) || Number.isNaN(premiereAt)) return null;
+    return Math.max(0, (createdAt - premiereAt) / 1000);
+  };
 
   const stats = [
     { label: "Năm", value: detail?.year ?? "—" },
@@ -529,14 +579,16 @@ export function WatchPage() {
               >
                 Trang phim
               </Link>
-              <Link
-                to={`/watch-party/create?movieId=${watchData.movieId ?? id}${currentEpisodeNumber ? `&ep=${currentEpisodeNumber}` : ""}&title=${encodeURIComponent(
-                  detail?.title ?? watchData.title
-                )}`}
-                className="rounded-full border border-primary/50 bg-primary/15 px-4 py-2 text-xs font-semibold text-primary shadow-[0_10px_30px_rgba(255,107,107,0.25)] transition hover:bg-primary/25"
-              >
-                Xem chung
-              </Link>
+              {!premiereInfo?.status && (
+                <Link
+                  to={`/watch-party/create?movieId=${watchData.movieId ?? id}${currentEpisodeNumber ? `&ep=${currentEpisodeNumber}` : ""}&title=${encodeURIComponent(
+                    detail?.title ?? watchData.title
+                  )}`}
+                  className="rounded-full border border-primary/50 bg-primary/15 px-4 py-2 text-xs font-semibold text-primary shadow-[0_10px_30px_rgba(255,107,107,0.25)] transition hover:bg-primary/25"
+                >
+                  Xem chung
+                </Link>
+              )}
             </div>
           </div>
 
@@ -630,13 +682,9 @@ export function WatchPage() {
                         poster={backgroundPoster}
                         autoPlay
                         startPosition={playerStartPosition}
+                        liveMode={isPremiereLive}
+                        liveEdgeSeconds={liveEdgeSeconds}
                         onStatePush={handleHistorySync}
-                        controlsEnabled={!isPremiereLive}
-                        lockMessage={
-                          isPremiereLive
-                            ? "Đang công chiếu trực tiếp"
-                            : undefined
-                        }
                       />
                     )}
                   </div>
@@ -663,19 +711,29 @@ export function WatchPage() {
                             Chưa có tin nhắn nào. Hãy bắt đầu trò chuyện!
                           </p>
                         )}
-                        {premiereMessages.map((msg, idx) => (
-                          <div
-                            key={`${msg.createdAt}-${idx}`}
-                            className="rounded-2xl border border-white/10 bg-black/30 p-2"
-                          >
-                            <p className="text-xs font-semibold text-white">
-                              {msg.userName || "Ẩn danh"}
-                            </p>
-                            <p className="text-xs text-slate-300">
-                              {msg.content}
-                            </p>
-                          </div>
-                        ))}
+                        {premiereMessages.map((msg, idx) => {
+                          const chatTime = resolveChatTime(msg);
+                          const chatLabel =
+                            typeof chatTime === "number"
+                              ? formatChatTime(chatTime)
+                              : null;
+                          return (
+                            <div
+                              key={`${msg.createdAt}-${idx}`}
+                              className="rounded-2xl border border-white/10 bg-black/30 p-2"
+                            >
+                              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <p className="text-xs font-semibold text-white">
+                                  {msg.userName || "Ẩn danh"}
+                                </p>
+                                {chatLabel && <span>{chatLabel}</span>}
+                              </div>
+                              <p className="text-xs text-slate-300">
+                                {msg.content}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="mt-3 border-t border-white/10 pt-3">
                         <div className="flex items-center gap-2">

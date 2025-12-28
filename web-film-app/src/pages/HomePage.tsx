@@ -456,7 +456,9 @@ export function HomePage() {
             {upcomingPremieres.map((item) => (
               <Link
                 key={`${item.movieId}-${item.episodeNumber ?? "single"}`}
-                to={`/movie/${item.movieId}`}
+                to={`/watch/${item.movieId}${
+                  item.episodeNumber ? `?ep=${item.episodeNumber}` : ""
+                }`}
                 className="group overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-lg shadow-black/30 transition hover:-translate-y-1 hover:border-sky-400/60"
               >
                 <div className="relative">

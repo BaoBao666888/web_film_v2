@@ -141,6 +141,7 @@ const ensurePremiereRoom = async ({ movie, episode }) => {
     hostName: "Premiere",
     isLive: true,
     isPrivate: false,
+    roomType: "premiere",
     autoStart: true,
     currentPosition: 0,
     state: {

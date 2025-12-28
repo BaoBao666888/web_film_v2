@@ -73,6 +73,7 @@ class WatchPartyService {
       hostName,
       isLive = false,
       isPrivate = false,
+      roomType,
       autoStart = true,
       currentPosition = 0,
       participant,
@@ -109,6 +110,7 @@ class WatchPartyService {
       allowDownload: false,
       isLive,
       isPrivate,
+      roomType: roomType === "premiere" ? "premiere" : "party",
       autoStart,
       currentPosition,
       state: {
@@ -128,7 +130,10 @@ class WatchPartyService {
    * Get public rooms
    */
   async getPublicRooms(limit = 100) {
-    const rooms = await WatchParty.find({ isPrivate: false })
+    const rooms = await WatchParty.find({
+      isPrivate: false,
+      roomType: { $ne: "premiere" },
+    })
       .sort({ lastActive: -1 })
       .limit(limit);
     rooms.forEach(pruneParticipants);

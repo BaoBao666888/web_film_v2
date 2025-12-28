@@ -59,6 +59,18 @@ const cleanupTempUploads = async (urls: Array<string | undefined>) => {
   }
 };
 
+const collectTempUrls = (payload: {
+  poster?: string;
+  thumbnail?: string;
+  videoUrl?: string;
+  episodes?: EpisodeInput[];
+}) => [
+  payload.poster,
+  payload.thumbnail,
+  payload.videoUrl,
+  ...(payload.episodes?.map((ep) => ep.videoUrl) ?? []),
+];
+
 const toISOFromDateTimeLocal = (value: string) => {
   if (!value) return "";
   const date = new Date(value);
@@ -99,10 +111,14 @@ export function AdminAddMoviePage() {
   const [loading, setLoading] = useState(false);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [episodeUploadingIndex, setEpisodeUploadingIndex] = useState<
+    number | null
+  >(null);
   const tempUploadsRef = useRef({
     poster: "",
     thumbnail: "",
     videoUrl: "",
+    episodes: [] as string[],
   });
 
   useEffect(() => {
@@ -130,12 +146,13 @@ export function AdminAddMoviePage() {
       poster: form.poster,
       thumbnail: form.thumbnail,
       videoUrl: form.videoUrl,
+      episodes: form.episodes.map((ep) => ep.videoUrl),
     };
-  }, [form.poster, form.thumbnail, form.videoUrl]);
+  }, [form.poster, form.thumbnail, form.videoUrl, form.episodes]);
 
   useEffect(() => {
     return () => {
-      void cleanupTempUploads(Object.values(tempUploadsRef.current));
+      void cleanupTempUploads(collectTempUrls(tempUploadsRef.current));
     };
   }, []);
 
@@ -217,6 +234,10 @@ export function AdminAddMoviePage() {
   };
 
   const removeEpisode = (index: number) => {
+    const removed = form.episodes[index]?.videoUrl;
+    if (isTempUploadUrl(removed)) {
+      void cleanupTempUploads([removed]);
+    }
     setForm((prev) => ({
       ...prev,
       episodes: prev.episodes.filter((_, idx) => idx !== index),
@@ -262,8 +283,38 @@ export function AdminAddMoviePage() {
         videoSource: value,
         videoType: value === "upload" ? "mp4" : value,
         videoUrl: nextVideoUrl,
+        episodes:
+          prev.type === "series" && value === "upload"
+            ? prev.episodes.map((episode) => ({
+                ...episode,
+                videoType: "mp4",
+              }))
+            : prev.episodes,
       };
     });
+  };
+
+  const handleEpisodeFileUpload = async (index: number, file: File) => {
+    setEpisodeUploadingIndex(index);
+    try {
+      const previousUrl = form.episodes[index]?.videoUrl;
+      const url = await api.upload.single(file);
+      if (previousUrl && previousUrl !== url && isTempUploadUrl(previousUrl)) {
+        await cleanupTempUploads([previousUrl]);
+      }
+      setForm((prev) => ({
+        ...prev,
+        episodes: prev.episodes.map((ep, idx) =>
+          idx === index
+            ? { ...ep, videoUrl: url, videoType: "mp4" }
+            : ep
+        ),
+      }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Upload thất bại");
+    } finally {
+      setEpisodeUploadingIndex(null);
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -289,7 +340,7 @@ export function AdminAddMoviePage() {
     try {
       const resolvedVideoType =
         form.type === "series"
-          ? form.videoType
+          ? (form.videoSource === "upload" ? "mp4" : form.videoType)
           : (form.videoSource === "upload"
               ? "mp4"
               : form.videoSource) as Movie["videoType"];
@@ -323,9 +374,11 @@ export function AdminAddMoviePage() {
                 title: ep.title || `Tập ${idx + 1}`,
                 videoUrl: ep.videoUrl,
                 videoType:
-                  (ep.videoType as Movie["videoType"]) ??
-                  (form.videoType as Movie["videoType"]) ??
-                  "hls",
+                  form.videoSource === "upload"
+                    ? "mp4"
+                    : (ep.videoType as Movie["videoType"]) ??
+                      (form.videoType as Movie["videoType"]) ??
+                      "hls",
                 duration: ep.duration,
                 status:
                   form.status === "hidden"
@@ -544,9 +597,6 @@ export function AdminAddMoviePage() {
             value={form.type}
             onChange={(event) => {
               const nextType = event.target.value as "single" | "series";
-              if (nextType === "series" && form.videoSource === "upload") {
-                void handleVideoSourceChange("hls");
-              }
               updateField("type", nextType);
             }}
             className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
@@ -807,18 +857,19 @@ export function AdminAddMoviePage() {
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Định dạng nguồn
             </label>
-            {form.type === "series" ? (
-              <select
-                value={form.videoType}
-                onChange={(event) =>
-                  updateField("videoType", event.target.value)
-                }
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
-              >
-                <option value="hls">HLS (.m3u8)</option>
-                <option value="mp4">MP4 trực tiếp</option>
-              </select>
-            ) : (
+          {form.type === "series" ? (
+            <select
+              value={form.videoSource}
+              onChange={(event) =>
+                handleVideoSourceChange(event.target.value as VideoSource)
+              }
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-dark/60 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="upload">Video upload (mặc định)</option>
+              <option value="hls">Link HLS (.m3u8)</option>
+              <option value="mp4">Link MP4</option>
+            </select>
+          ) : (
               <select
                 value={form.videoSource}
                 onChange={(event) =>
@@ -904,18 +955,39 @@ export function AdminAddMoviePage() {
                     <label className="text-[11px] uppercase tracking-wide text-slate-500">
                       Link video
                     </label>
-                    <input
-                      value={ep.videoUrl}
-                      onChange={(event) =>
-                        updateEpisodeField(
-                          index,
-                          "videoUrl",
-                          event.target.value
-                        )
-                      }
-                      placeholder="https://..."
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
-                    />
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        value={ep.videoUrl}
+                        onChange={(event) =>
+                          updateEpisodeField(
+                            index,
+                            "videoUrl",
+                            event.target.value
+                          )
+                        }
+                        readOnly={form.videoSource === "upload"}
+                        placeholder={
+                          form.videoSource === "upload"
+                            ? "Tải file video lên"
+                            : "https://..."
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                      />
+                      {form.videoSource === "upload" && (
+                        <label className="cursor-pointer rounded-xl border border-primary/50 bg-primary/10 px-3 py-2 text-xs text-primary hover:bg-primary/20">
+                          {episodeUploadingIndex === index ? "..." : "📁"}
+                          <input
+                            type="file"
+                            accept="video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleEpisodeFileUpload(index, file);
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -947,7 +1019,8 @@ export function AdminAddMoviePage() {
                           event.target.value as Movie["videoType"]
                         )
                       }
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none"
+                      disabled={form.videoSource === "upload"}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-dark/60 px-3 py-2 text-sm text-white outline-none disabled:opacity-60"
                     >
                       <option value="hls">HLS</option>
                       <option value="mp4">MP4</option>

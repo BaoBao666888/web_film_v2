@@ -38,6 +38,8 @@ interface CinemaPlayerProps {
   autoPlay?: boolean;
   startPosition?: number | null;
   hlsRoomId?: string;
+  liveMode?: boolean;
+  liveEdgeSeconds?: number | null;
 }
 
 const formatQualityLabel = (resolution?: string) => {
@@ -61,6 +63,8 @@ export function CinemaPlayer({
   autoPlay = false,
   startPosition = null,
   hlsRoomId,
+  liveMode = false,
+  liveEdgeSeconds = null,
 }: CinemaPlayerProps) {
   const resolvedStream = stream?.url ? stream : null;
   const [status, setStatus] = useState<string>("Đang khởi tạo player...");
@@ -86,6 +90,7 @@ export function CinemaPlayer({
   const syncRateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const externalStateRef = useRef<ExternalState | null>(null);
   const userInteractedRef = useRef(false);
+  const autoLiveSeekRef = useRef(false);
   const autoMutedRef = useRef(false);
   const speedPresets = [0.75, 1, 1.25, 1.5];
   const controlsDisabled = controlsEnabled === false;
@@ -526,22 +531,46 @@ export function CinemaPlayer({
     if (controlsDisabled) return;
     const video = videoRef.current;
     if (!video || Number.isNaN(value)) return;
-    const clamped = Math.max(0, Math.min(value, duration || 0));
+    const maxSeek =
+      liveMode && liveEdgeClamped !== null ? liveEdgeClamped : duration || 0;
+    const clamped = Math.max(0, Math.min(value, maxSeek));
     video.currentTime = clamped;
     setCurrentTime(clamped);
     showControls();
     emitState(true);
   };
 
+  const handleGoLive = () => {
+    if (controlsDisabled) return;
+    const video = videoRef.current;
+    if (!video || liveEdgeSeconds === null || !Number.isFinite(liveEdgeSeconds)) {
+      return;
+    }
+    const target =
+      liveEdgeClamped !== null
+        ? liveEdgeClamped
+        : duration > 0
+          ? Math.min(liveEdgeSeconds, duration)
+          : liveEdgeSeconds;
+    video.currentTime = Math.max(0, target);
+    emitState(true);
+    void tryPlay(true);
+  };
+
   const formatTime = (time: number) => {
     if (!Number.isFinite(time)) return "00:00";
-    const minutes = Math.floor(time / 60)
+    const totalSeconds = Math.max(0, Math.floor(time));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`;
+    }
+    return `${minutes.toString().padStart(2, "0")}:${seconds
       .toString()
-      .padStart(2, "0");
-    const seconds = Math.floor(time % 60)
-      .toString()
-      .padStart(2, "0");
-    return `${minutes}:${seconds}`;
+      .padStart(2, "0")}`;
   };
 
   const showControls = () => {
@@ -580,15 +609,68 @@ export function CinemaPlayer({
   }, [onStatePush]);
 
   const safeDuration = duration > 0 ? duration : 0;
-  const playedPercent = safeDuration
-    ? Math.min((currentTime / safeDuration) * 100, 100)
+  const liveEdgeValue =
+    liveMode && typeof liveEdgeSeconds === "number" && Number.isFinite(liveEdgeSeconds)
+      ? Math.max(0, liveEdgeSeconds)
+      : null;
+  const liveEdgeClamped =
+    liveEdgeValue !== null && safeDuration > 0
+      ? Math.min(liveEdgeValue, safeDuration)
+      : liveEdgeValue;
+  const effectiveDuration =
+    liveMode && liveEdgeClamped !== null ? Math.max(liveEdgeClamped, 0.1) : safeDuration;
+  const effectiveBuffered =
+    liveMode && liveEdgeClamped !== null ? Math.min(buffered, liveEdgeClamped) : buffered;
+  const playedPercent = effectiveDuration
+    ? Math.min((currentTime / effectiveDuration) * 100, 100)
     : 0;
-  const bufferedAhead = Math.max(buffered - currentTime, 0);
-  const bufferedAheadPercent = safeDuration
-    ? Math.min((bufferedAhead / safeDuration) * 100, 100 - playedPercent)
+  const bufferedAhead = Math.max(effectiveBuffered - currentTime, 0);
+  const bufferedAheadPercent = effectiveDuration
+    ? Math.min((bufferedAhead / effectiveDuration) * 100, 100 - playedPercent)
     : 0;
   const bufferEndPercent = Math.min(playedPercent + bufferedAheadPercent, 100);
-  const showKnob = safeDuration > 0 && currentTime > 0.05;
+  const showKnob = effectiveDuration > 0 && currentTime > 0.05;
+  const liveEdgePercent =
+    liveEdgeClamped !== null && effectiveDuration > 0
+      ? Math.min((liveEdgeClamped / effectiveDuration) * 100, 100)
+      : liveEdgeClamped !== null
+        ? 100
+        : null;
+  const behindLiveSeconds =
+    liveEdgeClamped !== null ? Math.max(liveEdgeClamped - currentTime, 0) : 0;
+  const isAtLiveEdge = liveEdgeClamped !== null && behindLiveSeconds < 2.5;
+  const showGoLive = liveEdgeClamped !== null && behindLiveSeconds > 3;
+  const liveClickable = liveMode && showGoLive;
+
+  useEffect(() => {
+    autoLiveSeekRef.current = false;
+  }, [resolvedStream?.url, liveMode]);
+
+  useEffect(() => {
+    if (!liveMode || liveEdgeClamped === null) return;
+    if (autoLiveSeekRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    const seekLive = () => {
+      if (autoLiveSeekRef.current) return;
+      video.currentTime = Math.max(0, liveEdgeClamped);
+      autoLiveSeekRef.current = true;
+      if (autoPlay) {
+        void tryPlay(true);
+      }
+    };
+
+    if (video.readyState >= 1) {
+      seekLive();
+      return;
+    }
+
+    video.addEventListener("loadedmetadata", seekLive, { once: true });
+    return () => {
+      video.removeEventListener("loadedmetadata", seekLive);
+    };
+  }, [autoPlay, liveEdgeClamped, liveMode]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -732,7 +814,7 @@ export function CinemaPlayer({
               controlsDisabled ? "opacity-70" : ""
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-[11px] text-white/70">
                 {formatTime(currentTime)}
               </span>
@@ -754,6 +836,14 @@ export function CinemaPlayer({
                     }}
                   />
                 </div>
+                {liveEdgePercent !== null && (
+                  <span
+                    className="absolute top-1/2 z-30 h-3 w-3 -translate-y-1/2 -translate-x-1/2 rounded-full border border-red-400/60 bg-red-500 shadow-[0_0_10px_rgba(248,113,113,0.65)]"
+                    style={{
+                      left: `${liveEdgePercent}%`,
+                    }}
+                  />
+                )}
                 <span
                   className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_0_2px_rgba(15,23,42,0.7),0_0_8px_rgba(255,107,107,0.5)] transition-opacity ${
                     showKnob ? "opacity-100" : "opacity-0"
@@ -766,16 +856,35 @@ export function CinemaPlayer({
                 <input
                   type="range"
                   min={0}
-                  max={Math.max(duration, 0.1)}
+                  max={Math.max(effectiveDuration, 0.1)}
                   step="0.1"
-                  value={Math.min(currentTime, duration || 0)}
+                  value={Math.min(currentTime, effectiveDuration || 0)}
                   onChange={(e) => handleProgressChange(Number(e.target.value))}
                   className="absolute inset-0 h-6 w-full cursor-pointer appearance-none bg-transparent opacity-0"
                 />
               </div>
-              <span className="text-[11px] text-white/70">
-                {formatTime(duration)}
-              </span>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/70">
+                {!liveMode && <span>{formatTime(duration)}</span>}
+                {liveMode && (
+                  <button
+                    type="button"
+                    onClick={liveClickable ? handleGoLive : undefined}
+                    title={liveClickable ? "Về trực tiếp" : undefined}
+                    className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                      isAtLiveEdge
+                        ? "border-red-400/60 bg-red-500/20 text-red-200"
+                        : "border-white/15 bg-white/10 text-white/70"
+                    } ${liveClickable ? "cursor-pointer hover:border-red-400/70 hover:text-red-100" : "cursor-default"}`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        isAtLiveEdge ? "bg-red-400" : "bg-white/40"
+                      }`}
+                    />
+                    LIVE
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
