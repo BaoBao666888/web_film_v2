@@ -377,7 +377,15 @@ export const api = {
       }),
   },
   notifications: {
-    list: () => apiFetch<InboxResponse>(`/notifications`),
+    list: (params: { page?: number; limit?: number } = {}) => {
+      const search = new URLSearchParams();
+      if (params.page) search.set("page", String(params.page));
+      if (params.limit) search.set("limit", String(params.limit));
+      const qs = search.toString();
+      return apiFetch<InboxResponse>(
+        `/notifications${qs ? `?${qs}` : ""}`
+      );
+    },
     unreadCount: () =>
       apiFetch<InboxUnreadCountResponse>(`/notifications/unread-count`),
     markRead: () =>

@@ -10,12 +10,31 @@ const sanitizeText = (value, maxLength) => {
 };
 
 class NotificationService {
-  async listForUser(userId, { limit = 50 } = {}) {
-    const normalizedLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
-    return Notification.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(normalizedLimit)
-      .lean();
+  async listForUser(userId, { page = 1, limit = 20 } = {}) {
+    const sanitizedPage = Math.max(Number(page) || 1, 1);
+    const sanitizedLimit = Math.min(Math.max(Number(limit) || 20, 1), 200);
+    const skip = (sanitizedPage - 1) * sanitizedLimit;
+
+    const [items, totalItems] = await Promise.all([
+      Notification.find({ userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(sanitizedLimit)
+        .lean(),
+      Notification.countDocuments({ userId }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page: sanitizedPage,
+        limit: sanitizedLimit,
+        totalItems,
+        totalPages: sanitizedLimit
+          ? Math.max(1, Math.ceil(totalItems / sanitizedLimit))
+          : 1,
+      },
+    };
   }
 
   async getUnreadCount(userId) {

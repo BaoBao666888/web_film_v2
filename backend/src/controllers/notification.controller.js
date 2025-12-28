@@ -7,9 +7,12 @@ class NotificationController {
       if (!userId) {
         return res.status(401).json({ message: "Bạn chưa đăng nhập" });
       }
-      const { limit } = req.query;
-      const items = await notificationService.listForUser(userId, { limit });
-      res.json({ items });
+      const { limit, page } = req.query;
+      const result = await notificationService.listForUser(userId, {
+        limit,
+        page,
+      });
+      res.json(result);
     } catch (error) {
       console.error("Error listing notifications:", error);
       res.status(500).json({ message: "Lỗi khi lấy hộp thư" });

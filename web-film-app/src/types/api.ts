@@ -299,6 +299,7 @@ export interface InboxMessage {
 
 export interface InboxResponse {
   items: InboxMessage[];
+  meta: PaginatedMeta;
 }
 
 export interface InboxUnreadCountResponse {
