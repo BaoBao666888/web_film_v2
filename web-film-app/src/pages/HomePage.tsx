@@ -376,7 +376,7 @@ export function HomePage() {
               Phim đang công chiếu
             </p>
             <h3 className="mt-1 text-2xl font-semibold text-white">
-              Trực tiếp như Youtube Premiere
+              Trực tiếp
             </h3>
             <p className="text-sm text-slate-400">
               Cùng xem đồng thời và chat realtime ngay trên khung công chiếu.
